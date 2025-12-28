@@ -1,7 +1,8 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { getAuth } from '@clerk/fastify';
 import { prisma } from './prisma.js';
-import type { User } from '@prisma/client';
+// User type from Prisma - using any for now due to build compatibility
+type User = Record<string, unknown>;
 
 // Extend FastifyRequest to include our user
 declare module 'fastify' {

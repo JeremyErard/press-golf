@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import Stripe from "stripe";
-import { prisma } from "../lib/prisma";
-import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
+import { prisma } from "../lib/prisma.js";
+import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe.js";
 
 export default async function webhookRoutes(fastify: FastifyInstance) {
   // Skip if Stripe not configured
@@ -124,7 +124,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       subscriptionStatus: status,
       subscriptionEndsAt: subscription.cancel_at
         ? new Date(subscription.cancel_at * 1000)
-        : new Date(subscription.current_period_end * 1000),
+        : new Date((subscription as unknown as { current_period_end: number }).current_period_end * 1000),
     },
   });
 }

@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
-import { prisma } from "../lib/prisma";
-import { requireAuth, getUser } from "../lib/auth";
+import { prisma } from "../lib/prisma.js";
+import { requireAuth, getUser } from "../lib/auth.js";
 
 const createInviteSchema = z.object({
   roundId: z.string().optional(),
@@ -159,7 +159,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
                 id: invite.round.id,
                 date: invite.round.date,
                 course: invite.round.course,
-                games: invite.round.games.map((g) => ({
+                games: invite.round.games.map((g: { type: string; betAmount: unknown }) => ({
                   type: g.type,
                   betAmount: Number(g.betAmount),
                 })),

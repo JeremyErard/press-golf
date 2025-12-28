@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
-import { prisma } from "../lib/prisma";
-import { requireAuth, getUser } from "../lib/auth";
-import { stripe, STRIPE_PRICE_ID, FRONTEND_URL } from "../lib/stripe";
+import { prisma } from "../lib/prisma.js";
+import { requireAuth, getUser } from "../lib/auth.js";
+import { stripe, STRIPE_PRICE_ID, FRONTEND_URL } from "../lib/stripe.js";
 
 export default async function billingRoutes(fastify: FastifyInstance) {
   // Check if Stripe is configured
