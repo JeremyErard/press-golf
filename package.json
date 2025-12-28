@@ -1,0 +1,26 @@
+{
+  "name": "press",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w apps/api",
+    "dev:mobile": "npm run start -w apps/mobile",
+    "build:api": "npm run build -w apps/api",
+    "db:migrate": "npm run migrate:dev -w apps/api",
+    "db:push": "npm run db:push -w apps/api",
+    "db:studio": "npm run studio -w apps/api",
+    "db:seed": "npm run seed -w apps/api",
+    "typecheck": "npm run typecheck -w apps/api && npm run typecheck -w apps/mobile",
+    "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "pino-pretty": "^13.1.3"
+  }
+}

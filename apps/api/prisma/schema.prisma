@@ -1,0 +1,477 @@
+// Press Golf App - Prisma Schema
+// Phase 1: User and PaymentMethod models
+// Phase 2: Course, Tee, Hole models
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ===================
+// USERS & AUTH
+// ===================
+
+model User {
+  id            String   @id @default(cuid())
+  clerkId       String   @unique
+  email         String   @unique
+  firstName     String?
+  lastName      String?
+  displayName   String?
+  avatarUrl     String?
+  phone         String?
+
+  // Golf-specific
+  ghinNumber    String?
+  handicapIndex Decimal? @db.Decimal(3, 1)
+
+  // Stripe Subscription
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?
+  subscriptionStatus   SubscriptionStatus @default(FREE)
+  subscriptionEndsAt   DateTime?
+  isFoundingMember     Boolean            @default(false)
+
+  // Invites
+  invitedByCode String? // Invite code they used to sign up
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  paymentMethods       PaymentMethod[]
+  coursesCreated       Course[]
+  roundsCreated        Round[]        @relation("RoundsCreated")
+  roundPlayers         RoundPlayer[]
+  settlementsOwed      Settlement[]   @relation("SettlementsOwed")
+  settlementsReceiving Settlement[]   @relation("SettlementsReceiving")
+  invitesSent          Invite[]       @relation("InvitesSent")
+  buddies              Buddy[]        @relation("UserBuddies")
+  buddyOf              Buddy[]        @relation("BuddyOf")
+
+  @@index([clerkId])
+  @@index([email])
+  @@index([stripeCustomerId])
+}
+
+// ===================
+// BUDDIES (Golf Friends Network)
+// ===================
+
+model Buddy {
+  id            String   @id @default(cuid())
+  userId        String   // The user who "owns" this buddy relationship
+  buddyUserId   String   // The buddy (another user)
+  nickname      String?  // Optional nickname for this buddy
+  createdAt     DateTime @default(now())
+
+  // How they became buddies
+  sourceType    BuddySourceType @default(INVITE)
+  sourceInviteId String?        // The invite that created this relationship
+
+  user      User    @relation("UserBuddies", fields: [userId], references: [id], onDelete: Cascade)
+  buddyUser User    @relation("BuddyOf", fields: [buddyUserId], references: [id], onDelete: Cascade)
+  sourceInvite Invite? @relation(fields: [sourceInviteId], references: [id])
+
+  @@unique([userId, buddyUserId]) // Can only be buddies once
+  @@index([userId])
+  @@index([buddyUserId])
+}
+
+enum BuddySourceType {
+  INVITE      // Added via invite
+  ROUND       // Played in same round
+  MANUAL      // Manually added
+}
+
+enum SubscriptionStatus {
+  FREE      // Not subscribed
+  ACTIVE    // Paying subscriber
+  PAST_DUE  // Payment failed, grace period
+  CANCELED  // Canceled but not expired
+  FOUNDING  // Free forever (founding members)
+}
+
+model PaymentMethod {
+  id          String            @id @default(cuid())
+  userId      String
+  type        PaymentMethodType
+  handle      String
+  isPreferred Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId])
+}
+
+enum PaymentMethodType {
+  VENMO
+  ZELLE
+  CASHAPP
+  APPLE_PAY
+}
+
+// ===================
+// COURSES
+// ===================
+
+model Course {
+  id          String   @id @default(cuid())
+  name        String
+  city        String?
+  state       String?
+  country     String   @default("USA")
+  logoUrl     String?
+  website     String?
+  isVerified  Boolean  @default(false)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy User?  @relation(fields: [createdById], references: [id])
+  tees      Tee[]
+  holes     Hole[]
+  rounds    Round[]
+
+  @@index([name])
+  @@index([state])
+}
+
+model Tee {
+  id           String   @id @default(cuid())
+  courseId     String
+  name         String   // "Blue", "White", "Gold", "Red"
+  color        String?  // Hex color for display
+  slopeRating  Int?
+  courseRating Decimal? @db.Decimal(4, 1)
+  totalYardage Int?
+
+  course       Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  holeYardages HoleYardage[]
+  rounds       Round[]
+
+  @@unique([courseId, name])
+  @@index([courseId])
+}
+
+model Hole {
+  id           String @id @default(cuid())
+  courseId     String
+  holeNumber   Int    // 1-18
+  par          Int    // 3, 4, or 5
+  handicapRank Int    // 1-18 for stroke allocation
+
+  course   Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  yardages HoleYardage[]
+
+  @@unique([courseId, holeNumber])
+  @@index([courseId])
+}
+
+model HoleYardage {
+  id      String @id @default(cuid())
+  holeId  String
+  teeId   String
+  yardage Int
+
+  hole Hole @relation(fields: [holeId], references: [id], onDelete: Cascade)
+  tee  Tee  @relation(fields: [teeId], references: [id], onDelete: Cascade)
+
+  @@unique([holeId, teeId])
+}
+
+// ===================
+// ROUNDS & SCORING (Phase 3)
+// ===================
+
+model Round {
+  id          String      @id @default(cuid())
+  courseId    String
+  teeId       String
+  date        DateTime    @default(now())
+  status      RoundStatus @default(SETUP)
+  inviteCode  String      @unique @default(cuid())
+  createdById String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  course      Course        @relation(fields: [courseId], references: [id])
+  tee         Tee           @relation(fields: [teeId], references: [id])
+  createdBy   User          @relation("RoundsCreated", fields: [createdById], references: [id])
+  players     RoundPlayer[]
+  games       Game[]
+  settlements Settlement[]
+  invites     Invite[]
+
+  @@index([courseId])
+  @@index([createdById])
+  @@index([inviteCode])
+  @@index([status])
+}
+
+enum RoundStatus {
+  SETUP      // Setting up, waiting for players
+  ACTIVE     // Round in progress
+  COMPLETED  // Round finished
+}
+
+model RoundPlayer {
+  id             String  @id @default(cuid())
+  roundId        String
+  userId         String
+  courseHandicap Int?    // Calculated from handicapIndex and tee slope
+  position       Int     @default(0) // Player order (1st, 2nd, etc.)
+
+  round        Round        @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
+  scores       HoleScore[]
+  gameResults  GameResult[]
+  pressResults PressResult[]
+
+  @@unique([roundId, userId])
+  @@index([roundId])
+  @@index([userId])
+}
+
+model HoleScore {
+  id            String @id @default(cuid())
+  roundPlayerId String
+  holeNumber    Int    // 1-18
+  strokes       Int?   // null = not yet scored
+  putts         Int?   // optional tracking
+
+  roundPlayer RoundPlayer @relation(fields: [roundPlayerId], references: [id], onDelete: Cascade)
+
+  @@unique([roundPlayerId, holeNumber])
+  @@index([roundPlayerId])
+}
+
+// ===================
+// GAMES & BETTING (Phase 4)
+// ===================
+
+model Game {
+  id          String   @id @default(cuid())
+  roundId     String
+  type        GameType
+  betAmount   Decimal  @db.Decimal(10, 2) // Per-unit bet amount
+  isAutoPress Boolean  @default(false)    // Auto-press when 2 down
+  createdAt   DateTime @default(now())
+
+  round              Round                 @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  results            GameResult[]
+  wolfDecisions      WolfDecision[]
+  vegasTeams         VegasTeam[]
+  bingoBangoPoints   BingoBangoBongoPoint[]
+  bankerDecisions    BankerDecision[]
+  presses            Press[]
+
+  @@unique([roundId, type]) // One game type per round
+  @@index([roundId])
+}
+
+enum GameType {
+  NASSAU            // Front 9, Back 9, Overall (3 bets)
+  SKINS             // Each hole is a skin
+  MATCH_PLAY        // Simple head-to-head
+  WOLF              // Rotating captain picks partner or goes lone
+  NINES             // 9 points per hole split among players
+  STABLEFORD        // Points-based: 0=double+, 1=bogey, 2=par, 3=birdie, 4=eagle
+  BINGO_BANGO_BONGO // 3 points/hole: first on, closest when all on, first in
+  VEGAS             // Teams of 2, combine scores as number (4+5=45)
+  SNAKE             // Last player to 3-putt holds snake, pays at end
+  BANKER            // One player banks against all others each hole
+}
+
+model GameResult {
+  id            String   @id @default(cuid())
+  gameId        String
+  roundPlayerId String
+  segment       String?  // "front", "back", "overall" for Nassau; hole number for Skins
+  netAmount     Decimal  @db.Decimal(10, 2) // Positive = won, Negative = lost
+
+  game        Game        @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  roundPlayer RoundPlayer @relation(fields: [roundPlayerId], references: [id], onDelete: Cascade)
+
+  @@index([gameId])
+  @@index([roundPlayerId])
+}
+
+// Wolf game decisions per hole
+model WolfDecision {
+  id          String  @id @default(cuid())
+  gameId      String
+  holeNumber  Int
+  wolfUserId  String  // Who is the wolf this hole
+  partnerUserId String? // Who wolf picked (null = Lone Wolf)
+  isLoneWolf  Boolean @default(false)
+  isBlind     Boolean @default(false) // Blind wolf (decided before seeing shots)
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, holeNumber])
+  @@index([gameId])
+}
+
+// Vegas team pairings (2v2)
+model VegasTeam {
+  id        String @id @default(cuid())
+  gameId    String
+  teamNumber Int   // 1 or 2
+  player1Id String
+  player2Id String
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, teamNumber])
+  @@index([gameId])
+}
+
+// Bingo Bango Bongo points per hole
+model BingoBangoBongoPoint {
+  id         String @id @default(cuid())
+  gameId     String
+  holeNumber Int
+  bingoUserId String? // First player on green
+  bangoUserId String? // Closest to pin when all on green
+  bongoUserId String? // First player to hole out
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, holeNumber])
+  @@index([gameId])
+}
+
+// Banker rotation (who banks each hole)
+model BankerDecision {
+  id         String @id @default(cuid())
+  gameId     String
+  holeNumber Int
+  bankerUserId String // Who is banking this hole
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, holeNumber])
+  @@index([gameId])
+}
+
+// ===================
+// PRESSES (Nassau/Match Play Side Bets)
+// ===================
+
+// Press: When 2-down, start a new side bet from current hole
+model Press {
+  id              String      @id @default(cuid())
+  gameId          String
+  segment         PressSegment // front, back, or overall (for Nassau) or match (for Match Play)
+  startHole       Int         // Hole number where press began (1-18)
+  initiatedById   String      // User who pressed
+  status          PressStatus @default(ACTIVE)
+  parentPressId   String?     // If this is a press-the-press, reference parent
+  betMultiplier   Decimal     @default(1) @db.Decimal(3, 1) // 1x, 2x for double press
+  createdAt       DateTime    @default(now())
+
+  game        Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  parentPress Press?   @relation("PressChain", fields: [parentPressId], references: [id])
+  childPresses Press[] @relation("PressChain")
+  results     PressResult[]
+
+  @@index([gameId])
+  @@index([parentPressId])
+}
+
+enum PressSegment {
+  FRONT    // Front 9 (holes 1-9)
+  BACK     // Back 9 (holes 10-18)
+  OVERALL  // Full 18 match
+  MATCH    // Simple match play (non-Nassau)
+}
+
+enum PressStatus {
+  ACTIVE     // Press is ongoing
+  WON        // Press initiator won
+  LOST       // Press initiator lost
+  PUSHED     // Tied
+  CANCELED   // Manually canceled
+}
+
+// Press results per player (calculated at round end)
+model PressResult {
+  id            String   @id @default(cuid())
+  pressId       String
+  roundPlayerId String
+  netAmount     Decimal  @db.Decimal(10, 2) // Positive = won, Negative = lost
+
+  press       Press       @relation(fields: [pressId], references: [id], onDelete: Cascade)
+  roundPlayer RoundPlayer @relation(fields: [roundPlayerId], references: [id], onDelete: Cascade)
+
+  @@index([pressId])
+  @@index([roundPlayerId])
+}
+
+// ===================
+// SETTLEMENTS (Phase 5)
+// ===================
+
+model Settlement {
+  id          String           @id @default(cuid())
+  roundId     String
+  fromUserId  String
+  toUserId    String
+  amount      Decimal          @db.Decimal(10, 2)
+  status      SettlementStatus @default(PENDING)
+  paidAt      DateTime?
+  createdAt   DateTime         @default(now())
+
+  round    Round @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  fromUser User  @relation("SettlementsOwed", fields: [fromUserId], references: [id])
+  toUser   User  @relation("SettlementsReceiving", fields: [toUserId], references: [id])
+
+  @@index([roundId])
+  @@index([fromUserId])
+  @@index([toUserId])
+}
+
+enum SettlementStatus {
+  PENDING
+  PAID
+  DISPUTED
+}
+
+// ===================
+// INVITES (Phase 6 - PWA Viral Growth)
+// ===================
+
+model Invite {
+  id           String       @id @default(cuid())
+  code         String       @unique @default(cuid())
+  roundId      String?      // Optional: invite to specific round
+  inviterId    String
+  inviteeEmail String?
+  inviteePhone String?
+  status       InviteStatus @default(PENDING)
+  createdAt    DateTime     @default(now())
+  usedAt       DateTime?
+  usedById     String?      // User ID who accepted
+
+  inviter User   @relation("InvitesSent", fields: [inviterId], references: [id])
+  round   Round? @relation(fields: [roundId], references: [id])
+  buddiesCreated Buddy[] // Buddy relationships created from this invite
+
+  @@index([code])
+  @@index([inviterId])
+  @@index([roundId])
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}

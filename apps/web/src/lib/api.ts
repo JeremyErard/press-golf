@@ -1,0 +1,480 @@
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
+async function request<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const url = `${API_URL}${endpoint}`;
+
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
+
+  const json: ApiResponse<T> = await response.json();
+
+  if (!response.ok || !json.success) {
+    const error = json.error || { code: "UNKNOWN", message: "An error occurred" };
+    throw new ApiError(error.code, error.message, response.status);
+  }
+
+  return json.data as T;
+}
+
+export class ApiError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public status: number
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+// Auth-aware fetch that includes Clerk token
+export async function apiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  token?: string | null
+): Promise<T> {
+  const headers: HeadersInit = {
+    ...options.headers,
+  };
+
+  if (token) {
+    (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
+  }
+
+  return request<T>(endpoint, { ...options, headers });
+}
+
+// API Client with typed methods
+export const api = {
+  // User
+  getMe: (token: string) => apiRequest<User>("/users/me", {}, token),
+  updateMe: (token: string, data: Partial<User>) =>
+    apiRequest<User>("/users/me", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }, token),
+
+  // Rounds
+  getRounds: (token: string) => apiRequest<Round[]>("/rounds", {}, token),
+  getRound: (token: string, id: string) =>
+    apiRequest<RoundDetail>(`/rounds/${id}`, {}, token),
+  createRound: (token: string, data: CreateRoundInput) =>
+    apiRequest<Round>("/rounds", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }, token),
+  joinRound: (token: string, inviteCode: string) =>
+    apiRequest<Round>(`/rounds/join/${inviteCode}`, {
+      method: "POST",
+    }, token),
+  updateRoundStatus: (token: string, id: string, status: "ACTIVE" | "COMPLETED") =>
+    apiRequest<RoundDetail>(`/rounds/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }, token),
+
+  // Courses
+  getCourses: (token: string) => apiRequest<Course[]>("/courses", {}, token),
+  getCourse: (token: string, id: string) =>
+    apiRequest<CourseDetail>(`/courses/${id}`, {}, token),
+  createCourse: (token: string, data: CreateCourseInput) =>
+    apiRequest<Course>("/courses", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }, token),
+  fetchCourseFromUrl: (token: string, url: string) =>
+    apiRequest<ScrapedCourseData>("/courses/fetch-from-url", {
+      method: "POST",
+      body: JSON.stringify({ url }),
+    }, token),
+
+  // Games
+  addGame: (token: string, roundId: string, data: AddGameInput) =>
+    apiRequest<Game>(`/games/${roundId}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }, token),
+  calculateResults: (token: string, roundId: string) =>
+    apiRequest<GameResult[]>(`/games/${roundId}/calculate`, {
+      method: "POST",
+    }, token),
+
+  // Scores
+  updateScore: (token: string, roundId: string, data: UpdateScoreInput) =>
+    apiRequest<HoleScore>(`/rounds/${roundId}/scores`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }, token),
+
+  // Billing
+  createCheckoutSession: (token: string) =>
+    apiRequest<{ url: string }>("/billing/checkout", {
+      method: "POST",
+    }, token),
+  createPortalSession: (token: string) =>
+    apiRequest<{ url: string }>("/billing/portal", {
+      method: "POST",
+    }, token),
+  getBillingStatus: (token: string) =>
+    apiRequest<BillingStatus>("/billing/status", {}, token),
+
+  // Invites
+  createInvite: (token: string, data: CreateInviteInput) =>
+    apiRequest<Invite>("/invites", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }, token),
+  getInvite: (code: string) =>
+    apiRequest<InviteDetails>(`/invites/${code}`, {}), // No auth - public
+  acceptInvite: (token: string, code: string) =>
+    apiRequest<Round>(`/invites/${code}/accept`, {
+      method: "POST",
+    }, token),
+
+  // Press
+  createPress: (token: string, gameId: string, data: CreatePressInput) =>
+    apiRequest<Press>(`/games/${gameId}/press`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }, token),
+  getPresses: (token: string, gameId: string) =>
+    apiRequest<Press[]>(`/games/${gameId}/presses`, {}, token),
+  cancelPress: (token: string, pressId: string) =>
+    apiRequest<Press>(`/games/press/${pressId}`, {
+      method: "DELETE",
+    }, token),
+  getPressStatus: (token: string, roundId: string) =>
+    apiRequest<PressStatus[]>(`/games/${roundId}/press-status`, {}, token),
+
+  // Buddies
+  getBuddies: (token: string) =>
+    apiRequest<Buddy[]>("/buddies", {}, token),
+  addBuddy: (token: string, buddyUserId: string, nickname?: string) =>
+    apiRequest<Buddy>("/buddies", {
+      method: "POST",
+      body: JSON.stringify({ buddyUserId, nickname }),
+    }, token),
+  removeBuddy: (token: string, buddyId: string) =>
+    apiRequest<{ deleted: boolean }>(`/buddies/${buddyId}`, {
+      method: "DELETE",
+    }, token),
+  addBuddyToRound: (token: string, roundId: string, buddyUserId: string) =>
+    apiRequest<RoundPlayer>(`/rounds/${roundId}/add-buddy/${buddyUserId}`, {
+      method: "POST",
+    }, token),
+  addBuddiesFromRound: (token: string, roundId: string) =>
+    apiRequest<{ added: number; message: string }>(`/buddies/from-round/${roundId}`, {
+      method: "POST",
+    }, token),
+};
+
+// Types
+export interface User {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
+  avatarUrl?: string;
+  phone?: string;
+  ghinNumber?: string;
+  handicapIndex?: number;
+  stripeCustomerId?: string;
+  subscriptionStatus: "FREE" | "ACTIVE" | "PAST_DUE" | "CANCELED" | "FOUNDING";
+  isFoundingMember: boolean;
+}
+
+export interface Round {
+  id: string;
+  courseId: string;
+  teeId: string;
+  date: string;
+  status: "SETUP" | "ACTIVE" | "COMPLETED";
+  inviteCode: string;
+  createdById: string;
+  _count?: {
+    players: number;
+  };
+}
+
+export interface RoundDetail extends Round {
+  course: Course;
+  tee: Tee;
+  players: RoundPlayer[];
+  games: Game[];
+}
+
+export interface RoundPlayer {
+  id: string;
+  userId: string;
+  courseHandicap?: number;
+  position: number;
+  user: User;
+  scores?: HoleScore[];
+}
+
+export interface Course {
+  id: string;
+  name: string;
+  city?: string;
+  state?: string;
+  country: string;
+  logoUrl?: string;
+  website?: string;
+  isVerified: boolean;
+}
+
+export interface CourseDetail extends Course {
+  tees: Tee[];
+  holes: Hole[];
+}
+
+export interface Tee {
+  id: string;
+  courseId: string;
+  name: string;
+  color?: string;
+  slopeRating?: number;
+  courseRating?: number;
+  totalYardage?: number;
+}
+
+export interface Hole {
+  id: string;
+  courseId: string;
+  holeNumber: number;
+  par: number;
+  handicapRank: number;
+}
+
+export interface HoleScore {
+  id: string;
+  roundPlayerId: string;
+  holeNumber: number;
+  strokes?: number;
+  putts?: number;
+}
+
+export interface Game {
+  id: string;
+  roundId: string;
+  type: GameType;
+  betAmount: number;
+  isAutoPress: boolean;
+}
+
+export type GameType =
+  | "NASSAU"
+  | "SKINS"
+  | "MATCH_PLAY"
+  | "WOLF"
+  | "NINES"
+  | "STABLEFORD"
+  | "BINGO_BANGO_BONGO"
+  | "VEGAS"
+  | "SNAKE"
+  | "BANKER";
+
+export interface GameResult {
+  id: string;
+  gameId: string;
+  roundPlayerId: string;
+  segment?: string;
+  netAmount: number;
+}
+
+export interface BillingStatus {
+  status: "FREE" | "ACTIVE" | "PAST_DUE" | "CANCELED" | "FOUNDING";
+  endsAt?: string;
+  isFoundingMember: boolean;
+}
+
+export interface Invite {
+  id: string;
+  code: string;
+  roundId?: string;
+  inviterId: string;
+  status: "PENDING" | "ACCEPTED" | "EXPIRED";
+}
+
+export interface InviteDetails {
+  code: string;
+  inviter: {
+    displayName: string;
+    avatarUrl?: string;
+  };
+  round?: {
+    id: string;
+    date: string;
+    course: {
+      name: string;
+      city?: string;
+      state?: string;
+    };
+    games: {
+      type: GameType;
+      betAmount: number;
+    }[];
+    playerCount: number;
+  };
+}
+
+export interface CreateRoundInput {
+  courseId: string;
+  teeId: string;
+  date?: string;
+}
+
+export interface CreateCourseInput {
+  name: string;
+  city?: string;
+  state?: string;
+  holes: {
+    holeNumber: number;
+    par: number;
+    handicapRank: number;
+    yardages?: { teeName: string; yardage: number }[];
+  }[];
+  tees: {
+    name: string;
+    color?: string;
+    slopeRating?: number;
+    courseRating?: number;
+    totalYardage?: number;
+  }[];
+}
+
+export interface ScrapedCourseData {
+  name: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  website?: string;
+  tees?: {
+    name: string;
+    color?: string;
+    slopeRating?: number;
+    courseRating?: number;
+    totalYardage?: number;
+  }[];
+  holes?: {
+    holeNumber: number;
+    par: number;
+    handicapRank: number;
+    yardages?: { teeName: string; yardage: number }[];
+  }[];
+}
+
+export interface AddGameInput {
+  type: GameType;
+  betAmount: number;
+  isAutoPress?: boolean;
+}
+
+export interface UpdateScoreInput {
+  holeNumber: number;
+  strokes?: number;
+  putts?: number;
+}
+
+export interface CreateInviteInput {
+  roundId?: string;
+  email?: string;
+  phone?: string;
+}
+
+// Press types
+export type PressSegment = "FRONT" | "BACK" | "OVERALL" | "MATCH";
+export type PressStatusType = "ACTIVE" | "WON" | "LOST" | "PUSHED" | "CANCELED";
+
+export interface Press {
+  id: string;
+  gameId: string;
+  segment: PressSegment;
+  startHole: number;
+  initiatedById: string;
+  status: PressStatusType;
+  parentPressId?: string;
+  betMultiplier: number;
+  createdAt: string;
+  childPresses?: Press[];
+  results?: PressResult[];
+}
+
+export interface PressResult {
+  id: string;
+  pressId: string;
+  roundPlayerId: string;
+  netAmount: number;
+}
+
+export interface CreatePressInput {
+  segment: PressSegment;
+  startHole: number;
+  parentPressId?: string;
+  betMultiplier?: number;
+}
+
+export interface PressStatus {
+  gameId: string;
+  gameType: string;
+  isAutoPress: boolean;
+  segments: PressSegmentStatus[];
+}
+
+export interface PressSegmentStatus {
+  segment: string;
+  currentScore: number;
+  holesPlayed: number;
+  holesRemaining: number;
+  canPress: boolean;
+  activePresses: ActivePressStatus[];
+  suggestAutoPress: boolean;
+  autoPressHole: number | null;
+}
+
+export interface ActivePressStatus {
+  id: string;
+  startHole: number;
+  currentScore: number;
+  holesPlayed: number;
+  holesRemaining: number;
+  canPressThePress: boolean;
+}
+
+// Buddy types
+export interface Buddy {
+  id: string;
+  displayName: string;
+  nickname?: string;
+  user: {
+    id: string;
+    displayName?: string;
+    firstName?: string;
+    lastName?: string;
+    avatarUrl?: string;
+    handicapIndex?: number;
+  };
+  sourceType: "INVITE" | "ROUND" | "MANUAL";
+  createdAt: string;
+}
