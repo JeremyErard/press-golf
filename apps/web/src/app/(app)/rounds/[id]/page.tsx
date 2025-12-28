@@ -91,7 +91,7 @@ const ALL_GAME_TYPES: GameType[] = [
 
 export default function RoundDetailPage() {
   const params = useParams();
-  const router = useRouter();
+  const _router = useRouter();
   const { getToken } = useAuth();
   const roundId = params.id as string;
 
@@ -163,9 +163,9 @@ export default function RoundDetailPage() {
           title: "Join my golf round",
           text: shareText,
         });
-      } catch (err) {
+      } catch (_err) {
         // User cancelled or error - try clipboard fallback
-        if ((err as Error).name !== 'AbortError') {
+        if ((_err as Error).name !== 'AbortError') {
           await navigator.clipboard.writeText(shareText);
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
@@ -270,7 +270,7 @@ export default function RoundDetailPage() {
           scores: [],
         }],
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to add buddy to round:", error);
       // Could show a toast here for ALREADY_IN_ROUND error
     } finally {
@@ -291,7 +291,7 @@ export default function RoundDetailPage() {
           text: shareText,
           url: inviteUrl,
         });
-      } catch (err) {
+      } catch (_err) {
         // User cancelled
       }
     } else {
@@ -749,14 +749,14 @@ export default function RoundDetailPage() {
                 <Users className="h-12 w-12 mx-auto text-muted mb-3" />
                 <p className="text-body font-medium">No buddies yet</p>
                 <p className="text-caption text-muted mt-1">
-                  Invite friends to your rounds and they'll be added to your buddy list
+                  Invite friends to your rounds and they will be added to your buddy list
                 </p>
               </div>
             )}
 
             {/* Tip */}
             <p className="text-caption text-muted text-center">
-              When someone accepts your invite, they're automatically added as a buddy for quick invites next time
+              When someone accepts your invite, they are automatically added as a buddy for quick invites next time
             </p>
           </div>
         </SheetContent>

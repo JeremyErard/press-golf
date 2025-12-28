@@ -6,7 +6,7 @@ import { useAuth } from "@clerk/nextjs";
 import { Plus, Trash2, Check, Link as LinkIcon, Loader2, AlertCircle, Sparkles } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Input, Badge } from "@/components/ui";
-import { api, type ScrapedCourseData } from "@/lib/api";
+import { api } from "@/lib/api";
 
 interface HoleData {
   holeNumber: number;
@@ -54,7 +54,7 @@ export default function AddCoursePage() {
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
-  const [website, setWebsite] = useState("");
+  const [_website, setWebsite] = useState("");
 
   // Holes
   const [holes, setHoles] = useState<HoleData[]>(defaultHoles);
@@ -107,8 +107,8 @@ export default function AddCoursePage() {
 
       // Move to review step to show scraped data
       setStep("review");
-    } catch (error: any) {
-      setFetchError(error.message || "Failed to fetch course data");
+    } catch (error) {
+      setFetchError(String(error) || "Failed to fetch course data");
     } finally {
       setIsFetching(false);
     }
@@ -198,7 +198,7 @@ export default function AddCoursePage() {
                   <div className="flex-1">
                     <p className="text-body font-semibold">Import from URL</p>
                     <p className="text-caption text-muted">
-                      Paste a course website link and we'll extract the data automatically
+                      Paste a course website link and we will extract the data automatically
                     </p>
                   </div>
                 </div>
@@ -251,7 +251,7 @@ export default function AddCoursePage() {
                 </div>
 
                 <p className="text-caption text-muted">
-                  Paste the URL of the golf course's website. We'll try to find the scorecard and extract course data automatically.
+                  Paste the URL of the golf course's website. We will try to find the scorecard and extract course data automatically.
                 </p>
 
                 {fetchError && (

@@ -4,12 +4,10 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import {
   User,
-  Phone,
   CreditCard,
   LogOut,
   ChevronRight,
   Crown,
-  Mail
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, Avatar, Button, Badge } from "@/components/ui";
@@ -32,7 +30,7 @@ export default function ProfilePage() {
   };
 
   // Mock subscription status - will come from API
-  const subscriptionStatus = "FOUNDING" as const;
+  const _subscriptionStatus = "FOUNDING" as const;
   const isFoundingMember = true;
 
   return (

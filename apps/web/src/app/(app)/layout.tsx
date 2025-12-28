@@ -10,7 +10,7 @@ export default function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded } = useAuth();
 
   useEffect(() => {
     // Register service worker and set up PWA

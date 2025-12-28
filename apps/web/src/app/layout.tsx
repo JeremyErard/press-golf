@@ -50,6 +50,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // @ts-expect-error Clerk + Next.js 14 async component type mismatch
     <ClerkProvider>
       <html lang="en" className="dark">
         <head>

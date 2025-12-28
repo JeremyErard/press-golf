@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { Plus, ChevronRight } from "lucide-react";
-import { Button, Card, CardContent, Badge, Tabs, TabsList, TabsTrigger, TabsContent, Skeleton } from "@/components/ui";
+import { Button, Card, CardContent, Badge, Tabs, TabsList, TabsTrigger, Skeleton } from "@/components/ui";
 import { Header } from "@/components/layout/header";
 import { api, type Round } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
@@ -75,7 +75,7 @@ export default function RoundsPage() {
             
             
           >
-            {filteredRounds.map((round, index) => (
+            {filteredRounds.map((round, _index) => (
               <div
                 key={round.id}
                 

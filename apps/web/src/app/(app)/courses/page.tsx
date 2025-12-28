@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { Plus, Search, MapPin, ChevronRight, Check } from "lucide-react";
-import { Button, Card, CardContent, Input, Badge, Skeleton } from "@/components/ui";
+import { Button, Card, CardContent, Skeleton } from "@/components/ui";
 import { Header } from "@/components/layout/header";
 import { api, type Course } from "@/lib/api";
 
@@ -70,7 +70,7 @@ export default function CoursesPage() {
             
             
           >
-            {filteredCourses.map((course, index) => (
+            {filteredCourses.map((course, _index) => (
               <div
                 key={course.id}
                 

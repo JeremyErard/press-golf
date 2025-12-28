@@ -56,7 +56,7 @@ export default function SettlementPage() {
   const roundId = params.id as string;
 
   const [round, setRound] = useState<RoundDetail | null>(null);
-  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [settlements, _setSettlements] = useState<Settlement[]>([]);
   const [gameResults, setGameResults] = useState<Record<string, GameResult[]>>({});
   const [isLoading, setIsLoading] = useState(true);
 
@@ -111,7 +111,7 @@ export default function SettlementPage() {
 
   const netPosition = calculateNetPosition();
 
-  const getPaymentLink = (type: string, handle: string, amount: number) => {
+  const _getPaymentLink = (type: string, handle: string, amount: number) => {
     const amountStr = Math.abs(amount).toFixed(2);
     switch (type) {
       case "VENMO":

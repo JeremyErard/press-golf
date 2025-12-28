@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
 import { Minus, Plus, Check, AlertCircle, TrendingUp, TrendingDown, Minus as TiedIcon } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 export default function ScorecardPage() {
   const params = useParams();
   const { getToken } = useAuth();
-  const { user } = useUser();
+  // Removed unused useUser
   const roundId = params.id as string;
 
   const [round, setRound] = useState<RoundDetail | null>(null);
@@ -369,7 +369,7 @@ export default function ScorecardPage() {
                         {segment.canPress && (
                           <Button
                             size="sm"
-                            variant="brand"
+                            variant="default"
                             onClick={() => handlePress(
                               game.gameId,
                               segment.segment as PressSegment,

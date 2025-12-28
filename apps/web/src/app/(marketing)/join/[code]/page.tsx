@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { Flag, Users, DollarSign, Calendar, Share, Check } from "lucide-react";
+import { Flag, Users, Calendar } from "lucide-react";
 import { Button, Card, CardContent, Avatar, Badge, Skeleton } from "@/components/ui";
 import { api, type InviteDetails, type GameType } from "@/lib/api";
-import { formatDate, isStandalone, isIOS, isAndroid } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { getInstallInstructions, showInstallPrompt } from "@/lib/pwa";
 
 const gameTypeLabels: Record<GameType, string> = {
@@ -42,7 +42,7 @@ export default function InviteLandingPage() {
       try {
         const data = await api.getInvite(code);
         setInvite(data);
-      } catch (err) {
+      } catch (_err) {
         setError("This invite link is invalid or has expired.");
       } finally {
         setIsLoading(false);
