@@ -32,7 +32,7 @@ export default async function webhookRoutes(fastify: FastifyInstance) {
         const rawBody = (request as FastifyRequest & { rawBody: Buffer }).rawBody;
         event = stripe.webhooks.constructEvent(rawBody, sig, STRIPE_WEBHOOK_SECRET);
       } catch (err) {
-        fastify.log.error("Webhook signature verification failed:", err);
+        fastify.log.error({ err }, "Webhook signature verification failed");
         return reply.code(400).send({ error: "Invalid signature" });
       }
 
@@ -69,7 +69,7 @@ export default async function webhookRoutes(fastify: FastifyInstance) {
             fastify.log.info(`Unhandled event type: ${event.type}`);
         }
       } catch (err) {
-        fastify.log.error(`Error handling ${event.type}:`, err);
+        fastify.log.error({ err, eventType: event.type }, "Error handling webhook event");
         return reply.code(500).send({ error: "Webhook handler failed" });
       }
 
@@ -124,9 +124,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       subscriptionStatus: status,
       subscriptionEndsAt: subscription.cancel_at
         ? new Date(subscription.cancel_at * 1000)
-        : subscription.current_period_end
-        ? new Date(subscription.current_period_end * 1000)
-        : null,
+        : new Date(subscription.current_period_end * 1000),
     },
   });
 }
