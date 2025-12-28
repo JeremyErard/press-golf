@@ -34,7 +34,7 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
     const rounds = await prisma.round.findMany({
       where: {
         players: {
-          some: { userId: user.id },
+          some: { userId: user.id as string },
         },
       },
       include: {
@@ -109,10 +109,10 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
         courseId,
         teeId,
         date: date ? new Date(date) : new Date(),
-        createdById: user.id,
+        createdById: user.id as string,
         players: {
           create: {
-            userId: user.id,
+            userId: user.id as string,
             courseHandicap,
             position: 1,
           },
@@ -203,7 +203,7 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Check if already joined
-    const existingPlayer = round.players.find(p => p.userId === user.id);
+    const existingPlayer = round.players.find(p => p.userId === (user.id as string));
     if (existingPlayer) {
       return badRequest(reply, 'You have already joined this round');
     }
@@ -225,7 +225,7 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
     await prisma.roundPlayer.create({
       data: {
         roundId: round.id,
-        userId: user.id,
+        userId: user.id as string,
         courseHandicap,
         position: round.players.length + 1,
       },
@@ -300,7 +300,7 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Check if user is in this round
-    const isPlayer = round.players.some(p => p.userId === user.id);
+    const isPlayer = round.players.some(p => p.userId === (user.id as string));
     if (!isPlayer) {
       return forbidden(reply, 'You are not a player in this round');
     }
@@ -336,7 +336,7 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Only creator can change status
-    if (round.createdById !== user.id) {
+    if (round.createdById !== (user.id as string)) {
       return forbidden(reply, 'Only the round creator can change status');
     }
 
@@ -399,7 +399,7 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Verify the requesting user is in this round
-    const requestingPlayer = round.players.find(p => p.userId === user.id);
+    const requestingPlayer = round.players.find(p => p.userId === (user.id as string));
     if (!requestingPlayer) {
       return forbidden(reply, 'You are not a player in this round');
     }
@@ -462,7 +462,7 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
       return notFound(reply, 'Round not found');
     }
 
-    if (round.createdById !== user.id) {
+    if (round.createdById !== (user.id as string)) {
       return forbidden(reply, 'Only the round creator can delete it');
     }
 

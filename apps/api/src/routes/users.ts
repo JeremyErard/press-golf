@@ -31,7 +31,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
     const user = getUser(request);
 
     const fullUser = await prisma.user.findUnique({
-      where: { id: user.id },
+      where: { id: user.id as string },
       include: { paymentMethods: true },
     });
 
@@ -59,7 +59,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
     if (handicapIndex !== undefined) updateData.handicapIndex = handicapIndex;
 
     const updatedUser = await prisma.user.update({
-      where: { id: user.id },
+      where: { id: user.id as string },
       data: updateData,
     });
 
@@ -77,7 +77,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
     const user = getUser(request);
 
     const methods = await prisma.paymentMethod.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id as string },
       orderBy: [
         { isPreferred: 'desc' },
         { createdAt: 'asc' },
@@ -107,7 +107,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
     // If setting as preferred, unset all others first
     if (isPreferred) {
       await prisma.paymentMethod.updateMany({
-        where: { userId: user.id },
+        where: { userId: user.id as string },
         data: { isPreferred: false },
       });
     }
@@ -116,12 +116,12 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
     const method = await prisma.paymentMethod.upsert({
       where: {
         userId_type: {
-          userId: user.id,
+          userId: user.id as string,
           type,
         },
       },
       create: {
-        userId: user.id,
+        userId: user.id as string,
         type,
         handle,
         isPreferred,
@@ -150,7 +150,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
     const method = await prisma.paymentMethod.findFirst({
       where: {
         id,
-        userId: user.id,
+        userId: user.id as string,
       },
     });
 
@@ -180,7 +180,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
     const method = await prisma.paymentMethod.findFirst({
       where: {
         id,
-        userId: user.id,
+        userId: user.id as string,
       },
     });
 
@@ -191,7 +191,7 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
     // Unset all others, set this one
     await prisma.$transaction([
       prisma.paymentMethod.updateMany({
-        where: { userId: user.id },
+        where: { userId: user.id as string },
         data: { isPreferred: false },
       }),
       prisma.paymentMethod.update({
