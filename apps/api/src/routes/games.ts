@@ -57,7 +57,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Verify user is in the round
-    const isPlayer = round.players.some(p => p.userId === user.id);
+    const isPlayer = round.players.some(p => p.userId === (user.id as string));
     if (!isPlayer) {
       return forbidden(reply, 'You must be a player in this round');
     }
@@ -303,7 +303,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       return notFound(reply, 'Round not found');
     }
 
-    if (round.createdById !== user.id) {
+    if (round.createdById !== (user.id as string)) {
       return forbidden(reply, 'Only the round creator can finalize');
     }
 
@@ -620,7 +620,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Either party can mark as paid
-    if (settlement.fromUserId !== user.id && settlement.toUserId !== user.id) {
+    if (settlement.fromUserId !== (user.id as string) && settlement.toUserId !== (user.id as string)) {
       return forbidden(reply, 'You are not part of this settlement');
     }
 
@@ -678,7 +678,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
     const expectedWolf = playerOrder[wolfIndex];
 
     // Verify the user is the wolf for this hole (or is the round creator)
-    if (user.id !== expectedWolf.userId && user.id !== game.round.createdById) {
+    if ((user.id as string) !== expectedWolf.userId && (user.id as string) !== game.round.createdById) {
       return forbidden(reply, 'You are not the wolf for this hole');
     }
 
@@ -840,7 +840,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         gameId,
         segment,
         startHole,
-        initiatedById: user.id,
+        initiatedById: user.id as string,
         parentPressId: parentPressId || null,
         betMultiplier: new Decimal(betMultiplier || 1),
       },
@@ -914,7 +914,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Only the initiator or round creator can cancel
-    if (press.initiatedById !== user.id && press.game.round.createdById !== user.id) {
+    if (press.initiatedById !== (user.id as string) && press.game.round.createdById !== (user.id as string)) {
       return forbidden(reply, 'Only the press initiator or round creator can cancel');
     }
 

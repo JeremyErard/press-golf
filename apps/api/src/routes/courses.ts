@@ -218,7 +218,7 @@ export const courseRoutes: FastifyPluginAsync = async (app) => {
           state: state?.trim() || null,
           country,
           website: website?.trim() || null,
-          createdById: user.id,
+          createdById: user.id as string,
         },
       });
 
@@ -307,7 +307,7 @@ export const courseRoutes: FastifyPluginAsync = async (app) => {
       return notFound(reply, 'Course not found');
     }
 
-    if (course.createdById !== user.id) {
+    if (course.createdById !== (user.id as string)) {
       return forbidden(reply, 'You can only edit courses you created');
     }
 
@@ -353,7 +353,7 @@ export const courseRoutes: FastifyPluginAsync = async (app) => {
       return notFound(reply, 'Course not found');
     }
 
-    if (course.createdById !== user.id) {
+    if (course.createdById !== (user.id as string)) {
       return forbidden(reply, 'You can only delete courses you created');
     }
 
@@ -386,7 +386,7 @@ export const courseRoutes: FastifyPluginAsync = async (app) => {
     if (!course) {
       return notFound(reply, 'Course not found');
     }
-    if (course.createdById !== user.id) {
+    if (course.createdById !== (user.id as string)) {
       return forbidden(reply, 'You can only edit courses you created');
     }
 

@@ -15,7 +15,7 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
       const user = getUser(request);
 
       const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId },
+        where: { clerkId: user.userId as string },
         select: { id: true },
       });
 
@@ -83,7 +83,7 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
       const { buddyUserId, nickname } = request.body as { buddyUserId: string; nickname?: string };
 
       const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId },
+        where: { clerkId: user.userId as string },
         select: { id: true },
       });
 
@@ -174,7 +174,7 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
       const { nickname } = request.body as { nickname?: string };
 
       const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId },
+        where: { clerkId: user.userId as string },
         select: { id: true },
       });
 
@@ -220,7 +220,7 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
       const { id } = request.params;
 
       const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId },
+        where: { clerkId: user.userId as string },
         select: { id: true },
       });
 
@@ -265,7 +265,7 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
       const { roundId } = request.params;
 
       const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId },
+        where: { clerkId: user.userId as string },
         select: { id: true },
       });
 
@@ -338,7 +338,7 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
       const { roundId, buddyUserId } = request.params;
 
       const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId },
+        where: { clerkId: user.userId as string },
         select: { id: true },
       });
 

@@ -20,7 +20,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
 
       // Get the user ID from the database
       const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId },
+        where: { clerkId: user.userId as string },
         select: { id: true },
       });
 
@@ -181,7 +181,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
 
       // Get the user ID from the database
       const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId },
+        where: { clerkId: user.userId as string },
         select: { id: true },
       });
 

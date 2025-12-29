@@ -19,7 +19,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
 
       // Check if user already has an active subscription
       const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId },
+        where: { clerkId: user.userId as string },
         select: {
           id: true,
           email: true,
@@ -104,7 +104,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
       const user = getUser(request);
 
       const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId },
+        where: { clerkId: user.userId as string },
         select: { stripeCustomerId: true, isFoundingMember: true },
       });
 
@@ -143,7 +143,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
       const user = getUser(request);
 
       const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId },
+        where: { clerkId: user.userId as string },
         select: {
           subscriptionStatus: true,
           subscriptionEndsAt: true,
