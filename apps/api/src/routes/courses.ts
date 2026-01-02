@@ -173,7 +173,16 @@ Extract as much data as you can see. If some fields are not visible, omit them b
         });
       }
 
-      const extracted = JSON.parse(jsonMatch[0]);
+      let extracted;
+      try {
+        extracted = JSON.parse(jsonMatch[0]);
+      } catch (parseError) {
+        request.log.error({ parseError, jsonMatch: jsonMatch[0] }, 'Failed to parse JSON from Claude response');
+        return reply.send({
+          success: false,
+          error: 'Failed to parse scorecard data. Please try again or enter details manually.',
+        });
+      }
 
       if (!extracted.found) {
         return reply.send({
@@ -313,6 +322,31 @@ Extract as much data as you can see. If some fields are not visible, omit them b
       return badRequest(reply, 'URL is required');
     }
 
+    // Validate URL format and length
+    const trimmedUrl = url.trim();
+    if (trimmedUrl.length > 2000) {
+      return badRequest(reply, 'URL is too long (max 2000 characters)');
+    }
+
+    // Validate URL format
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(trimmedUrl);
+    } catch {
+      return badRequest(reply, 'Invalid URL format');
+    }
+
+    // Only allow http/https protocols
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return badRequest(reply, 'Only HTTP and HTTPS URLs are allowed');
+    }
+
+    // Block localhost and private IPs for security
+    const hostname = parsedUrl.hostname.toLowerCase();
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.startsWith('172.')) {
+      return badRequest(reply, 'Private/local URLs are not allowed');
+    }
+
     try {
       // Fetch the webpage
       request.log.info({ url }, 'Fetching course webpage');
@@ -420,6 +454,22 @@ Extract as much data as you can see. If some fields are not visible, omit them b
 
     if (!name || name.trim().length === 0) {
       return badRequest(reply, 'Course name is required');
+    }
+
+    // Validate tee ratings if provided
+    for (const tee of tees) {
+      if (tee.courseRating !== undefined && tee.courseRating !== null) {
+        const rating = Number(tee.courseRating);
+        if (isNaN(rating) || rating < 55 || rating > 85) {
+          return badRequest(reply, `Invalid course rating for ${tee.name}. Must be between 55 and 85.`);
+        }
+      }
+      if (tee.slopeRating !== undefined && tee.slopeRating !== null) {
+        const slope = Number(tee.slopeRating);
+        if (isNaN(slope) || slope < 55 || slope > 155) {
+          return badRequest(reply, `Invalid slope rating for ${tee.name}. Must be between 55 and 155.`);
+        }
+      }
     }
 
     try {

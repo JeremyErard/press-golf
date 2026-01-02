@@ -49,6 +49,23 @@ await app.register(clerkPlugin, {
   secretKey: process.env.CLERK_SECRET_KEY,
 });
 
+// Add cache headers for GET requests to public endpoints
+app.addHook('onSend', async (request, reply) => {
+  // Only add cache headers for GET requests
+  if (request.method === 'GET') {
+    const publicPaths = ['/api/courses', '/api/invites/'];
+    const isPublic = publicPaths.some(path => request.url.startsWith(path));
+
+    if (isPublic && reply.statusCode === 200) {
+      // Cache public data for 5 minutes
+      reply.header('Cache-Control', 'public, max-age=300');
+    } else {
+      // Don't cache authenticated/private responses
+      reply.header('Cache-Control', 'no-store');
+    }
+  }
+});
+
 // Health check endpoint
 app.get('/health', async () => {
   return {

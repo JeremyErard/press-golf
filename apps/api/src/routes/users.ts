@@ -220,29 +220,46 @@ function validatePaymentHandle(type: string, handle: string): string | null {
     return 'Handle is required';
   }
 
+  // Sanitize input - remove control characters and limit length
+  const sanitized = handle.trim().replace(/[\x00-\x1F\x7F]/g, '');
+  if (sanitized.length > 100) {
+    return 'Handle is too long (max 100 characters)';
+  }
+  if (sanitized !== handle.trim()) {
+    return 'Handle contains invalid characters';
+  }
+
   switch (type) {
     case 'VENMO':
-      if (!handle.startsWith('@')) {
+      if (!sanitized.startsWith('@')) {
         return 'Venmo handle must start with @';
       }
-      if (handle.length < 2) {
-        return 'Venmo handle is too short';
+      if (sanitized.length < 2 || sanitized.length > 50) {
+        return 'Venmo handle must be 2-50 characters';
+      }
+      // Venmo usernames are alphanumeric with underscores/hyphens
+      if (!/^@[\w\-]+$/.test(sanitized)) {
+        return 'Venmo handle can only contain letters, numbers, underscores, and hyphens';
       }
       break;
 
     case 'CASHAPP':
-      if (!handle.startsWith('$')) {
+      if (!sanitized.startsWith('$')) {
         return 'Cash App handle must start with $';
       }
-      if (handle.length < 2) {
-        return 'Cash App handle is too short';
+      if (sanitized.length < 2 || sanitized.length > 50) {
+        return 'Cash App handle must be 2-50 characters';
+      }
+      // Cash App tags are alphanumeric
+      if (!/^\$[\w]+$/.test(sanitized)) {
+        return 'Cash App handle can only contain letters, numbers, and underscores';
       }
       break;
 
     case 'ZELLE':
       // Should be email or phone
-      const isEmail = handle.includes('@') && handle.includes('.');
-      const isPhone = /^[\d\s\-\+\(\)]+$/.test(handle) && handle.replace(/\D/g, '').length >= 10;
+      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitized);
+      const isPhone = /^[\d\s\-\+\(\)]+$/.test(sanitized) && sanitized.replace(/\D/g, '').length >= 10;
       if (!isEmail && !isPhone) {
         return 'Zelle requires a valid email or phone number';
       }
@@ -250,9 +267,9 @@ function validatePaymentHandle(type: string, handle: string): string | null {
 
     case 'APPLE_PAY':
       // Should be phone number
-      const phoneDigits = handle.replace(/\D/g, '');
-      if (phoneDigits.length < 10) {
-        return 'Apple Pay requires a valid phone number';
+      const phoneDigits = sanitized.replace(/\D/g, '');
+      if (phoneDigits.length < 10 || phoneDigits.length > 15) {
+        return 'Apple Pay requires a valid phone number (10-15 digits)';
       }
       break;
 

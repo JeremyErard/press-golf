@@ -274,7 +274,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
 
     const results: Record<string, any> = {};
 
-    // Fetch extra game data
+    // Fetch extra game data - find game types
     const wolfGame = round.games.find(g => g.type === 'WOLF');
     const vegasGame = round.games.find(g => g.type === 'VEGAS');
     const bbbGame = round.games.find(g => g.type === 'BINGO_BANGO_BONGO');
@@ -282,34 +282,32 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
     const nassauGame = round.games.find(g => g.type === 'NASSAU');
     const matchPlayGame = round.games.find(g => g.type === 'MATCH_PLAY');
 
-    let wolfDecisions: any[] = [];
-    let vegasTeams: any[] = [];
-    let bbbPoints: any[] = [];
-    let bankerDecisions: any[] = [];
-
-    if (wolfGame) {
-      wolfDecisions = await prisma.wolfDecision.findMany({
-        where: { gameId: wolfGame.id },
-        orderBy: { holeNumber: 'asc' },
-      });
-    }
-    if (vegasGame) {
-      vegasTeams = await prisma.vegasTeam.findMany({
-        where: { gameId: vegasGame.id },
-      });
-    }
-    if (bbbGame) {
-      bbbPoints = await prisma.bingoBangoBongoPoint.findMany({
-        where: { gameId: bbbGame.id },
-        orderBy: { holeNumber: 'asc' },
-      });
-    }
-    if (bankerGame) {
-      bankerDecisions = await prisma.bankerDecision.findMany({
-        where: { gameId: bankerGame.id },
-        orderBy: { holeNumber: 'asc' },
-      });
-    }
+    // Fetch game-specific data in parallel to avoid N+1 queries
+    const [wolfDecisions, vegasTeams, bbbPoints, bankerDecisions] = await Promise.all([
+      wolfGame
+        ? prisma.wolfDecision.findMany({
+            where: { gameId: wolfGame.id },
+            orderBy: { holeNumber: 'asc' },
+          })
+        : Promise.resolve([]),
+      vegasGame
+        ? prisma.vegasTeam.findMany({
+            where: { gameId: vegasGame.id },
+          })
+        : Promise.resolve([]),
+      bbbGame
+        ? prisma.bingoBangoBongoPoint.findMany({
+            where: { gameId: bbbGame.id },
+            orderBy: { holeNumber: 'asc' },
+          })
+        : Promise.resolve([]),
+      bankerGame
+        ? prisma.bankerDecision.findMany({
+            where: { gameId: bankerGame.id },
+            orderBy: { holeNumber: 'asc' },
+          })
+        : Promise.resolve([]),
+    ]);
 
     for (const game of round.games) {
       const betAmount = Number(game.betAmount);
@@ -409,6 +407,15 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
     if (round.createdById !== (user.id as string)) {
       return forbidden(reply, 'Only the round creator can finalize');
     }
+
+    // Audit log: finalization attempt
+    request.log.info({
+      action: 'ROUND_FINALIZE_ATTEMPT',
+      roundId,
+      userId: user.id,
+      playerCount: round.players.length,
+      gameCount: round.games.length,
+    }, 'User attempting to finalize round');
 
     // Prevent duplicate finalization
     if (round.status === 'COMPLETED') {
@@ -634,6 +641,22 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    // Validate settlement amounts before consolidation
+    const MAX_INDIVIDUAL_SETTLEMENT = 50000; // $50,000 max per settlement
+    for (const s of settlements) {
+      if (s.amount > MAX_INDIVIDUAL_SETTLEMENT) {
+        request.log.warn({ amount: s.amount, fromUserId: s.fromUserId, toUserId: s.toUserId }, 'Settlement amount exceeds maximum');
+        return badRequest(reply, `Settlement amount ($${s.amount.toFixed(2)}) exceeds maximum allowed ($${MAX_INDIVIDUAL_SETTLEMENT})`);
+      }
+      if (s.amount < 0) {
+        request.log.error({ amount: s.amount }, 'Negative settlement amount calculated');
+        return reply.status(500).send({
+          success: false,
+          error: { code: 'INVALID_SETTLEMENT', message: 'Invalid settlement calculation. Please try again.' },
+        });
+      }
+    }
+
     // Consolidate settlements (combine multiple between same players)
     const consolidated: Record<string, number> = {};
     for (const s of settlements) {
@@ -645,6 +668,14 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       } else {
         consolidated[key] = (consolidated[key] || 0) + s.amount;
       }
+    }
+
+    // Validate consolidated amounts
+    const MAX_TOTAL_SETTLEMENT = 100000; // $100,000 max total per round
+    const totalSettlementAmount = Object.values(consolidated).reduce((sum, amt) => sum + Math.abs(amt), 0);
+    if (totalSettlementAmount > MAX_TOTAL_SETTLEMENT) {
+      request.log.warn({ totalAmount: totalSettlementAmount, roundId }, 'Total settlement amount exceeds maximum');
+      return badRequest(reply, `Total settlement amount ($${totalSettlementAmount.toFixed(2)}) exceeds maximum allowed ($${MAX_TOTAL_SETTLEMENT})`);
     }
 
     // Create settlement records and mark round as completed in a transaction
@@ -687,6 +718,15 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         return settlements;
       });
 
+      // Audit log: successful finalization
+      request.log.info({
+        action: 'ROUND_FINALIZED',
+        roundId,
+        userId: user.id,
+        settlementCount: createdSettlements.length,
+        totalAmount: createdSettlements.reduce((sum, s) => sum + Number(s.amount), 0),
+      }, 'Round finalized successfully');
+
       return {
         success: true,
         data: {
@@ -694,7 +734,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         },
       };
     } catch (error) {
-      request.log.error(error, 'Failed to finalize round');
+      request.log.error({ error, roundId, userId: user.id }, 'Failed to finalize round');
       return reply.status(500).send({
         success: false,
         error: { code: 'FINALIZATION_FAILED', message: 'Failed to finalize round. Please try again.' },
@@ -757,6 +797,16 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       return badRequest(reply, 'Settlement has already been marked as paid');
     }
 
+    // Audit log: settlement payment attempt
+    request.log.info({
+      action: 'SETTLEMENT_MARK_PAID_ATTEMPT',
+      settlementId: id,
+      userId: user.id,
+      amount: Number(settlement.amount),
+      fromUserId: settlement.fromUserId,
+      toUserId: settlement.toUserId,
+    }, 'User attempting to mark settlement as paid');
+
     // Use updateMany with status check for race condition protection
     const result = await prisma.settlement.updateMany({
       where: {
@@ -770,6 +820,11 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
     });
 
     if (result.count === 0) {
+      request.log.warn({
+        action: 'SETTLEMENT_MARK_PAID_RACE',
+        settlementId: id,
+        userId: user.id,
+      }, 'Settlement already updated by another request');
       return badRequest(reply, 'Settlement was already updated by another request');
     }
 
@@ -777,6 +832,15 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
     const updated = await prisma.settlement.findUnique({
       where: { id },
     });
+
+    // Audit log: successful payment mark
+    request.log.info({
+      action: 'SETTLEMENT_MARKED_PAID',
+      settlementId: id,
+      userId: user.id,
+      amount: Number(settlement.amount),
+      roundId: settlement.roundId,
+    }, 'Settlement marked as paid');
 
     return {
       success: true,

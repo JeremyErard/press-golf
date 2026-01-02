@@ -499,4 +499,68 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
       data: { deleted: true },
     };
   });
+
+  // =====================
+  // PATCH /api/rounds/:id
+  // Update round details (date only, and only in SETUP status)
+  // =====================
+  app.patch<{ Params: { id: string }; Body: { date?: string } }>('/:id', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { id } = request.params;
+    const { date } = request.body;
+
+    const round = await prisma.round.findUnique({
+      where: { id },
+    });
+
+    if (!round) {
+      return notFound(reply, 'Round not found');
+    }
+
+    // Only creator can edit round
+    if (round.createdById !== (user.id as string)) {
+      return forbidden(reply, 'Only the round creator can edit this round');
+    }
+
+    // Can only edit rounds in SETUP status
+    if (round.status !== 'SETUP') {
+      return badRequest(reply, 'Cannot edit round after it has started');
+    }
+
+    // Validate date if provided
+    let parsedDate: Date | undefined;
+    if (date) {
+      parsedDate = new Date(date);
+      if (isNaN(parsedDate.getTime())) {
+        return badRequest(reply, 'Invalid date format');
+      }
+    }
+
+    const updatedRound = await prisma.round.update({
+      where: { id },
+      data: {
+        ...(parsedDate && { date: parsedDate }),
+      },
+      include: {
+        course: true,
+        tee: true,
+        players: {
+          include: {
+            user: {
+              select: { id: true, displayName: true, firstName: true, avatarUrl: true },
+            },
+          },
+          orderBy: { position: 'asc' },
+        },
+        games: true,
+      },
+    });
+
+    return {
+      success: true,
+      data: updatedRound,
+    };
+  });
 };
