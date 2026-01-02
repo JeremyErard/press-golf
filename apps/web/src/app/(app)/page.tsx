@@ -199,26 +199,38 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen pb-28">
-      {/* Header Section */}
-      <div className="px-5 pt-6 pb-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-gray-400 text-sm font-medium tracking-wide">
-              {getGreeting()}
-            </p>
-            <h1 className="text-[2rem] font-bold text-white mt-0.5">
-              {user?.firstName || "Jeremy"}
-            </h1>
-          </div>
-          <Link href="/profile">
-            <Avatar
-              src={user?.imageUrl}
-              name={user?.firstName || "J"}
-              size="lg"
-              className="ring-2 ring-white/10 shadow-lg"
-            />
+      {/* Logo Header */}
+      <div className="px-5 pt-6 pb-2">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-black tracking-tight text-white">
+            <span className="inline-block transform -skew-x-2">P</span>
+            <span className="inline-block transform skew-x-1">R</span>
+            <span className="inline-block">E</span>
+            <span className="inline-block transform skew-x-1">S</span>
+            <span className="inline-block transform -skew-x-2">S</span>
+          </h1>
+          <Link href="/profile" className="group">
+            <div className="relative">
+              <Avatar
+                src={user?.imageUrl}
+                name={user?.firstName || "G"}
+                size="lg"
+                className="ring-2 ring-brand/30 shadow-lg shadow-brand/20 group-hover:ring-brand/50 transition-all"
+              />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-[#0d1117]" />
+            </div>
           </Link>
         </div>
+      </div>
+
+      {/* Greeting Section */}
+      <div className="px-5 pb-4">
+        <p className="text-gray-400 text-sm font-medium tracking-wide">
+          {getGreeting()}
+        </p>
+        <p className="text-[1.75rem] font-bold text-white mt-0.5 tracking-tight">
+          {user?.firstName || "Golfer"}
+        </p>
       </div>
 
       <div className="px-5 space-y-5">
@@ -254,7 +266,7 @@ export default function DashboardPage() {
           <div className="relative z-10 p-5">
             <p className="text-gray-400 text-sm font-medium mb-1">Career Earnings</p>
             <p className={`text-[3.5rem] font-bold leading-none tracking-tight ${careerEarnings >= 0 ? "text-green-400" : "text-red-400"}`}>
-              {careerEarnings >= 0 ? "+" : ""}{formatMoney(careerEarnings)}
+              {formatMoney(careerEarnings)}
             </p>
             <div className="mt-4">
               <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-green-500/20 text-green-400 border border-green-500/30">
@@ -377,15 +389,48 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : (
-            <Card className="bg-[#111d32] border-white/5">
-              <CardContent className="py-12 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/5 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-                  </svg>
+            <Card className="bg-gradient-to-br from-[#111d32] to-[#0d1825] border-white/5 overflow-hidden">
+              <CardContent className="py-8 px-5">
+                {/* Welcome message */}
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-brand/20 to-green-600/20 flex items-center justify-center ring-1 ring-brand/30">
+                    <svg className="w-8 h-8 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                    </svg>
+                  </div>
+                  <h3 className="text-white font-semibold text-lg">Welcome to Press!</h3>
+                  <p className="text-gray-400 text-sm mt-1">Get started with these quick steps</p>
                 </div>
-                <p className="text-gray-400 font-medium">No rounds yet</p>
-                <p className="text-gray-500 text-sm mt-1">Start your first round!</p>
+
+                {/* Onboarding checklist */}
+                <div className="space-y-3">
+                  <Link href="/profile/edit" className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors group">
+                    <div className="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center text-brand font-bold text-sm">1</div>
+                    <div className="flex-1">
+                      <p className="text-white font-medium text-sm">Complete your profile</p>
+                      <p className="text-gray-500 text-xs">Add your name and handicap</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-brand transition-colors" />
+                  </Link>
+
+                  <Link href="/courses" className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors group">
+                    <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-sm">2</div>
+                    <div className="flex-1">
+                      <p className="text-white font-medium text-sm">Browse courses</p>
+                      <p className="text-gray-500 text-xs">Find your home course</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-amber-400 transition-colors" />
+                  </Link>
+
+                  <Link href="/rounds/new" className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors group">
+                    <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold text-sm">3</div>
+                    <div className="flex-1">
+                      <p className="text-white font-medium text-sm">Start your first round</p>
+                      <p className="text-gray-500 text-xs">Set up games and invite friends</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-green-400 transition-colors" />
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           )}
