@@ -6,31 +6,42 @@ import { requireAuth, getUser } from "../lib/auth.js";
 export default async function buddyRoutes(fastify: FastifyInstance) {
   // =====================
   // GET /api/buddies
-  // Get all buddies for current user
+  // Get all buddies for current user (with pagination)
   // =====================
-  fastify.get(
+  fastify.get<{ Querystring: { limit?: string; offset?: string } }>(
     "/buddies",
     { preHandler: requireAuth },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Querystring: { limit?: string; offset?: string } }>, reply: FastifyReply) => {
       const user = getUser(request);
       const userId = user.id as string;
 
-      const buddies = await prisma.buddy.findMany({
-        where: { userId },
-        include: {
-          buddyUser: {
-            select: {
-              id: true,
-              displayName: true,
-              firstName: true,
-              lastName: true,
-              avatarUrl: true,
-              handicapIndex: true,
+      // Parse and validate pagination params
+      const requestedLimit = parseInt(request.query.limit || '50', 10);
+      const requestedOffset = parseInt(request.query.offset || '0', 10);
+      const limit = Math.min(Math.max(1, isNaN(requestedLimit) ? 50 : requestedLimit), 100); // Max 100
+      const offset = Math.max(0, isNaN(requestedOffset) ? 0 : requestedOffset);
+
+      const [buddies, total] = await Promise.all([
+        prisma.buddy.findMany({
+          where: { userId },
+          include: {
+            buddyUser: {
+              select: {
+                id: true,
+                displayName: true,
+                firstName: true,
+                lastName: true,
+                avatarUrl: true,
+                handicapIndex: true,
+              },
             },
           },
-        },
-        orderBy: { createdAt: "desc" },
-      });
+          orderBy: { createdAt: "desc" },
+          take: limit,
+          skip: offset,
+        }),
+        prisma.buddy.count({ where: { userId } }),
+      ]);
 
       return reply.send({
         success: true,
@@ -53,6 +64,11 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
           sourceType: b.sourceType,
           createdAt: b.createdAt,
         })),
+        meta: {
+          total,
+          limit,
+          offset,
+        },
       });
     }
   );

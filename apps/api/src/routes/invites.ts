@@ -6,8 +6,11 @@ import { requireAuth, getUser } from "../lib/auth.js";
 const createInviteSchema = z.object({
   roundId: z.string().optional(),
   email: z.string().email().optional(),
-  phone: z.string().optional(),
-});
+  phone: z.string().regex(/^\+?[1-9]\d{6,14}$/, 'Invalid phone number format').optional(),
+}).refine(
+  (data) => data.email || data.phone || data.roundId,
+  { message: 'Either email, phone, or roundId must be provided' }
+);
 
 export default async function inviteRoutes(fastify: FastifyInstance) {
   // Create Invite
@@ -16,7 +19,17 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
     { preHandler: requireAuth },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = getUser(request);
-      const body = createInviteSchema.parse(request.body);
+
+      let body;
+      try {
+        body = createInviteSchema.parse(request.body);
+      } catch (error) {
+        const message = error instanceof z.ZodError ? error.issues?.[0]?.message || 'Invalid input' : 'Invalid input';
+        return reply.code(400).send({
+          success: false,
+          error: { code: "VALIDATION_ERROR", message },
+        });
+      }
 
       // If round specified, verify user is in the round
       if (body.roundId) {

@@ -140,6 +140,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ roundId, ...data }),
     }, token),
+  updateGame: (token: string, gameId: string, betAmount: number) =>
+    apiRequest<Game>(`/games/${gameId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ betAmount }),
+    }, token),
+  deleteGame: (token: string, gameId: string) =>
+    apiRequest<{ deleted: boolean }>(`/games/${gameId}`, {
+      method: "DELETE",
+    }, token),
   calculateResults: (token: string, roundId: string) =>
     apiRequest<CalculateResultsResponse>(`/games/${roundId}/calculate`, {}, token),
 

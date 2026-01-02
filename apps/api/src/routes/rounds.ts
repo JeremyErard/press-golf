@@ -104,37 +104,45 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Create round with creator as first player
-    const round = await prisma.round.create({
-      data: {
-        courseId,
-        teeId,
-        date: date ? new Date(date) : new Date(),
-        createdById: user.id as string,
-        players: {
-          create: {
-            userId: user.id as string,
-            courseHandicap,
-            position: 1,
-          },
-        },
-      },
-      include: {
-        course: true,
-        tee: true,
-        players: {
-          include: {
-            user: {
-              select: { id: true, displayName: true, firstName: true, avatarUrl: true },
+    try {
+      const round = await prisma.round.create({
+        data: {
+          courseId,
+          teeId,
+          date: date ? new Date(date) : new Date(),
+          createdById: user.id as string,
+          players: {
+            create: {
+              userId: user.id as string,
+              courseHandicap,
+              position: 1,
             },
           },
         },
-      },
-    });
+        include: {
+          course: true,
+          tee: true,
+          players: {
+            include: {
+              user: {
+                select: { id: true, displayName: true, firstName: true, avatarUrl: true },
+              },
+            },
+          },
+        },
+      });
 
-    return {
-      success: true,
-      data: round,
-    };
+      return {
+        success: true,
+        data: round,
+      };
+    } catch (error) {
+      request.log.error(error, 'Failed to create round');
+      return reply.status(500).send({
+        success: false,
+        error: { code: 'ROUND_CREATION_FAILED', message: 'Failed to create round. Please try again.' },
+      });
+    }
   });
 
   // =====================
@@ -338,6 +346,18 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
     // Only creator can change status
     if (round.createdById !== (user.id as string)) {
       return forbidden(reply, 'Only the round creator can change status');
+    }
+
+    // Validate status transitions
+    const validTransitions: Record<string, string[]> = {
+      'SETUP': ['ACTIVE'],
+      'ACTIVE': ['COMPLETED'],
+      'COMPLETED': [], // Cannot transition from COMPLETED via this endpoint
+    };
+
+    const allowedNextStates = validTransitions[round.status] || [];
+    if (!allowedNextStates.includes(status)) {
+      return badRequest(reply, `Cannot transition from ${round.status} to ${status}. Valid transitions: ${allowedNextStates.join(', ') || 'none'}`);
     }
 
     const updatedRound = await prisma.round.update({

@@ -130,12 +130,12 @@ Confidence should be: high, medium, or low`,
         });
       }
 
-      // Validate handicap range
+      // Validate handicap range (USGA: +9.9 to 54.0)
       const handicap = parseFloat(extracted.handicapIndex);
-      if (isNaN(handicap) || handicap < -10 || handicap > 54) {
+      if (isNaN(handicap) || handicap < -9.9 || handicap > 54.0) {
         return reply.send({
           success: false,
-          error: 'Invalid handicap index value',
+          error: 'Invalid handicap index. Must be between +9.9 and 54.0',
         });
       }
 
@@ -164,9 +164,9 @@ Confidence should be: high, medium, or low`,
     const user = getUser(request);
     const { handicapIndex, source } = request.body;
 
-    // Validate handicap
-    if (typeof handicapIndex !== 'number' || handicapIndex < -10 || handicapIndex > 54) {
-      return badRequest(reply, 'Invalid handicap index. Must be between -10 and 54.');
+    // Validate handicap (USGA: +9.9 to 54.0)
+    if (typeof handicapIndex !== 'number' || handicapIndex < -9.9 || handicapIndex > 54.0) {
+      return badRequest(reply, 'Invalid handicap index. Must be between +9.9 and 54.0');
     }
 
     const validSources = ['GHIN', 'USGA', 'CLUB', 'OTHER'];
@@ -204,9 +204,9 @@ Confidence should be: high, medium, or low`,
     const user = getUser(request);
     const { handicapIndex } = request.body;
 
-    // Validate handicap
-    if (typeof handicapIndex !== 'number' || handicapIndex < -10 || handicapIndex > 54) {
-      return badRequest(reply, 'Invalid handicap index. Must be between -10 and 54.');
+    // Validate handicap (USGA: +9.9 to 54.0)
+    if (typeof handicapIndex !== 'number' || handicapIndex < -9.9 || handicapIndex > 54.0) {
+      return badRequest(reply, 'Invalid handicap index. Must be between +9.9 and 54.0');
     }
 
     // Update user with manual handicap (pending approval)

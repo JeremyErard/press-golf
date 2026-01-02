@@ -255,7 +255,13 @@ Extract as much data as you can see. If some fields are not visible, omit them b
   // Search/list courses (public)
   // =====================
   app.get<{ Querystring: SearchQuery }>('/', async (request, reply) => {
-    const { q, state, limit = '20', offset = '0' } = request.query;
+    const { q, state, limit: limitStr = '20', offset: offsetStr = '0' } = request.query;
+
+    // Parse and validate pagination params with max limits
+    const requestedLimit = parseInt(limitStr, 10);
+    const requestedOffset = parseInt(offsetStr, 10);
+    const limit = Math.min(Math.max(1, isNaN(requestedLimit) ? 20 : requestedLimit), 100); // Max 100
+    const offset = Math.max(0, isNaN(requestedOffset) ? 0 : requestedOffset);
 
     const where: Record<string, unknown> = {};
 
@@ -277,8 +283,8 @@ Extract as much data as you can see. If some fields are not visible, omit them b
           _count: { select: { holes: true } },
         },
         orderBy: { name: 'asc' },
-        take: parseInt(limit),
-        skip: parseInt(offset),
+        take: limit,
+        skip: offset,
       }),
       prisma.course.count({ where }),
     ]);
@@ -288,8 +294,8 @@ Extract as much data as you can see. If some fields are not visible, omit them b
       data: courses,
       meta: {
         total,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
+        limit,
+        offset,
       },
     };
   });

@@ -140,6 +140,99 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // =====================
+  // DELETE /api/games/:gameId
+  // Delete a game (only if round is in SETUP or ACTIVE, and only by round creator)
+  // =====================
+  app.delete<{ Params: { gameId: string } }>('/:gameId', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { gameId } = request.params;
+
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+      include: {
+        round: true,
+      },
+    });
+
+    if (!game) {
+      return notFound(reply, 'Game not found');
+    }
+
+    // Only round creator can delete games
+    if (game.round.createdById !== (user.id as string)) {
+      return forbidden(reply, 'Only the round creator can delete games');
+    }
+
+    // Cannot delete games from completed rounds
+    if (game.round.status === 'COMPLETED') {
+      return badRequest(reply, 'Cannot delete games from a completed round');
+    }
+
+    // Delete the game (cascade will handle related records)
+    await prisma.game.delete({
+      where: { id: gameId },
+    });
+
+    return {
+      success: true,
+      data: { deleted: true },
+    };
+  });
+
+  // =====================
+  // PATCH /api/games/:gameId
+  // Update a game's bet amount (only if round is in SETUP)
+  // =====================
+  app.patch<{ Params: { gameId: string }; Body: { betAmount: number } }>('/:gameId', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { gameId } = request.params;
+    const { betAmount } = request.body;
+
+    if (betAmount === undefined || betAmount < 0) {
+      return badRequest(reply, 'Valid bet amount is required');
+    }
+
+    if (betAmount > 10000) {
+      return badRequest(reply, 'Bet amount cannot exceed $10,000');
+    }
+
+    const game = await prisma.game.findUnique({
+      where: { id: gameId },
+      include: {
+        round: true,
+      },
+    });
+
+    if (!game) {
+      return notFound(reply, 'Game not found');
+    }
+
+    // Only round creator can update games
+    if (game.round.createdById !== (user.id as string)) {
+      return forbidden(reply, 'Only the round creator can update games');
+    }
+
+    // Can only update games before round starts
+    if (game.round.status !== 'SETUP') {
+      return badRequest(reply, 'Cannot update games after round has started');
+    }
+
+    const updated = await prisma.game.update({
+      where: { id: gameId },
+      data: { betAmount },
+    });
+
+    return {
+      success: true,
+      data: updated,
+    };
+  });
+
+  // =====================
   // GET /api/games/:roundId/calculate
   // Calculate game results based on current scores
   // =====================
