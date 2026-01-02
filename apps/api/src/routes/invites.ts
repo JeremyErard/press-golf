@@ -18,25 +18,12 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
       const user = getUser(request);
       const body = createInviteSchema.parse(request.body);
 
-      // Get the user ID from the database
-      const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId as string },
-        select: { id: true },
-      });
-
-      if (!dbUser) {
-        return reply.code(404).send({
-          success: false,
-          error: { code: "USER_NOT_FOUND", message: "User not found" },
-        });
-      }
-
       // If round specified, verify user is in the round
       if (body.roundId) {
         const roundPlayer = await prisma.roundPlayer.findFirst({
           where: {
             roundId: body.roundId,
-            userId: dbUser.id,
+            userId: user.id as string,
           },
         });
 
@@ -50,7 +37,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
 
       const invite = await prisma.invite.create({
         data: {
-          inviterId: dbUser.id,
+          inviterId: user.id as string,
           roundId: body.roundId,
           inviteeEmail: body.email,
           inviteePhone: body.phone,
@@ -178,19 +165,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { code: string } }>, reply: FastifyReply) => {
       const user = getUser(request);
       const { code } = request.params;
-
-      // Get the user ID from the database
-      const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId as string },
-        select: { id: true },
-      });
-
-      if (!dbUser) {
-        return reply.code(404).send({
-          success: false,
-          error: { code: "USER_NOT_FOUND", message: "User not found" },
-        });
-      }
+      const userId = user.id as string;
 
       const invite = await prisma.invite.findUnique({
         where: { code },
@@ -217,13 +192,13 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         data: {
           status: "ACCEPTED",
           usedAt: new Date(),
-          usedById: dbUser.id,
+          usedById: userId,
         },
       });
 
       // Update user's invitedByCode
       await prisma.user.update({
-        where: { id: dbUser.id },
+        where: { id: userId },
         data: { invitedByCode: code },
       });
 
@@ -233,7 +208,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         where: {
           userId_buddyUserId: {
             userId: invite.inviterId,
-            buddyUserId: dbUser.id,
+            buddyUserId: userId,
           },
         },
       });
@@ -242,7 +217,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         await prisma.buddy.create({
           data: {
             userId: invite.inviterId,
-            buddyUserId: dbUser.id,
+            buddyUserId: userId,
             sourceType: "INVITE",
             sourceInviteId: invite.id,
           },
@@ -253,7 +228,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
       const existingBuddy2 = await prisma.buddy.findUnique({
         where: {
           userId_buddyUserId: {
-            userId: dbUser.id,
+            userId: userId,
             buddyUserId: invite.inviterId,
           },
         },
@@ -262,7 +237,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
       if (!existingBuddy2) {
         await prisma.buddy.create({
           data: {
-            userId: dbUser.id,
+            userId: userId,
             buddyUserId: invite.inviterId,
             sourceType: "INVITE",
             sourceInviteId: invite.id,
@@ -276,7 +251,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         const existingPlayer = await prisma.roundPlayer.findFirst({
           where: {
             roundId: invite.roundId,
-            userId: dbUser.id,
+            userId: userId,
           },
         });
 
@@ -289,7 +264,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
           await prisma.roundPlayer.create({
             data: {
               roundId: invite.roundId,
-              userId: dbUser.id,
+              userId: userId,
               position: playerCount + 1,
             },
           });

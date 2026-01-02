@@ -84,8 +84,9 @@ export const api = {
       body: JSON.stringify(data),
     }, token),
   joinRound: (token: string, inviteCode: string) =>
-    apiRequest<Round>(`/rounds/join/${inviteCode}`, {
+    apiRequest<Round>("/rounds/join", {
       method: "POST",
+      body: JSON.stringify({ inviteCode }),
     }, token),
   updateRoundStatus: (token: string, id: string, status: "ACTIVE" | "COMPLETED") =>
     apiRequest<RoundDetail>(`/rounds/${id}/status`, {
@@ -135,9 +136,9 @@ export const api = {
 
   // Games
   addGame: (token: string, roundId: string, data: AddGameInput) =>
-    apiRequest<Game>(`/games/${roundId}`, {
+    apiRequest<Game>("/games", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify({ roundId, ...data }),
     }, token),
   calculateResults: (token: string, roundId: string) =>
     apiRequest<CalculateResultsResponse>(`/games/${roundId}/calculate`, {}, token),
@@ -157,7 +158,7 @@ export const api = {
   // Scores
   updateScore: (token: string, roundId: string, data: UpdateScoreInput) =>
     apiRequest<HoleScore>(`/rounds/${roundId}/scores`, {
-      method: "PUT",
+      method: "POST",
       body: JSON.stringify(data),
     }, token),
 

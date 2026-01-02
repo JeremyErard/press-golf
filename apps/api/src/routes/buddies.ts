@@ -13,21 +13,10 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
     { preHandler: requireAuth },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const user = getUser(request);
-
-      const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId as string },
-        select: { id: true },
-      });
-
-      if (!dbUser) {
-        return reply.code(404).send({
-          success: false,
-          error: { code: "USER_NOT_FOUND", message: "User not found" },
-        });
-      }
+      const userId = user.id as string;
 
       const buddies = await prisma.buddy.findMany({
-        where: { userId: dbUser.id },
+        where: { userId },
         include: {
           buddyUser: {
             select: {
@@ -81,21 +70,10 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
     ) => {
       const user = getUser(request);
       const { buddyUserId, nickname } = request.body as { buddyUserId: string; nickname?: string };
-
-      const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId as string },
-        select: { id: true },
-      });
-
-      if (!dbUser) {
-        return reply.code(404).send({
-          success: false,
-          error: { code: "USER_NOT_FOUND", message: "User not found" },
-        });
-      }
+      const userId = user.id as string;
 
       // Can't buddy yourself
-      if (dbUser.id === buddyUserId) {
+      if (userId === buddyUserId) {
         return reply.code(400).send({
           success: false,
           error: { code: "INVALID_BUDDY", message: "You cannot add yourself as a buddy" },
@@ -119,7 +97,7 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
       const existing = await prisma.buddy.findUnique({
         where: {
           userId_buddyUserId: {
-            userId: dbUser.id,
+            userId,
             buddyUserId,
           },
         },
@@ -134,7 +112,7 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
 
       const buddy = await prisma.buddy.create({
         data: {
-          userId: dbUser.id,
+          userId,
           buddyUserId,
           nickname,
           sourceType: "MANUAL",
@@ -172,24 +150,13 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
       const user = getUser(request);
       const { id } = request.params;
       const { nickname } = request.body as { nickname?: string };
-
-      const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId as string },
-        select: { id: true },
-      });
-
-      if (!dbUser) {
-        return reply.code(404).send({
-          success: false,
-          error: { code: "USER_NOT_FOUND", message: "User not found" },
-        });
-      }
+      const userId = user.id as string;
 
       const buddy = await prisma.buddy.findUnique({
         where: { id },
       });
 
-      if (!buddy || buddy.userId !== dbUser.id) {
+      if (!buddy || buddy.userId !== userId) {
         return reply.code(404).send({
           success: false,
           error: { code: "BUDDY_NOT_FOUND", message: "Buddy not found" },
@@ -218,24 +185,13 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       const user = getUser(request);
       const { id } = request.params;
-
-      const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId as string },
-        select: { id: true },
-      });
-
-      if (!dbUser) {
-        return reply.code(404).send({
-          success: false,
-          error: { code: "USER_NOT_FOUND", message: "User not found" },
-        });
-      }
+      const userId = user.id as string;
 
       const buddy = await prisma.buddy.findUnique({
         where: { id },
       });
 
-      if (!buddy || buddy.userId !== dbUser.id) {
+      if (!buddy || buddy.userId !== userId) {
         return reply.code(404).send({
           success: false,
           error: { code: "BUDDY_NOT_FOUND", message: "Buddy not found" },
@@ -263,24 +219,13 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { roundId: string } }>, reply: FastifyReply) => {
       const user = getUser(request);
       const { roundId } = request.params;
-
-      const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId as string },
-        select: { id: true },
-      });
-
-      if (!dbUser) {
-        return reply.code(404).send({
-          success: false,
-          error: { code: "USER_NOT_FOUND", message: "User not found" },
-        });
-      }
+      const userId = user.id as string;
 
       // Get all players from the round except current user
       const roundPlayers = await prisma.roundPlayer.findMany({
         where: {
           roundId,
-          userId: { not: dbUser.id },
+          userId: { not: userId },
         },
         include: {
           user: {
@@ -295,7 +240,7 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
         const existing = await prisma.buddy.findUnique({
           where: {
             userId_buddyUserId: {
-              userId: dbUser.id,
+              userId,
               buddyUserId: player.userId,
             },
           },
@@ -304,7 +249,7 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
         if (!existing) {
           await prisma.buddy.create({
             data: {
-              userId: dbUser.id,
+              userId,
               buddyUserId: player.userId,
               sourceType: "ROUND",
             },
@@ -336,22 +281,11 @@ export default async function buddyRoutes(fastify: FastifyInstance) {
     ) => {
       const user = getUser(request);
       const { roundId, buddyUserId } = request.params;
-
-      const dbUser = await prisma.user.findUnique({
-        where: { clerkId: user.userId as string },
-        select: { id: true },
-      });
-
-      if (!dbUser) {
-        return reply.code(404).send({
-          success: false,
-          error: { code: "USER_NOT_FOUND", message: "User not found" },
-        });
-      }
+      const userId = user.id as string;
 
       // Verify user is in the round
       const roundPlayer = await prisma.roundPlayer.findFirst({
-        where: { roundId, userId: dbUser.id },
+        where: { roundId, userId },
       });
 
       if (!roundPlayer) {
