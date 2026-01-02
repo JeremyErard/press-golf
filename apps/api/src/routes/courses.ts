@@ -416,6 +416,7 @@ Extract as much data as you can see. If some fields are not visible, omit them b
       return badRequest(reply, 'Course name is required');
     }
 
+    try {
     // Create course with tees and holes in a transaction
     const course = await prisma.$transaction(async (tx) => {
       // Create the course
@@ -493,6 +494,13 @@ Extract as much data as you can see. If some fields are not visible, omit them b
       success: true,
       data: fullCourse,
     };
+    } catch (error) {
+      request.log.error(error, 'Failed to create course');
+      return reply.status(500).send({
+        success: false,
+        error: { code: 'COURSE_CREATION_FAILED', message: 'Failed to create course. Please try again.' },
+      });
+    }
   });
 
   // =====================

@@ -296,6 +296,7 @@ model Game {
 
   @@unique([roundId, type]) // One game type per round
   @@index([roundId])
+  @@index([type])
 }
 
 enum GameType {
@@ -458,6 +459,7 @@ model Settlement {
   @@index([roundId])
   @@index([fromUserId])
   @@index([toUserId])
+  @@index([status])
 }
 
 enum SettlementStatus {

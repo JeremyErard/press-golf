@@ -47,6 +47,16 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       return badRequest(reply, 'Bet amount must be positive');
     }
 
+    if (betAmount > 10000) {
+      return badRequest(reply, 'Bet amount cannot exceed $10,000');
+    }
+
+    // Validate game type
+    const validGameTypes = ['NASSAU', 'SKINS', 'MATCH_PLAY', 'WOLF', 'NINES', 'STABLEFORD', 'BINGO_BANGO_BONGO', 'VEGAS', 'SNAKE', 'BANKER'];
+    if (!validGameTypes.includes(type)) {
+      return badRequest(reply, `Invalid game type. Must be one of: ${validGameTypes.join(', ')}`);
+    }
+
     const round = await prisma.round.findUnique({
       where: { id: roundId },
       include: { players: true },
@@ -307,6 +317,19 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       return forbidden(reply, 'Only the round creator can finalize');
     }
 
+    // Prevent duplicate finalization
+    if (round.status === 'COMPLETED') {
+      return badRequest(reply, 'Round has already been finalized');
+    }
+
+    // Check if settlements already exist for this round
+    const existingSettlements = await prisma.settlement.count({
+      where: { roundId },
+    });
+    if (existingSettlements > 0) {
+      return badRequest(reply, 'Settlements already exist for this round');
+    }
+
     // Calculate all game results
     const settlements: Array<{ fromUserId: string; toUserId: string; amount: number }> = [];
     const holes = round.course?.holes || [];
@@ -531,47 +554,59 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    // Create settlement records
-    const createdSettlements = [];
-    for (const [key, amount] of Object.entries(consolidated)) {
-      if (amount > 0) {
-        const [fromUserId, toUserId] = key.split('->');
-        const settlement = await prisma.settlement.create({
-          data: {
-            roundId,
-            fromUserId,
-            toUserId,
-            amount: new Decimal(amount),
-          },
+    // Create settlement records and mark round as completed in a transaction
+    try {
+      const createdSettlements = await prisma.$transaction(async (tx) => {
+        const settlements = [];
+        for (const [key, amount] of Object.entries(consolidated)) {
+          if (amount > 0) {
+            const [fromUserId, toUserId] = key.split('->');
+            const settlement = await tx.settlement.create({
+              data: {
+                roundId,
+                fromUserId,
+                toUserId,
+                amount: new Decimal(amount),
+              },
+            });
+            settlements.push(settlement);
+          } else if (amount < 0) {
+            // Reverse the direction
+            const [toUserId, fromUserId] = key.split('->');
+            const settlement = await tx.settlement.create({
+              data: {
+                roundId,
+                fromUserId,
+                toUserId,
+                amount: new Decimal(Math.abs(amount)),
+              },
+            });
+            settlements.push(settlement);
+          }
+        }
+
+        // Mark round as completed
+        await tx.round.update({
+          where: { id: roundId },
+          data: { status: 'COMPLETED' },
         });
-        createdSettlements.push(settlement);
-      } else if (amount < 0) {
-        // Reverse the direction
-        const [toUserId, fromUserId] = key.split('->');
-        const settlement = await prisma.settlement.create({
-          data: {
-            roundId,
-            fromUserId,
-            toUserId,
-            amount: new Decimal(Math.abs(amount)),
-          },
-        });
-        createdSettlements.push(settlement);
-      }
+
+        return settlements;
+      });
+
+      return {
+        success: true,
+        data: {
+          settlements: createdSettlements,
+        },
+      };
+    } catch (error) {
+      request.log.error(error, 'Failed to finalize round');
+      return reply.status(500).send({
+        success: false,
+        error: { code: 'FINALIZATION_FAILED', message: 'Failed to finalize round. Please try again.' },
+      });
     }
-
-    // Mark round as completed
-    await prisma.round.update({
-      where: { id: roundId },
-      data: { status: 'COMPLETED' },
-    });
-
-    return {
-      success: true,
-      data: {
-        settlements: createdSettlements,
-      },
-    };
   });
 
   // =====================
@@ -624,12 +659,30 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       return forbidden(reply, 'You are not part of this settlement');
     }
 
-    const updated = await prisma.settlement.update({
-      where: { id },
+    // Prevent marking already-paid settlements
+    if (settlement.status === 'PAID') {
+      return badRequest(reply, 'Settlement has already been marked as paid');
+    }
+
+    // Use updateMany with status check for race condition protection
+    const result = await prisma.settlement.updateMany({
+      where: {
+        id,
+        status: 'PENDING', // Only update if still pending
+      },
       data: {
         status: 'PAID',
         paidAt: new Date(),
       },
+    });
+
+    if (result.count === 0) {
+      return badRequest(reply, 'Settlement was already updated by another request');
+    }
+
+    // Fetch the updated settlement
+    const updated = await prisma.settlement.findUnique({
+      where: { id },
     });
 
     return {
