@@ -164,7 +164,7 @@ export default function DashboardPage() {
       const { results } = activeRoundResults;
       // For Nassau and Match Play, show holes up/down rather than money
       if (results.nassau) {
-        const { front, back, overall } = results.nassau;
+        const { overall } = results.nassau;
         // Use overall score for net position
         if (overall.winnerId === currentPlayer.userId) {
           userNet = overall.margin;
