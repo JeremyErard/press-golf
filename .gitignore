@@ -50,3 +50,4 @@ web-build/
 tmp/
 temp/
 .vercel
+.env.check

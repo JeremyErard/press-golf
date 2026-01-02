@@ -195,7 +195,7 @@ export default function SubscriptionPage() {
             <div className="bg-gradient-to-br from-brand/20 to-green-600/10 border border-brand/30 rounded-2xl p-6 text-center">
               <p className="text-sm text-brand font-medium mb-2">Press Pro</p>
               <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-bold text-white">$4.99</span>
+                <span className="text-4xl font-bold text-white">$1.99</span>
                 <span className="text-muted">/month</span>
               </div>
               <p className="text-sm text-muted mt-2">Cancel anytime</p>
