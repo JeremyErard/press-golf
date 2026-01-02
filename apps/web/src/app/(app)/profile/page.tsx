@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, Avatar, Button, Badge } from "@/components/ui";
+import { HandicapCard } from "@/components/handicap/handicap-card";
 
 export default function ProfilePage() {
   const { user, isLoaded } = useUser();
@@ -67,18 +68,22 @@ export default function ProfilePage() {
           </Card>
         </div>
 
+        {/* Handicap */}
+        <div className="space-y-md">
+          <h3 className="text-h3 font-semibold text-muted px-xs">Handicap</h3>
+          <HandicapCard />
+        </div>
+
         {/* Settings */}
-        <div
-          
-          
-          
-          className="space-y-md"
-        >
+        <div className="space-y-md">
           <h3 className="text-h3 font-semibold text-muted px-xs">Settings</h3>
 
           <Card>
             <CardContent className="p-0 divide-y divide-border">
-              <button className="w-full flex items-center justify-between p-lg hover:bg-surface transition-colors">
+              <button
+                onClick={() => router.push("/profile/edit")}
+                className="w-full flex items-center justify-between p-lg hover:bg-surface transition-colors"
+              >
                 <div className="flex items-center gap-md">
                   <div className="w-10 h-10 rounded-full bg-elevated flex items-center justify-center">
                     <User className="h-5 w-5 text-muted" />
@@ -91,7 +96,10 @@ export default function ProfilePage() {
                 <ChevronRight className="h-5 w-5 text-muted" />
               </button>
 
-              <button className="w-full flex items-center justify-between p-lg hover:bg-surface transition-colors">
+              <button
+                onClick={() => router.push("/profile/payment-methods")}
+                className="w-full flex items-center justify-between p-lg hover:bg-surface transition-colors"
+              >
                 <div className="flex items-center gap-md">
                   <div className="w-10 h-10 rounded-full bg-elevated flex items-center justify-center">
                     <CreditCard className="h-5 w-5 text-muted" />
@@ -104,7 +112,10 @@ export default function ProfilePage() {
                 <ChevronRight className="h-5 w-5 text-muted" />
               </button>
 
-              <button className="w-full flex items-center justify-between p-lg hover:bg-surface transition-colors">
+              <button
+                onClick={() => router.push("/profile/subscription")}
+                className="w-full flex items-center justify-between p-lg hover:bg-surface transition-colors"
+              >
                 <div className="flex items-center gap-md">
                   <div className="w-10 h-10 rounded-full bg-elevated flex items-center justify-center">
                     <Crown className="h-5 w-5 text-muted" />

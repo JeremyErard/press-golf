@@ -18,6 +18,7 @@
     "@clerk/fastify": "^1.0.0",
     "@fastify/cors": "^9.0.0",
     "@fastify/helmet": "^11.0.0",
+    "@fastify/multipart": "^9.3.0",
     "@prisma/client": "^5.0.0",
     "cheerio": "^1.1.2",
     "fastify": "^4.0.0",

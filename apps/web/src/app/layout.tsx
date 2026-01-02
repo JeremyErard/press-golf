@@ -32,6 +32,21 @@ export const metadata: Metadata = {
     title: "Press - Golf Betting Made Simple",
     description: "Track golf bets with your buddies. Nassau, Skins, Wolf, and more.",
     siteName: "Press",
+    url: "https://pressbet.golf",
+    images: [
+      {
+        url: "https://pressbet.golf/images/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Press - Golf Betting Made Simple",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Press - Golf Betting Made Simple",
+    description: "Track golf bets with your buddies. Nassau, Skins, Wolf, and more.",
+    images: ["https://pressbet.golf/images/og-image.jpg"],
   },
 };
 

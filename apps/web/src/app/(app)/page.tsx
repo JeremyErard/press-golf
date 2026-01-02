@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ChevronRight, Play } from "lucide-react";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
+import { PendingApprovals } from "@/components/handicap/pending-approvals";
 import { api, type Round } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 
@@ -71,6 +72,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="px-5 space-y-5">
+        {/* Pending Handicap Approvals (for round creators) */}
+        <PendingApprovals />
+
         {/* Career Earnings Card */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0d2818] via-[#14532d] to-[#052e16] shadow-xl shadow-green-900/20">
           {/* Golf Course Illustration */}

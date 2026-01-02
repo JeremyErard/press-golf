@@ -11,6 +11,7 @@ import billingRoutes from './routes/billing.js';
 import inviteRoutes from './routes/invites.js';
 import webhookRoutes from './routes/webhooks.js';
 import buddyRoutes from './routes/buddies.js';
+import handicapRoutes from './routes/handicap.js';
 
 // Create Fastify instance
 const app = Fastify({
@@ -64,6 +65,7 @@ await app.register(billingRoutes, { prefix: '/api' });
 await app.register(inviteRoutes, { prefix: '/api' });
 await app.register(webhookRoutes, { prefix: '/api' });
 await app.register(buddyRoutes, { prefix: '/api' });
+await app.register(handicapRoutes, { prefix: '/api/handicap' });
 
 // Start server
 const start = async () => {

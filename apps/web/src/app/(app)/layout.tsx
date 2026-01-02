@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { OnboardingCheck } from "@/components/handicap/onboarding-check";
 import { registerServiceWorker, setupInstallPrompt } from "@/lib/pwa";
 
 export default function AppLayout({
@@ -30,11 +31,13 @@ export default function AppLayout({
   }
 
   return (
-    <div className="min-h-screen pb-20">
-      <main className="max-w-lg mx-auto">
-        {children}
-      </main>
-      <BottomNav />
-    </div>
+    <OnboardingCheck>
+      <div className="min-h-screen pb-20">
+        <main className="max-w-lg mx-auto">
+          {children}
+        </main>
+        <BottomNav />
+      </div>
+    </OnboardingCheck>
   );
 }

@@ -30,6 +30,11 @@ model User {
   ghinNumber    String?
   handicapIndex Decimal? @db.Decimal(3, 1)
 
+  // Handicap verification
+  handicapVerifiedAt     DateTime?
+  handicapSource         HandicapSource?
+  handicapPendingApproval Boolean @default(false)
+
   // Stripe Subscription
   stripeCustomerId     String?            @unique
   stripeSubscriptionId String?
@@ -53,6 +58,7 @@ model User {
   invitesSent          Invite[]       @relation("InvitesSent")
   buddies              Buddy[]        @relation("UserBuddies")
   buddyOf              Buddy[]        @relation("BuddyOf")
+  handicapApprovals    HandicapApproval[]
 
   @@index([clerkId])
   @@index([email])
@@ -87,6 +93,20 @@ enum BuddySourceType {
   INVITE      // Added via invite
   ROUND       // Played in same round
   MANUAL      // Manually added
+}
+
+enum HandicapSource {
+  GHIN        // USGA GHIN system
+  USGA        // Other USGA source
+  CLUB        // Club handicap system
+  MANUAL      // Manually entered (requires approval)
+  OTHER       // Other verified source
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum SubscriptionStatus {
@@ -209,6 +229,7 @@ model Round {
   games       Game[]
   settlements Settlement[]
   invites     Invite[]
+  handicapApprovals HandicapApproval[]
 
   @@index([courseId])
   @@index([createdById])
@@ -474,4 +495,27 @@ enum InviteStatus {
   PENDING
   ACCEPTED
   EXPIRED
+}
+
+// ===================
+// HANDICAP APPROVALS
+// ===================
+
+model HandicapApproval {
+  id          String         @id @default(cuid())
+  userId      String
+  roundId     String
+  handicap    Decimal        @db.Decimal(3, 1)
+  status      ApprovalStatus @default(PENDING)
+  approvedBy  String?        // clerkId of approver (round creator)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  round Round @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roundId])
+  @@index([userId])
+  @@index([roundId])
+  @@index([status])
 }

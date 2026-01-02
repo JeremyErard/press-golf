@@ -186,6 +186,93 @@ export const api = {
     apiRequest<{ added: number; message: string }>(`/buddies/from-round/${roundId}`, {
       method: "POST",
     }, token),
+
+  // Handicap
+  getHandicapStatus: (token: string) =>
+    apiRequest<HandicapStatusResponse>("/handicap/status", {}, token),
+
+  extractHandicap: async (token: string, file: File): Promise<ExtractedHandicap> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+    const response = await fetch(`${API_URL}/handicap/extract`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+      credentials: "include",
+    });
+
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new ApiError(
+        json.error?.code || "EXTRACTION_FAILED",
+        json.error || "Failed to extract handicap from image",
+        response.status
+      );
+    }
+    return json.data;
+  },
+
+  verifyHandicap: (token: string, handicapIndex: number, source: HandicapSource) =>
+    apiRequest<{ handicapIndex: number; handicapSource: HandicapSource; handicapVerifiedAt: string; isVerified: boolean }>(
+      "/handicap/verify",
+      {
+        method: "POST",
+        body: JSON.stringify({ handicapIndex, source }),
+      },
+      token
+    ),
+
+  submitManualHandicap: (token: string, handicapIndex: number) =>
+    apiRequest<{ handicapIndex: number; handicapSource: string; handicapVerifiedAt: string; pendingApproval: boolean; message: string }>(
+      "/handicap/manual",
+      {
+        method: "POST",
+        body: JSON.stringify({ handicapIndex }),
+      },
+      token
+    ),
+
+  getPendingApprovals: (token: string) =>
+    apiRequest<HandicapApproval[]>("/handicap/pending", {}, token),
+
+  approveHandicap: (token: string, approvalId: string, status: "APPROVED" | "REJECTED") =>
+    apiRequest<{ id: string; status: ApprovalStatus; message: string }>(
+      `/handicap/approve/${approvalId}`,
+      {
+        method: "POST",
+        body: JSON.stringify({ status }),
+      },
+      token
+    ),
+
+  requestHandicapApproval: (token: string, roundId: string) =>
+    apiRequest<ApprovalRequest>(`/handicap/request-approval/${roundId}`, {
+      method: "POST",
+    }, token),
+
+  // Payment Methods
+  getPaymentMethods: (token: string) =>
+    apiRequest<PaymentMethod[]>("/users/me/payment-methods", {}, token),
+
+  addPaymentMethod: (token: string, data: { type: PaymentMethodType; handle: string; isPreferred?: boolean }) =>
+    apiRequest<PaymentMethod>("/users/me/payment-methods", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }, token),
+
+  deletePaymentMethod: (token: string, id: string) =>
+    apiRequest<{ deleted: boolean }>(`/users/me/payment-methods/${id}`, {
+      method: "DELETE",
+    }, token),
+
+  setPreferredPaymentMethod: (token: string, id: string) =>
+    apiRequest<PaymentMethod>(`/users/me/payment-methods/${id}/preferred`, {
+      method: "PATCH",
+    }, token),
 };
 
 // Types
@@ -199,6 +286,9 @@ export interface User {
   phone?: string;
   ghinNumber?: string;
   handicapIndex?: number;
+  handicapVerifiedAt?: string;
+  handicapSource?: HandicapSource;
+  handicapPendingApproval?: boolean;
   stripeCustomerId?: string;
   subscriptionStatus: "FREE" | "ACTIVE" | "PAST_DUE" | "CANCELED" | "FOUNDING";
   isFoundingMember: boolean;
@@ -476,5 +566,60 @@ export interface Buddy {
     handicapIndex?: number;
   };
   sourceType: "INVITE" | "ROUND" | "MANUAL";
+  createdAt: string;
+}
+
+// Handicap types
+export type HandicapSource = "GHIN" | "USGA" | "CLUB" | "MANUAL" | "OTHER";
+export type HandicapStatus = "none" | "verified" | "manual_pending" | "expired";
+export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface HandicapStatusResponse {
+  handicapIndex: number | null;
+  source: HandicapSource | null;
+  verifiedAt: string | null;
+  status: HandicapStatus;
+  isExpired: boolean;
+  daysUntilExpiry: number | null;
+}
+
+export interface ExtractedHandicap {
+  handicapIndex: number;
+  source: HandicapSource;
+  confidence: "high" | "medium" | "low";
+}
+
+export interface HandicapApproval {
+  id: string;
+  handicap: number;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+  };
+  round: {
+    id: string;
+    date: string;
+    courseName: string;
+  };
+}
+
+export interface ApprovalRequest {
+  id: string;
+  status: ApprovalStatus;
+  needsApproval: boolean;
+  message: string;
+}
+
+// Payment Method types
+export type PaymentMethodType = "VENMO" | "ZELLE" | "CASHAPP" | "APPLE_PAY";
+
+export interface PaymentMethod {
+  id: string;
+  userId: string;
+  type: PaymentMethodType;
+  handle: string;
+  isPreferred: boolean;
   createdAt: string;
 }
