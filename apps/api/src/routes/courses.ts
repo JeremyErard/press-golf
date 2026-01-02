@@ -1,8 +1,14 @@
 import { FastifyPluginAsync } from 'fastify';
+import multipart from '@fastify/multipart';
+import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, getUser } from '../lib/auth.js';
 import { badRequest, notFound, forbidden } from '../lib/errors.js';
 import { fetchWebpage, extractCourseData, findScorecardLinks, fetchPdf, extractCourseDataFromPdf } from '../lib/claude.js';
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
 // Type definitions
 interface CreateCourseBody {
@@ -42,6 +48,208 @@ interface SearchQuery {
 }
 
 export const courseRoutes: FastifyPluginAsync = async (app) => {
+  // Register multipart for file uploads
+  await app.register(multipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB max
+    },
+  });
+
+  // =====================
+  // POST /api/courses/extract-from-image
+  // Extract course data from a scorecard photo using Claude Vision
+  // =====================
+  app.post('/extract-from-image', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const data = await request.file();
+    if (!data) {
+      return badRequest(reply, 'No image file provided');
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(data.mimetype)) {
+      return badRequest(reply, 'Invalid file type. Please upload a JPEG, PNG, WebP, or GIF image.');
+    }
+
+    // Read file into buffer
+    const buffer = await data.toBuffer();
+    const base64Image = buffer.toString('base64');
+    const mediaType = data.mimetype as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+
+    try {
+      // Use Claude Vision to extract scorecard data
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: mediaType,
+                  data: base64Image,
+                },
+              },
+              {
+                type: 'text',
+                text: `Extract all golf course scorecard data from this image.
+
+Look for:
+- Course name (usually at top of scorecard)
+- Location (city, state if visible)
+- For each of the 18 holes: hole number, par, handicap/stroke index
+- Tee information: tee names (e.g., Blue, White, Red), yardages per hole, total yardage, slope rating, course rating
+
+Return ONLY a JSON object with this exact format:
+{
+  "found": true,
+  "courseName": "Example Golf Club",
+  "city": "City Name",
+  "state": "ST",
+  "holes": [
+    { "holeNumber": 1, "par": 4, "handicapRank": 7 },
+    { "holeNumber": 2, "par": 5, "handicapRank": 1 },
+    ...for all 18 holes
+  ],
+  "tees": [
+    {
+      "name": "Blue",
+      "color": "#3B82F6",
+      "slopeRating": 130,
+      "courseRating": 72.5,
+      "totalYardage": 6800,
+      "yardages": [425, 510, 185, ...for all 18 holes]
+    },
+    {
+      "name": "White",
+      "color": "#FFFFFF",
+      "slopeRating": 125,
+      "courseRating": 70.0,
+      "totalYardage": 6200,
+      "yardages": [400, 480, 165, ...for all 18 holes]
+    }
+  ],
+  "confidence": "high"
+}
+
+Color codes to use:
+- Black tees: "#000000"
+- Blue tees: "#3B82F6"
+- White tees: "#FFFFFF"
+- Gold/Yellow tees: "#EAB308"
+- Red tees: "#EF4444"
+- Green tees: "#22C55E"
+
+If you cannot extract the scorecard data, return:
+{
+  "found": false,
+  "reason": "explanation of what went wrong"
+}
+
+Extract as much data as you can see. If some fields are not visible, omit them but still return what you can find.`,
+              },
+            ],
+          },
+        ],
+      });
+
+      // Extract text from response
+      const responseText = message.content
+        .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+        .map((block) => block.text)
+        .join('');
+
+      // Parse JSON from response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        return reply.send({
+          success: false,
+          error: 'Could not parse scorecard data from image',
+        });
+      }
+
+      const extracted = JSON.parse(jsonMatch[0]);
+
+      if (!extracted.found) {
+        return reply.send({
+          success: false,
+          error: extracted.reason || 'Could not find scorecard data in image',
+        });
+      }
+
+      // Transform the data to match our API format
+      const courseData: {
+        name?: string;
+        city?: string;
+        state?: string;
+        holes?: { holeNumber: number; par: number; handicapRank: number; yardages?: { teeName: string; yardage: number }[] }[];
+        tees?: { name: string; color?: string; slopeRating?: number; courseRating?: number; totalYardage?: number }[];
+        confidence?: string;
+      } = {
+        name: extracted.courseName,
+        city: extracted.city,
+        state: extracted.state,
+        confidence: extracted.confidence,
+      };
+
+      // Process holes with yardages from each tee
+      if (extracted.holes && Array.isArray(extracted.holes)) {
+        courseData.holes = extracted.holes.map((hole: { holeNumber: number; par: number; handicapRank: number }) => {
+          const holeData: { holeNumber: number; par: number; handicapRank: number; yardages?: { teeName: string; yardage: number }[] } = {
+            holeNumber: hole.holeNumber,
+            par: hole.par,
+            handicapRank: hole.handicapRank,
+          };
+
+          // Add yardages from each tee
+          if (extracted.tees && Array.isArray(extracted.tees)) {
+            const yardages: { teeName: string; yardage: number }[] = [];
+            extracted.tees.forEach((tee: { name: string; yardages?: number[] }) => {
+              if (tee.yardages && tee.yardages[hole.holeNumber - 1]) {
+                yardages.push({
+                  teeName: tee.name,
+                  yardage: tee.yardages[hole.holeNumber - 1],
+                });
+              }
+            });
+            if (yardages.length > 0) {
+              holeData.yardages = yardages;
+            }
+          }
+
+          return holeData;
+        });
+      }
+
+      // Process tees (without per-hole yardages, those go in holes)
+      if (extracted.tees && Array.isArray(extracted.tees)) {
+        courseData.tees = extracted.tees.map((tee: { name: string; color?: string; slopeRating?: number; courseRating?: number; totalYardage?: number }) => ({
+          name: tee.name,
+          color: tee.color,
+          slopeRating: tee.slopeRating,
+          courseRating: tee.courseRating,
+          totalYardage: tee.totalYardage,
+        }));
+      }
+
+      return reply.send({
+        success: true,
+        data: courseData,
+      });
+    } catch (error) {
+      request.log.error(error, 'Failed to extract scorecard from image');
+      return reply.status(500).send({
+        success: false,
+        error: 'Failed to process image',
+      });
+    }
+  });
+
   // =====================
   // GET /api/courses
   // Search/list courses (public)

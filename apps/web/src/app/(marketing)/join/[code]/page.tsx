@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { Flag, Users, Calendar } from "lucide-react";
+import { Flag, Users, Calendar, Loader2 } from "lucide-react";
 import { Button, Card, CardContent, Avatar, Badge, Skeleton } from "@/components/ui";
 import { api, type InviteDetails, type GameType } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
@@ -26,11 +26,12 @@ const gameTypeLabels: Record<GameType, string> = {
 export default function InviteLandingPage() {
   const params = useParams();
   const router = useRouter();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, getToken } = useAuth();
   const code = params.code as string;
 
   const [invite, setInvite] = useState<InviteDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showInstallGuide, setShowInstallGuide] = useState(false);
 
@@ -52,11 +53,42 @@ export default function InviteLandingPage() {
     fetchInvite();
   }, [code]);
 
+  const handleJoinRound = useCallback(async () => {
+    if (!invite?.round?.id) return;
+
+    setIsJoining(true);
+    try {
+      const token = await getToken();
+      if (!token) {
+        // User not signed in, redirect to sign up
+        router.push(`/sign-up?redirect=/join/${code}`);
+        return;
+      }
+
+      // Accept the invite to join the round
+      await api.acceptInvite(token, code);
+
+      // Redirect to the round page
+      router.push(`/rounds/${invite.round.id}`);
+    } catch (err) {
+      console.error("Failed to join round:", err);
+      setError("Failed to join the round. Please try again.");
+      setIsJoining(false);
+    }
+  }, [code, getToken, invite?.round?.id, router]);
+
+  // Auto-join if user is signed in and PWA is installed (returning after sign-up)
+  useEffect(() => {
+    if (isSignedIn && isPWAInstalled && invite?.round?.id && !isJoining && !error) {
+      handleJoinRound();
+    }
+  }, [isSignedIn, isPWAInstalled, invite?.round?.id, isJoining, error, handleJoinRound]);
+
   const handleGetStarted = async () => {
     // If PWA is installed, go to sign up/sign in
     if (isPWAInstalled) {
       if (isSignedIn) {
-        router.push(`/rounds/${invite?.round?.id}`);
+        await handleJoinRound();
       } else {
         router.push(`/sign-up?redirect=/join/${code}`);
       }
@@ -210,12 +242,22 @@ export default function InviteLandingPage() {
           
           className="mt-xl space-y-md"
         >
-          <Button className="w-full h-14" size="lg" onClick={handleGetStarted}>
-            {isPWAInstalled
-              ? isSignedIn
-                ? "Join Round"
-                : "Sign Up to Join"
-              : "Get Press App"}
+          <Button
+            className="w-full h-14"
+            size="lg"
+            onClick={handleGetStarted}
+            disabled={isJoining}
+          >
+            {isJoining ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                Joining...
+              </>
+            ) : isPWAInstalled ? (
+              isSignedIn ? "Join Round" : "Sign Up to Join"
+            ) : (
+              "Get Press App"
+            )}
           </Button>
 
           {!isPWAInstalled && (

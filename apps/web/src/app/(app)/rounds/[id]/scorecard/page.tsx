@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { Minus, Plus, Check, AlertCircle, TrendingUp, TrendingDown, Minus as TiedIcon } from "lucide-react";
 import { Header } from "@/components/layout/header";
@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 
 export default function ScorecardPage() {
   const params = useParams();
+  const router = useRouter();
   const { getToken } = useAuth();
-  // Removed unused useUser
   const roundId = params.id as string;
 
   const [round, setRound] = useState<RoundDetail | null>(null);
@@ -21,6 +21,7 @@ export default function ScorecardPage() {
   const [savingScore, setSavingScore] = useState<string | null>(null);
   const [pressStatus, setPressStatus] = useState<PressStatus[]>([]);
   const [isPressing, setIsPressing] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   // Local scores state for optimistic updates
   const [localScores, setLocalScores] = useState<Record<string, Record<number, number>>>({});
@@ -93,6 +94,7 @@ export default function ScorecardPage() {
         await api.updateScore(token, roundId, {
           holeNumber,
           strokes: newScore,
+          playerId,
         });
 
         // Refresh press status after score update
@@ -140,8 +142,47 @@ export default function ScorecardPage() {
     [getToken, fetchPressStatus]
   );
 
+  const handleFinishRound = useCallback(async () => {
+    setIsFinishing(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      // Finalize the round - this calculates results, creates settlements, and marks round as COMPLETED
+      await api.finalizeRound(token, roundId);
+      router.push(`/rounds/${roundId}/settlement`);
+    } catch (error) {
+      console.error("Failed to finish round:", error);
+      setIsFinishing(false);
+    }
+  }, [getToken, roundId, router]);
+
   const getPlayerTotal = (playerId: string, holes: number[]) => {
     return holes.reduce((sum, hole) => sum + (localScores[playerId]?.[hole] || 0), 0);
+  };
+
+  // Check if all players have scores for all 18 holes
+  const allScoresComplete = round?.players.every(player => {
+    for (let hole = 1; hole <= 18; hole++) {
+      if (!localScores[player.id]?.[hole]) {
+        return false;
+      }
+    }
+    return true;
+  }) ?? false;
+
+  // Count missing scores for display
+  const getMissingScoresCount = () => {
+    if (!round) return 0;
+    let missing = 0;
+    round.players.forEach(player => {
+      for (let hole = 1; hole <= 18; hole++) {
+        if (!localScores[player.id]?.[hole]) {
+          missing++;
+        }
+      }
+    });
+    return missing;
   };
 
   if (isLoading) {
@@ -431,6 +472,21 @@ export default function ScorecardPage() {
           </CardContent>
         </Card>
 
+        {/* Incomplete Scores Warning */}
+        {!allScoresComplete && currentHole === 18 && (
+          <Card className="bg-warning/10 border-warning/30">
+            <CardContent className="p-md">
+              <div className="flex items-center gap-sm text-warning">
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <p className="text-caption">
+                  Enter scores for all players on all holes before finishing the round.
+                  {getMissingScoresCount()} score{getMissingScoresCount() !== 1 ? 's' : ''} remaining.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Quick Actions */}
         <div className="flex gap-md">
           {currentHole > 1 && (
@@ -451,9 +507,15 @@ export default function ScorecardPage() {
             </Button>
           )}
           {currentHole === 18 && (
-            <Button className="flex-1">
+            <Button
+              className="flex-1"
+              onClick={handleFinishRound}
+              disabled={isFinishing || !allScoresComplete}
+            >
               <Check className="h-4 w-4 mr-2" />
-              Finish Round
+              {isFinishing ? "Finishing..." :
+               !allScoresComplete ? `${getMissingScoresCount()} scores missing` :
+               "Finish Round"}
             </Button>
           )}
         </div>

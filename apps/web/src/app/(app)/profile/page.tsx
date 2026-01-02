@@ -1,6 +1,7 @@
 "use client";
 
-import { useUser, useClerk } from "@clerk/nextjs";
+import { useEffect, useState } from "react";
+import { useUser, useClerk, useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import {
   User,
@@ -12,11 +13,32 @@ import {
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, Avatar, Button, Badge } from "@/components/ui";
 import { HandicapCard } from "@/components/handicap/handicap-card";
+import { api, type BillingStatus } from "@/lib/api";
 
 export default function ProfilePage() {
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
+  const { getToken } = useAuth();
   const router = useRouter();
+
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
+
+  useEffect(() => {
+    async function fetchBillingStatus() {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const status = await api.getBillingStatus(token);
+        setBillingStatus(status);
+      } catch (error) {
+        console.error("Failed to fetch billing status:", error);
+      }
+    }
+
+    if (isLoaded) {
+      fetchBillingStatus();
+    }
+  }, [getToken, isLoaded]);
 
   if (!isLoaded) {
     return (
@@ -30,9 +52,8 @@ export default function ProfilePage() {
     signOut(() => router.push("/sign-in"));
   };
 
-  // Mock subscription status - will come from API
-  const _subscriptionStatus = "FOUNDING" as const;
-  const isFoundingMember = true;
+  const isFoundingMember = billingStatus?.isFoundingMember || false;
+  const subscriptionStatus = billingStatus?.status || "FREE";
 
   return (
     <div>
@@ -123,7 +144,13 @@ export default function ProfilePage() {
                   <div className="text-left">
                     <p className="text-body font-medium">Subscription</p>
                     <p className="text-caption text-muted">
-                      {isFoundingMember ? "Free forever" : "Manage your plan"}
+                      {isFoundingMember
+                        ? "Free forever"
+                        : subscriptionStatus === "ACTIVE"
+                        ? "Pro member"
+                        : subscriptionStatus === "PAST_DUE"
+                        ? "Payment issue"
+                        : "Manage your plan"}
                     </p>
                   </div>
                 </div>

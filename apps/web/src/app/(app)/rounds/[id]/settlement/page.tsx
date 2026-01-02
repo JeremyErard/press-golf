@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useAuth, useUser } from "@clerk/nextjs";
 import {
@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
-import { api, type RoundDetail, type GameType, type GameResult } from "@/lib/api";
+import { api, type RoundDetail, type GameType, type ApiSettlement, type PaymentMethodType } from "@/lib/api";
 import { formatMoney, cn } from "@/lib/utils";
 
 const gameTypeLabels: Record<GameType, string> = {
@@ -29,26 +29,6 @@ const gameTypeLabels: Record<GameType, string> = {
   BANKER: "Banker",
 };
 
-interface Settlement {
-  id: string;
-  fromUser: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
-  };
-  toUser: {
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
-    paymentMethods?: {
-      type: string;
-      handle: string;
-    }[];
-  };
-  amount: number;
-  status: "PENDING" | "PAID" | "DISPUTED";
-}
-
 export default function SettlementPage() {
   const params = useParams();
   const { getToken } = useAuth();
@@ -56,9 +36,9 @@ export default function SettlementPage() {
   const roundId = params.id as string;
 
   const [round, setRound] = useState<RoundDetail | null>(null);
-  const [settlements, _setSettlements] = useState<Settlement[]>([]);
-  const [gameResults, setGameResults] = useState<Record<string, GameResult[]>>({});
+  const [settlements, setSettlements] = useState<ApiSettlement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [markingPaid, setMarkingPaid] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -66,24 +46,13 @@ export default function SettlementPage() {
         const token = await getToken();
         if (!token) return;
 
-        const roundData = await api.getRound(token, roundId);
+        const [roundData, settlementsData] = await Promise.all([
+          api.getRound(token, roundId),
+          api.getSettlements(token, roundId),
+        ]);
+
         setRound(roundData);
-
-        // Calculate results for each game
-        const results = await api.calculateResults(token, roundId);
-
-        // Group results by game
-        const grouped: Record<string, GameResult[]> = {};
-        results.forEach((result) => {
-          if (!grouped[result.gameId]) {
-            grouped[result.gameId] = [];
-          }
-          grouped[result.gameId].push(result);
-        });
-        setGameResults(grouped);
-
-        // Mock settlements for now (would come from API)
-        // In real implementation, this would be calculated from game results
+        setSettlements(settlementsData);
       } catch (error) {
         console.error("Failed to fetch data:", error);
       } finally {
@@ -94,24 +63,22 @@ export default function SettlementPage() {
     fetchData();
   }, [getToken, roundId]);
 
-  // Calculate user's net position
-  const calculateNetPosition = () => {
-    let total = 0;
-    Object.values(gameResults).forEach((results) => {
-      results.forEach((result) => {
-        // Find if this result belongs to current user
-        const player = round?.players.find((p) => p.id === result.roundPlayerId);
-        if (player?.user.id === user?.id) {
-          total += Number(result.netAmount);
-        }
-      });
+  // Calculate user's net position from settlements
+  const netPosition = useMemo(() => {
+    if (!user) return 0;
+
+    let net = 0;
+    settlements.forEach(s => {
+      if (s.toUserId === user.id) {
+        net += Number(s.amount);
+      } else if (s.fromUserId === user.id) {
+        net -= Number(s.amount);
+      }
     });
-    return total;
-  };
+    return net;
+  }, [settlements, user]);
 
-  const netPosition = calculateNetPosition();
-
-  const _getPaymentLink = (type: string, handle: string, amount: number) => {
+  const getPaymentLink = useCallback((type: string, handle: string, amount: number) => {
     const amountStr = Math.abs(amount).toFixed(2);
     switch (type) {
       case "VENMO":
@@ -123,7 +90,33 @@ export default function SettlementPage() {
       default:
         return null;
     }
-  };
+  }, []);
+
+  const handlePaymentClick = useCallback((type: PaymentMethodType, handle: string, amount: number) => {
+    const link = getPaymentLink(type, handle, amount);
+    if (link) {
+      window.open(link, "_blank");
+    }
+  }, [getPaymentLink]);
+
+  const handleMarkPaid = useCallback(async (settlementId: string) => {
+    setMarkingPaid(settlementId);
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const updated = await api.markSettlementPaid(token, settlementId);
+
+      // Update local state
+      setSettlements(prev =>
+        prev.map(s => s.id === settlementId ? updated : s)
+      );
+    } catch (error) {
+      console.error("Failed to mark settlement as paid:", error);
+    } finally {
+      setMarkingPaid(null);
+    }
+  }, [getToken]);
 
   if (isLoading) {
     return (
@@ -188,76 +181,20 @@ export default function SettlementPage() {
           </Card>
         </div>
 
-        {/* Game Results */}
+        {/* Games Played */}
         <div>
-          <h2 className="text-h3 font-semibold mb-md">Game Results</h2>
+          <h2 className="text-h3 font-semibold mb-md">Games Played</h2>
 
           {round.games.length > 0 ? (
-            <div className="space-y-md">
-              {round.games.map((game) => {
-                const results = gameResults[game.id] || [];
-
-                return (
-                  <Card key={game.id}>
-                    <CardContent className="p-lg">
-                      <div className="flex items-center justify-between mb-md">
-                        <h3 className="text-body font-semibold">
-                          {gameTypeLabels[game.type]}
-                        </h3>
-                        <Badge variant="accent">${Number(game.betAmount)}/unit</Badge>
-                      </div>
-
-                      <div className="space-y-sm">
-                        {round.players.map((player) => {
-                          const playerResult = results.find(
-                            (r) => r.roundPlayerId === player.id
-                          );
-                          const amount = playerResult
-                            ? Number(playerResult.netAmount)
-                            : 0;
-
-                          return (
-                            <div
-                              key={player.id}
-                              className="flex items-center justify-between py-xs"
-                            >
-                              <div className="flex items-center gap-sm">
-                                <Avatar
-                                  src={player.user.avatarUrl}
-                                  name={player.user.displayName || "Player"}
-                                  size="sm"
-                                />
-                                <span className="text-caption">
-                                  {player.user.displayName || player.user.firstName}
-                                </span>
-                              </div>
-                              <span
-                                className={cn(
-                                  "text-caption font-semibold",
-                                  amount > 0
-                                    ? "text-success"
-                                    : amount < 0
-                                    ? "text-error"
-                                    : "text-muted"
-                                )}
-                              >
-                                {amount !== 0 ? formatMoney(amount) : "-"}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            <div className="flex flex-wrap gap-sm">
+              {round.games.map((game) => (
+                <Badge key={game.id} variant="accent">
+                  {gameTypeLabels[game.type]} ${Number(game.betAmount)}
+                </Badge>
+              ))}
             </div>
           ) : (
-            <Card>
-              <CardContent className="p-lg text-center">
-                <p className="text-muted">No games were played</p>
-              </CardContent>
-            </Card>
+            <p className="text-muted text-caption">No games were played</p>
           )}
         </div>
 
@@ -268,8 +205,9 @@ export default function SettlementPage() {
           {settlements.length > 0 ? (
             <div className="space-y-md">
               {settlements.map((settlement) => {
-                const isOwed = settlement.fromUser.id === user?.id;
+                const isOwed = settlement.fromUserId === user?.id;
                 const otherUser = isOwed ? settlement.toUser : settlement.fromUser;
+                const otherName = otherUser.displayName || otherUser.firstName || "Player";
 
                 return (
                   <Card key={settlement.id}>
@@ -277,13 +215,12 @@ export default function SettlementPage() {
                       <div className="flex items-center justify-between mb-md">
                         <div className="flex items-center gap-md">
                           <Avatar
-                            src={otherUser.avatarUrl}
-                            name={otherUser.displayName}
+                            name={otherName}
                             size="md"
                           />
                           <div>
                             <p className="text-body font-medium">
-                              {otherUser.displayName}
+                              {otherName}
                             </p>
                             <p className="text-caption text-muted">
                               {isOwed ? "You owe" : "Owes you"}
@@ -297,7 +234,7 @@ export default function SettlementPage() {
                               isOwed ? "text-error" : "text-success"
                             )}
                           >
-                            ${settlement.amount.toFixed(2)}
+                            ${Number(settlement.amount).toFixed(2)}
                           </p>
                           <Badge
                             variant={
@@ -320,14 +257,40 @@ export default function SettlementPage() {
                       </div>
 
                       {isOwed && settlement.status !== "PAID" && (
-                        <div className="flex gap-sm">
-                          <Button variant="secondary" className="flex-1" size="sm">
-                            <ExternalLink className="h-4 w-4 mr-1" />
-                            Venmo
-                          </Button>
-                          <Button variant="secondary" className="flex-1" size="sm">
-                            <ExternalLink className="h-4 w-4 mr-1" />
-                            CashApp
+                        <div className="space-y-sm">
+                          {/* Payment method buttons */}
+                          {settlement.toUser.paymentMethods.length > 0 ? (
+                            <div className="flex flex-wrap gap-sm">
+                              {settlement.toUser.paymentMethods.map((method) => (
+                                <Button
+                                  key={method.id}
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => handlePaymentClick(method.type, method.handle, Number(settlement.amount))}
+                                >
+                                  <ExternalLink className="h-4 w-4 mr-1" />
+                                  {method.type === "VENMO" ? "Venmo" :
+                                   method.type === "CASHAPP" ? "CashApp" :
+                                   method.type === "ZELLE" ? "Zelle" :
+                                   method.type === "APPLE_PAY" ? "Apple Pay" : method.type}
+                                </Button>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-caption text-muted">
+                              {otherName} hasn&apos;t set up payment methods yet
+                            </p>
+                          )}
+                          {/* Mark as paid button */}
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => handleMarkPaid(settlement.id)}
+                            disabled={markingPaid === settlement.id}
+                          >
+                            <Check className="h-4 w-4 mr-1" />
+                            {markingPaid === settlement.id ? "Marking..." : "Mark as Paid"}
                           </Button>
                         </div>
                       )}

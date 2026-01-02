@@ -108,6 +108,31 @@ export const api = {
       body: JSON.stringify({ url }),
     }, token),
 
+  extractCourseFromImage: async (token: string, file: File): Promise<ScrapedCourseData & { confidence?: string }> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+    const response = await fetch(`${API_URL}/courses/extract-from-image`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+      credentials: "include",
+    });
+
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new ApiError(
+        json.error?.code || "EXTRACTION_FAILED",
+        json.error || "Failed to extract scorecard from image",
+        response.status
+      );
+    }
+    return json.data;
+  },
+
   // Games
   addGame: (token: string, roundId: string, data: AddGameInput) =>
     apiRequest<Game>(`/games/${roundId}`, {
@@ -115,7 +140,17 @@ export const api = {
       body: JSON.stringify(data),
     }, token),
   calculateResults: (token: string, roundId: string) =>
-    apiRequest<GameResult[]>(`/games/${roundId}/calculate`, {
+    apiRequest<CalculateResultsResponse>(`/games/${roundId}/calculate`, {}, token),
+
+  // Settlements
+  getSettlements: (token: string, roundId: string) =>
+    apiRequest<ApiSettlement[]>(`/games/settlements/${roundId}`, {}, token),
+  markSettlementPaid: (token: string, settlementId: string) =>
+    apiRequest<ApiSettlement>(`/games/settlements/${settlementId}/paid`, {
+      method: "PATCH",
+    }, token),
+  finalizeRound: (token: string, roundId: string) =>
+    apiRequest<{ settlements: ApiSettlement[] }>(`/games/${roundId}/finalize`, {
       method: "POST",
     }, token),
 
@@ -393,10 +428,74 @@ export interface GameResult {
   netAmount: number;
 }
 
+export interface CalculateResultsResponse {
+  roundId: string;
+  games: Game[];
+  results: {
+    nassau?: {
+      front: { winnerId: string | null; margin: number };
+      back: { winnerId: string | null; margin: number };
+      overall: { winnerId: string | null; margin: number };
+      betAmount: number;
+    };
+    skins?: {
+      skins: { hole: number; winnerId: string | null; value: number }[];
+      totalPot: number;
+    };
+    matchPlay?: {
+      standings: { userId: string; money: number }[];
+    };
+    wolf?: {
+      standings: { userId: string; points: number }[];
+    };
+    nines?: {
+      standings: { userId: string; totalMoney: number }[];
+    };
+    stableford?: {
+      standings: { userId: string; money: number }[];
+    };
+    bingoBangoBongo?: {
+      standings: { userId: string; money: number }[];
+    };
+    vegas?: {
+      teams: { money: number }[];
+    };
+    snake?: {
+      standings: { userId: string; money: number }[];
+    };
+    banker?: {
+      standings: { userId: string; money: number }[];
+    };
+  };
+  presses: Press[];
+}
+
 export interface BillingStatus {
   status: "FREE" | "ACTIVE" | "PAST_DUE" | "CANCELED" | "FOUNDING";
   endsAt?: string;
   isFoundingMember: boolean;
+}
+
+export interface ApiSettlement {
+  id: string;
+  roundId: string;
+  fromUserId: string;
+  toUserId: string;
+  amount: number;
+  status: "PENDING" | "PAID" | "DISPUTED";
+  paidAt?: string;
+  fromUser: {
+    id: string;
+    displayName: string | null;
+    firstName: string | null;
+    paymentMethods: PaymentMethod[];
+  };
+  toUser: {
+    id: string;
+    displayName: string | null;
+    firstName: string | null;
+    paymentMethods: PaymentMethod[];
+  };
 }
 
 export interface Invite {
@@ -485,6 +584,7 @@ export interface UpdateScoreInput {
   holeNumber: number;
   strokes?: number;
   putts?: number;
+  playerId?: string;
 }
 
 export interface CreateInviteInput {

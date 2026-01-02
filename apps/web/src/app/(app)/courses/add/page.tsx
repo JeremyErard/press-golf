@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { Plus, Trash2, Check, Link as LinkIcon, Loader2, AlertCircle, Sparkles } from "lucide-react";
+import { Camera, Link as LinkIcon, Loader2, AlertCircle, Check, Edit3, Trash2, Plus } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Input, Badge } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -34,57 +34,52 @@ const defaultTees: TeeData[] = [
   { name: "White", color: "#FFFFFF", slopeRating: 125, courseRating: 70.5 },
 ];
 
-type EntryMode = "choose" | "url" | "manual";
-type Step = "info" | "holes" | "tees" | "review";
+type Step = "choose" | "extracting" | "review" | "edit-holes" | "edit-tees";
 
 export default function AddCoursePage() {
   const router = useRouter();
   const { getToken } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [entryMode, setEntryMode] = useState<EntryMode>("choose");
-  const [step, setStep] = useState<Step>("info");
+  const [step, setStep] = useState<Step>("choose");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isFetching, setIsFetching] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [extractError, setExtractError] = useState<string | null>(null);
 
-  // URL entry
-  const [url, setUrl] = useState("");
-
-  // Course info
+  // Course data
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
-  const [_website, setWebsite] = useState("");
-
-  // Holes
   const [holes, setHoles] = useState<HoleData[]>(defaultHoles);
-
-  // Tees
   const [tees, setTees] = useState<TeeData[]>(defaultTees);
+  const [confidence, setConfidence] = useState<string | null>(null);
 
-  const handleFetchFromUrl = async () => {
-    if (!url.trim()) return;
+  // URL entry
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [url, setUrl] = useState("");
+  const [isFetchingUrl, setIsFetchingUrl] = useState(false);
 
-    setIsFetching(true);
-    setFetchError(null);
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setStep("extracting");
+    setExtractError(null);
 
     try {
       const token = await getToken();
       if (!token) {
-        setFetchError("Not authenticated. Please sign in again.");
-        setIsFetching(false);
+        setExtractError("Not authenticated. Please sign in again.");
+        setStep("choose");
         return;
       }
 
-      console.log("Fetching course from URL:", url.trim());
-      const data = await api.fetchCourseFromUrl(token, url.trim());
-      console.log("Fetched course data:", data);
+      const data = await api.extractCourseFromImage(token, file);
 
-      // Populate form with scraped data
+      // Populate form with extracted data
       if (data.name) setName(data.name);
       if (data.city) setCity(data.city);
       if (data.state) setState(data.state);
-      if (data.website) setWebsite(data.website);
+      if (data.confidence) setConfidence(data.confidence);
 
       if (data.tees && data.tees.length > 0) {
         setTees(data.tees.map(t => ({
@@ -105,13 +100,68 @@ export default function AddCoursePage() {
         })));
       }
 
-      // Move to review step to show scraped data
       setStep("review");
     } catch (error) {
-      setFetchError(String(error) || "Failed to fetch course data");
-    } finally {
-      setIsFetching(false);
+      setExtractError(String(error) || "Failed to extract scorecard data");
+      setStep("choose");
     }
+  };
+
+  const handleFetchFromUrl = async () => {
+    if (!url.trim()) return;
+
+    setIsFetchingUrl(true);
+    setExtractError(null);
+
+    try {
+      const token = await getToken();
+      if (!token) {
+        setExtractError("Not authenticated. Please sign in again.");
+        setIsFetchingUrl(false);
+        return;
+      }
+
+      const data = await api.fetchCourseFromUrl(token, url.trim());
+
+      if (data.name) setName(data.name);
+      if (data.city) setCity(data.city);
+      if (data.state) setState(data.state);
+
+      if (data.tees && data.tees.length > 0) {
+        setTees(data.tees.map(t => ({
+          name: t.name,
+          color: t.color || "#3B82F6",
+          slopeRating: t.slopeRating || 120,
+          courseRating: t.courseRating || 70,
+          totalYardage: t.totalYardage,
+        })));
+      }
+
+      if (data.holes && data.holes.length > 0) {
+        setHoles(data.holes.map(h => ({
+          holeNumber: h.holeNumber,
+          par: h.par,
+          handicapRank: h.handicapRank,
+          yardages: h.yardages,
+        })));
+      }
+
+      setStep("review");
+    } catch (error) {
+      setExtractError(String(error) || "Failed to fetch course data");
+    } finally {
+      setIsFetchingUrl(false);
+    }
+  };
+
+  const handleManualEntry = () => {
+    setName("");
+    setCity("");
+    setState("");
+    setHoles(defaultHoles);
+    setTees(defaultTees);
+    setConfidence(null);
+    setStep("review");
   };
 
   const updateHolePar = (holeNumber: number, par: number) => {
@@ -181,152 +231,152 @@ export default function AddCoursePage() {
       <Header title="Add Course" showBack />
 
       <div className="p-lg space-y-lg">
-        {/* Entry Mode Selection */}
-        {entryMode === "choose" && (
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+
+        {/* Step: Choose Method */}
+        {step === "choose" && (
           <div className="space-y-lg">
-            <p className="text-center text-muted">How would you like to add a course?</p>
+            {extractError && (
+              <div className="flex items-start gap-sm p-md rounded-lg bg-error/10 border border-error/20">
+                <AlertCircle className="h-5 w-5 text-error flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-caption text-error font-medium">Extraction Failed</p>
+                  <p className="text-caption text-error/80">{extractError}</p>
+                </div>
+              </div>
+            )}
 
+            {/* Primary: Photo */}
             <Card
-              className="cursor-pointer hover:border-brand transition-colors"
-              onClick={() => setEntryMode("url")}
+              className="cursor-pointer hover:border-brand transition-colors border-2 border-brand/50"
+              onClick={() => fileInputRef.current?.click()}
             >
-              <CardContent className="p-lg">
-                <div className="flex items-center gap-md">
-                  <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center">
-                    <Sparkles className="h-6 w-6 text-brand" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-body font-semibold">Import from URL</p>
-                    <p className="text-caption text-muted">
-                      Paste a course website link and we will extract the data automatically
-                    </p>
-                  </div>
+              <CardContent className="p-xl text-center">
+                <div className="w-16 h-16 rounded-full bg-brand/20 flex items-center justify-center mx-auto mb-md">
+                  <Camera className="h-8 w-8 text-brand" />
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card
-              className="cursor-pointer hover:border-brand transition-colors"
-              onClick={() => {
-                setEntryMode("manual");
-                setStep("info");
-              }}
-            >
-              <CardContent className="p-lg">
-                <div className="flex items-center gap-md">
-                  <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center">
-                    <Plus className="h-6 w-6 text-muted" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-body font-semibold">Enter Manually</p>
-                    <p className="text-caption text-muted">
-                      Add course details, pars, and tees by hand
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* URL Entry */}
-        {entryMode === "url" && step === "info" && (
-          <div className="space-y-lg">
-            <Card>
-              <CardContent className="p-lg space-y-lg">
-                <div className="flex items-center gap-sm mb-md">
-                  <Sparkles className="h-5 w-5 text-brand" />
-                  <p className="text-body font-medium">Import from Website</p>
-                </div>
-
-                <div className="relative">
-                  <LinkIcon className="absolute left-md top-1/2 -translate-y-1/2 h-5 w-5 text-muted" />
-                  <input
-                    type="url"
-                    placeholder="https://example-golf-club.com"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    className="w-full h-12 pl-12 pr-md rounded-md border border-border bg-surface text-body text-foreground placeholder:text-subtle focus-ring"
-                  />
-                </div>
-
+                <p className="text-h3 font-semibold mb-xs">Take Photo of Scorecard</p>
                 <p className="text-caption text-muted">
-                  Paste the URL of the golf course's website. We will try to find the scorecard and extract course data automatically.
+                  Snap a picture of the scorecard and we will extract all the data automatically
                 </p>
-
-                {fetchError && (
-                  <div className="flex items-start gap-sm p-md rounded-lg bg-error/10 border border-error/20">
-                    <AlertCircle className="h-5 w-5 text-error flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-caption text-error font-medium">Import Failed</p>
-                      <p className="text-caption text-error/80">{fetchError}</p>
-                    </div>
-                  </div>
-                )}
+                <Badge variant="brand" className="mt-md">Recommended</Badge>
               </CardContent>
             </Card>
 
-            <div className="flex gap-md">
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={() => setEntryMode("choose")}
+            {/* Secondary: URL */}
+            {!showUrlInput ? (
+              <button
+                onClick={() => setShowUrlInput(true)}
+                className="w-full text-center text-caption text-muted hover:text-foreground transition-colors py-sm"
               >
-                Back
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={handleFetchFromUrl}
-                disabled={!url.trim() || isFetching}
-              >
-                {isFetching ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Importing...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    Import Course
-                  </>
-                )}
-              </Button>
-            </div>
+                Or import from website URL
+              </button>
+            ) : (
+              <Card>
+                <CardContent className="p-lg space-y-md">
+                  <div className="flex items-center gap-sm">
+                    <LinkIcon className="h-5 w-5 text-muted" />
+                    <p className="text-body font-medium">Import from URL</p>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="url"
+                      placeholder="https://example-golf-club.com"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      className="w-full h-12 px-md rounded-md border border-border bg-surface text-body text-foreground placeholder:text-subtle focus-ring"
+                    />
+                  </div>
+                  <div className="flex gap-sm">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setShowUrlInput(false);
+                        setUrl("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleFetchFromUrl}
+                      disabled={!url.trim() || isFetchingUrl}
+                      className="flex-1"
+                    >
+                      {isFetchingUrl ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Importing...
+                        </>
+                      ) : (
+                        "Import"
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
+            {/* Tertiary: Manual */}
             <button
-              className="w-full text-center text-caption text-muted hover:text-foreground transition-colors"
-              onClick={() => {
-                setEntryMode("manual");
-                setStep("info");
-              }}
+              onClick={handleManualEntry}
+              className="w-full text-center text-caption text-muted hover:text-foreground transition-colors py-sm"
             >
-              Or enter details manually
+              Enter details manually
             </button>
           </div>
         )}
 
-        {/* Review Scraped Data */}
+        {/* Step: Extracting */}
+        {step === "extracting" && (
+          <div className="text-center py-xl">
+            <Loader2 className="h-12 w-12 text-brand animate-spin mx-auto mb-lg" />
+            <p className="text-h3 font-semibold mb-xs">Reading Scorecard...</p>
+            <p className="text-caption text-muted">
+              Extracting course data from your photo
+            </p>
+          </div>
+        )}
+
+        {/* Step: Review */}
         {step === "review" && (
           <div className="space-y-lg">
-            <div className="flex items-center gap-sm">
-              <Check className="h-5 w-5 text-success" />
-              <p className="text-body font-medium">Course Data Imported</p>
-            </div>
+            {confidence && (
+              <div className="flex items-center gap-sm">
+                <Check className="h-5 w-5 text-success" />
+                <p className="text-body font-medium">
+                  Scorecard Extracted
+                  {confidence === "high" && " (High Confidence)"}
+                  {confidence === "medium" && " (Medium Confidence)"}
+                  {confidence === "low" && " (Low Confidence - Please Review)"}
+                </p>
+              </div>
+            )}
 
+            {/* Course Info */}
             <Card>
               <CardContent className="p-lg space-y-md">
                 <div>
-                  <p className="text-caption text-muted">Course Name</p>
+                  <p className="text-caption text-muted mb-xs">Course Name *</p>
                   <Input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Course name"
+                    placeholder="Enter course name"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-md">
                   <div>
-                    <p className="text-caption text-muted">City</p>
+                    <p className="text-caption text-muted mb-xs">City</p>
                     <Input
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
@@ -334,7 +384,7 @@ export default function AddCoursePage() {
                     />
                   </div>
                   <div>
-                    <p className="text-caption text-muted">State</p>
+                    <p className="text-caption text-muted mb-xs">State</p>
                     <Input
                       value={state}
                       onChange={(e) => setState(e.target.value)}
@@ -350,7 +400,16 @@ export default function AddCoursePage() {
               <CardContent className="p-lg">
                 <div className="flex items-center justify-between mb-md">
                   <p className="text-body font-medium">Holes</p>
-                  <Badge variant="brand">Par {getTotalPar()}</Badge>
+                  <div className="flex items-center gap-sm">
+                    <Badge variant="brand">Par {getTotalPar()}</Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setStep("edit-holes")}
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-9 gap-1 mb-md">
@@ -369,22 +428,22 @@ export default function AddCoursePage() {
                     </div>
                   ))}
                 </div>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full mt-md"
-                  onClick={() => setStep("holes")}
-                >
-                  Edit Pars
-                </Button>
               </CardContent>
             </Card>
 
             {/* Tees Summary */}
             <Card>
               <CardContent className="p-lg">
-                <p className="text-body font-medium mb-md">Tees</p>
+                <div className="flex items-center justify-between mb-md">
+                  <p className="text-body font-medium">Tees</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setStep("edit-tees")}
+                  >
+                    <Edit3 className="h-4 w-4" />
+                  </Button>
+                </div>
 
                 <div className="space-y-sm">
                   {tees.map((tee, index) => (
@@ -394,7 +453,7 @@ export default function AddCoursePage() {
                           className="w-4 h-4 rounded-full border border-border"
                           style={{ backgroundColor: tee.color }}
                         />
-                        <span className="text-body">{tee.name}</span>
+                        <span className="text-body">{tee.name || "Unnamed"}</span>
                       </div>
                       <div className="flex items-center gap-md text-caption text-muted">
                         <span>Slope: {tee.slopeRating}</span>
@@ -404,28 +463,20 @@ export default function AddCoursePage() {
                     </div>
                   ))}
                 </div>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full mt-md"
-                  onClick={() => setStep("tees")}
-                >
-                  Edit Tees
-                </Button>
               </CardContent>
             </Card>
 
+            {/* Actions */}
             <div className="flex gap-md">
               <Button
                 variant="secondary"
                 className="flex-1"
                 onClick={() => {
-                  setStep("info");
-                  setEntryMode("url");
+                  setStep("choose");
+                  setConfidence(null);
                 }}
               >
-                Back
+                Start Over
               </Button>
               <Button
                 className="flex-1"
@@ -440,91 +491,8 @@ export default function AddCoursePage() {
           </div>
         )}
 
-        {/* Manual Entry - Step Indicator */}
-        {entryMode === "manual" && step !== "review" && (
-          <>
-            <div className="flex items-center gap-sm justify-center">
-              {["info", "holes", "tees"].map((s, i) => (
-                <div key={s} className="flex items-center">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-label font-semibold ${
-                      step === s
-                        ? "bg-brand text-white"
-                        : i < ["info", "holes", "tees"].indexOf(step)
-                        ? "bg-success text-white"
-                        : "bg-surface text-muted"
-                    }`}
-                  >
-                    {i < ["info", "holes", "tees"].indexOf(step) ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      i + 1
-                    )}
-                  </div>
-                  {i < 2 && (
-                    <div
-                      className={`w-8 h-0.5 ${
-                        i < ["info", "holes", "tees"].indexOf(step)
-                          ? "bg-success"
-                          : "bg-border"
-                      }`}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Step: Course Info (Manual) */}
-        {entryMode === "manual" && step === "info" && (
-          <div className="space-y-lg">
-            <Card>
-              <CardContent className="p-lg space-y-lg">
-                <Input
-                  label="Course Name"
-                  placeholder="e.g., Augusta National"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-                <div className="grid grid-cols-2 gap-md">
-                  <Input
-                    label="City"
-                    placeholder="e.g., Augusta"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                  />
-                  <Input
-                    label="State"
-                    placeholder="e.g., GA"
-                    value={state}
-                    onChange={(e) => setState(e.target.value)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="flex gap-md">
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={() => setEntryMode("choose")}
-              >
-                Back
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={() => setStep("holes")}
-                disabled={!name.trim()}
-              >
-                Next: Set Pars
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step: Holes */}
-        {step === "holes" && (
+        {/* Step: Edit Holes */}
+        {step === "edit-holes" && (
           <div className="space-y-lg">
             <Card>
               <CardContent className="p-lg">
@@ -586,26 +554,15 @@ export default function AddCoursePage() {
               </CardContent>
             </Card>
 
-            <div className="flex gap-md">
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={() => entryMode === "manual" ? setStep("info") : setStep("review")}
-              >
-                Back
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={() => entryMode === "manual" ? setStep("tees") : setStep("review")}
-              >
-                {entryMode === "manual" ? "Next: Add Tees" : "Done"}
-              </Button>
-            </div>
+            <Button className="w-full" onClick={() => setStep("review")}>
+              <Check className="h-4 w-4 mr-2" />
+              Done
+            </Button>
           </div>
         )}
 
-        {/* Step: Tees */}
-        {step === "tees" && (
+        {/* Step: Edit Tees */}
+        {step === "edit-tees" && (
           <div className="space-y-lg">
             {tees.map((tee, index) => (
               <Card key={index}>
@@ -659,12 +616,12 @@ export default function AddCoursePage() {
                     <p className="text-caption text-muted mb-xs">Color</p>
                     <div className="flex gap-sm">
                       {[
+                        "#000000", // Black
                         "#3B82F6", // Blue
                         "#FFFFFF", // White
                         "#EAB308", // Gold
                         "#EF4444", // Red
                         "#22C55E", // Green
-                        "#000000", // Black
                       ].map((color) => (
                         <button
                           key={color}
@@ -692,23 +649,10 @@ export default function AddCoursePage() {
               Add Another Tee
             </Button>
 
-            <div className="flex gap-md">
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={() => entryMode === "manual" ? setStep("holes") : setStep("review")}
-              >
-                Back
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={entryMode === "manual" ? handleSubmit : () => setStep("review")}
-                isLoading={isSubmitting}
-              >
-                <Check className="h-4 w-4 mr-2" />
-                {entryMode === "manual" ? "Create Course" : "Done"}
-              </Button>
-            </div>
+            <Button className="w-full" onClick={() => setStep("review")}>
+              <Check className="h-4 w-4 mr-2" />
+              Done
+            </Button>
           </div>
         )}
       </div>

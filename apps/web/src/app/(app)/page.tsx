@@ -1,40 +1,193 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronRight, Play } from "lucide-react";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
 import { PendingApprovals } from "@/components/handicap/pending-approvals";
-import { api, type Round } from "@/lib/api";
-import { formatDate } from "@/lib/utils";
+import { api, type Round, type RoundDetail, type CalculateResultsResponse } from "@/lib/api";
+import { formatDate, formatMoney } from "@/lib/utils";
+
+interface RoundWithEarnings extends Round {
+  earnings?: number;
+  courseName?: string;
+  games?: { type: string; betAmount: number }[];
+}
 
 export default function DashboardPage() {
   const { getToken } = useAuth();
   const { user } = useUser();
-  const [rounds, setRounds] = useState<Round[]>([]);
+  const [rounds, setRounds] = useState<RoundWithEarnings[]>([]);
+  const [activeRoundDetail, setActiveRoundDetail] = useState<RoundDetail | null>(null);
+  const [activeRoundResults, setActiveRoundResults] = useState<CalculateResultsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchRounds() {
+    async function fetchData() {
       try {
         const token = await getToken();
         if (!token) return;
-        const data = await api.getRounds(token);
-        setRounds(data);
+
+        const roundsData = await api.getRounds(token);
+
+        // For completed rounds, calculate earnings
+        const roundsWithEarnings: RoundWithEarnings[] = [];
+        for (const round of roundsData) {
+          const roundWithEarnings: RoundWithEarnings = { ...round };
+
+          if (round.status === "COMPLETED") {
+            try {
+              // Get round details for course name
+              const detail = await api.getRound(token, round.id);
+              roundWithEarnings.courseName = detail.course.name;
+              roundWithEarnings.games = detail.games.map(g => ({ type: g.type, betAmount: Number(g.betAmount) }));
+
+              // Calculate results for this round
+              const resultsResponse = await api.calculateResults(token, round.id);
+
+              // Find current user's player in this round and sum their earnings from all games
+              const currentPlayer = detail.players.find(p => p.user.id === user?.id);
+              if (currentPlayer && resultsResponse.results) {
+                let earnings = 0;
+
+                // Sum up money from each game type's standings
+                const { results } = resultsResponse;
+                if (results.nassau) {
+                  const betAmount = results.nassau.betAmount || 0;
+                  // Calculate Nassau earnings based on wins
+                  if (results.nassau.front.winnerId === currentPlayer.userId) earnings += betAmount;
+                  else if (results.nassau.front.winnerId) earnings -= betAmount;
+                  if (results.nassau.back.winnerId === currentPlayer.userId) earnings += betAmount;
+                  else if (results.nassau.back.winnerId) earnings -= betAmount;
+                  if (results.nassau.overall.winnerId === currentPlayer.userId) earnings += betAmount;
+                  else if (results.nassau.overall.winnerId) earnings -= betAmount;
+                }
+                if (results.matchPlay?.standings) {
+                  const standing = results.matchPlay.standings.find(s => s.userId === currentPlayer.userId);
+                  if (standing) earnings += standing.money;
+                }
+                if (results.skins?.skins) {
+                  earnings += results.skins.skins
+                    .filter(s => s.winnerId === currentPlayer.userId)
+                    .reduce((sum, s) => sum + s.value, 0);
+                }
+                if (results.wolf?.standings) {
+                  const standing = results.wolf.standings.find(s => s.userId === currentPlayer.userId);
+                  if (standing) earnings += standing.points;
+                }
+                if (results.nines?.standings) {
+                  const standing = results.nines.standings.find(s => s.userId === currentPlayer.userId);
+                  if (standing) earnings += standing.totalMoney;
+                }
+                if (results.stableford?.standings) {
+                  const standing = results.stableford.standings.find(s => s.userId === currentPlayer.userId);
+                  if (standing) earnings += standing.money;
+                }
+                if (results.bingoBangoBongo?.standings) {
+                  const standing = results.bingoBangoBongo.standings.find(s => s.userId === currentPlayer.userId);
+                  if (standing) earnings += standing.money;
+                }
+                if (results.snake?.standings) {
+                  const standing = results.snake.standings.find(s => s.userId === currentPlayer.userId);
+                  if (standing) earnings += standing.money;
+                }
+                if (results.banker?.standings) {
+                  const standing = results.banker.standings.find(s => s.userId === currentPlayer.userId);
+                  if (standing) earnings += standing.money;
+                }
+
+                roundWithEarnings.earnings = earnings;
+              }
+            } catch {
+              // Skip if we can't get results for this round
+            }
+          } else if (round.status === "ACTIVE") {
+            // Get active round details
+            try {
+              const detail = await api.getRound(token, round.id);
+              setActiveRoundDetail(detail);
+              roundWithEarnings.courseName = detail.course.name;
+              roundWithEarnings.games = detail.games.map(g => ({ type: g.type, betAmount: Number(g.betAmount) }));
+
+              // Try to get current results
+              const results = await api.calculateResults(token, round.id);
+              setActiveRoundResults(results);
+            } catch {
+              // Results might not be available yet
+            }
+          }
+
+          roundsWithEarnings.push(roundWithEarnings);
+        }
+
+        setRounds(roundsWithEarnings);
       } catch (error) {
-        console.error("Failed to fetch rounds:", error);
+        console.error("Failed to fetch data:", error);
       } finally {
         setIsLoading(false);
       }
     }
 
-    fetchRounds();
-  }, [getToken]);
+    fetchData();
+  }, [getToken, user?.id]);
 
   const activeRound = rounds.find((r) => r.status === "ACTIVE");
   const recentRounds = rounds.filter((r) => r.status === "COMPLETED").slice(0, 3);
+
+  // Calculate career earnings from all completed rounds
+  const careerEarnings = useMemo(() => {
+    return rounds
+      .filter(r => r.status === "COMPLETED" && r.earnings !== undefined)
+      .reduce((sum, r) => sum + (r.earnings || 0), 0);
+  }, [rounds]);
+
+  // Get current hole and match status for active round
+  const activeRoundStatus = useMemo(() => {
+    if (!activeRoundDetail || !user) return null;
+
+    // Find the highest hole with a score to determine current hole
+    let currentHole = 1;
+    activeRoundDetail.players.forEach(player => {
+      player.scores?.forEach(score => {
+        if (score.strokes && score.holeNumber > currentHole) {
+          currentHole = score.holeNumber;
+        }
+      });
+    });
+
+    // Calculate user's current match position from results
+    const currentPlayer = activeRoundDetail.players.find(p => p.user.id === user.id);
+    let userNet = 0;
+    if (currentPlayer && activeRoundResults?.results) {
+      const { results } = activeRoundResults;
+      // For Nassau and Match Play, show holes up/down rather than money
+      if (results.nassau) {
+        const { front, back, overall } = results.nassau;
+        // Use overall score for net position
+        if (overall.winnerId === currentPlayer.userId) {
+          userNet = overall.margin;
+        } else if (overall.winnerId) {
+          userNet = -overall.margin;
+        }
+      } else if (results.matchPlay?.standings) {
+        const standing = results.matchPlay.standings.find(s => s.userId === currentPlayer.userId);
+        if (standing) userNet = standing.money > 0 ? 1 : standing.money < 0 ? -1 : 0;
+      }
+    }
+
+    // Get game info
+    const primaryGame = activeRoundDetail.games[0];
+    const gameLabel = primaryGame ? `${primaryGame.type.replace(/_/g, " ")} $${Number(primaryGame.betAmount)}` : null;
+
+    return {
+      currentHole,
+      courseName: activeRoundDetail.course.name,
+      netPosition: userNet,
+      gameLabel,
+    };
+  }, [activeRoundDetail, activeRoundResults, user]);
 
   // Get greeting based on time of day
   const getGreeting = () => {
@@ -43,9 +196,6 @@ export default function DashboardPage() {
     if (hour < 17) return "Good Afternoon,";
     return "Good Evening,";
   };
-
-  // Mock career earnings for now
-  const careerEarnings = 345;
 
   return (
     <div className="min-h-screen pb-28">
@@ -103,19 +253,19 @@ export default function DashboardPage() {
           {/* Content */}
           <div className="relative z-10 p-5">
             <p className="text-gray-400 text-sm font-medium mb-1">Career Earnings</p>
-            <p className="text-[3.5rem] font-bold text-green-400 leading-none tracking-tight">
-              +${careerEarnings}
+            <p className={`text-[3.5rem] font-bold leading-none tracking-tight ${careerEarnings >= 0 ? "text-green-400" : "text-red-400"}`}>
+              {careerEarnings >= 0 ? "+" : ""}{formatMoney(careerEarnings)}
             </p>
             <div className="mt-4">
               <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-green-500/20 text-green-400 border border-green-500/30">
-                Career Nassau Net
+                Career Net
               </span>
             </div>
           </div>
         </div>
 
         {/* Active Round Card (if exists) */}
-        {activeRound && (
+        {activeRound && activeRoundStatus && (
           <Link href={`/rounds/${activeRound.id}/scorecard`}>
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#111d32] to-[#0f1a2e] border border-white/5 shadow-lg">
               {/* Course Image Background */}
@@ -137,19 +287,26 @@ export default function DashboardPage() {
               <div className="relative z-10 p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-500 text-[10px] font-bold text-black">
-                    6
+                    {activeRoundStatus.currentHole}
                   </span>
-                  <span className="text-amber-400 text-sm font-semibold">Hole 6</span>
+                  <span className="text-amber-400 text-sm font-semibold">Hole {activeRoundStatus.currentHole}</span>
                 </div>
 
                 <h3 className="text-white font-bold text-lg mb-1">
-                  Oakmont CC - You are 2 UP
+                  {activeRoundStatus.courseName}
+                  {activeRoundStatus.netPosition !== 0 && (
+                    <span className={activeRoundStatus.netPosition > 0 ? "text-green-400" : "text-red-400"}>
+                      {" - "}You are {Math.abs(activeRoundStatus.netPosition)} {activeRoundStatus.netPosition > 0 ? "UP" : "DOWN"}
+                    </span>
+                  )}
                 </h3>
 
                 <div className="flex items-center justify-between mt-4">
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                    Nassau $5
-                  </Badge>
+                  {activeRoundStatus.gameLabel && (
+                    <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                      {activeRoundStatus.gameLabel}
+                    </Badge>
+                  )}
                   <Button size="sm" className="bg-brand hover:bg-brand-dark text-white font-semibold px-4">
                     <Play className="w-3 h-3 mr-1.5 fill-current" />
                     Resume Round
@@ -199,14 +356,18 @@ export default function DashboardPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-white font-semibold">
-                            {formatDate(round.date)}
+                            {round.courseName || formatDate(round.date)}
                           </p>
                           <p className="text-sm text-gray-400 mt-0.5">
-                            {round._count?.players || 0} players
+                            {formatDate(round.date)} • {round._count?.players || 0} players
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-green-400 font-bold text-lg">+$45</span>
+                          {round.earnings !== undefined && (
+                            <span className={`font-bold text-lg ${round.earnings >= 0 ? "text-green-400" : "text-red-400"}`}>
+                              {round.earnings >= 0 ? "+" : ""}{formatMoney(round.earnings)}
+                            </span>
+                          )}
                           <ChevronRight className="h-5 w-5 text-gray-500" />
                         </div>
                       </div>
