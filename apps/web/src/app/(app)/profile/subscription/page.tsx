@@ -166,41 +166,56 @@ export default function SubscriptionPage() {
 
           <div className="bg-card border border-border rounded-xl divide-y divide-border">
             {[
-              "Unlimited rounds",
-              "All game types (Nassau, Skins, Wolf, etc.)",
-              "Automatic scoring calculations",
-              "Settlement tracking",
-              "Player statistics",
-              "Invite buddies to rounds",
+              { title: "Unlimited rounds", desc: "Track as many rounds as you play" },
+              { title: "All 10 game types", desc: "Nassau, Skins, Match Play, Wolf, Nines, Stableford, Bingo Bango Bongo, Vegas, Snake, Banker" },
+              { title: "Auto-calculations", desc: "Scores, handicaps, and winnings calculated instantly" },
+              { title: "Settlement tracking", desc: "Know who owes who and track payments" },
+              { title: "Player statistics", desc: "View your career earnings and performance" },
+              { title: "Buddy system", desc: "Save regular playing partners for quick invites" },
             ].map((feature) => (
-              <div key={feature} className="flex items-center gap-3 p-4">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center ${isActive ? "bg-brand/20 text-brand" : "bg-muted/20 text-muted"}`}>
+              <div key={feature.title} className="flex items-start gap-3 p-4">
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center mt-0.5 ${isActive ? "bg-brand/20 text-brand" : "bg-muted/20 text-muted"}`}>
                   <Check className="w-3 h-3" />
                 </div>
-                <span className={isActive ? "text-foreground" : "text-muted"}>
-                  {feature}
-                </span>
+                <div>
+                  <span className={`font-medium ${isActive ? "text-foreground" : "text-muted"}`}>
+                    {feature.title}
+                  </span>
+                  <p className="text-xs text-muted mt-0.5">{feature.desc}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Upgrade Button (only for free users) */}
+        {/* Pricing & Upgrade Button (only for free users) */}
         {!isActive && (
-          <button
-            onClick={handleUpgrade}
-            disabled={actionLoading}
-            className="w-full py-4 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {actionLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                <Crown className="w-5 h-5" />
-                Upgrade to Pro
-              </>
-            )}
-          </button>
+          <div className="space-y-4">
+            {/* Pricing Card */}
+            <div className="bg-gradient-to-br from-brand/20 to-green-600/10 border border-brand/30 rounded-2xl p-6 text-center">
+              <p className="text-sm text-brand font-medium mb-2">Press Pro</p>
+              <div className="flex items-baseline justify-center gap-1">
+                <span className="text-4xl font-bold text-white">$4.99</span>
+                <span className="text-muted">/month</span>
+              </div>
+              <p className="text-sm text-muted mt-2">Cancel anytime</p>
+            </div>
+
+            <button
+              onClick={handleUpgrade}
+              disabled={actionLoading}
+              className="w-full py-4 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {actionLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <Crown className="w-5 h-5" />
+                  Upgrade to Pro
+                </>
+              )}
+            </button>
+          </div>
         )}
       </div>
     </div>
