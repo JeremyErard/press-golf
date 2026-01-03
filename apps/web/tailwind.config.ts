@@ -14,6 +14,7 @@ const config: Config = {
         background: "var(--bg-primary)",
         surface: "var(--bg-surface)",
         elevated: "var(--bg-elevated)",
+        card: "var(--bg-card)",
 
         // Brand
         brand: {
