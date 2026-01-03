@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth, useUser } from "@clerk/nextjs";
 import {
   Crown,
@@ -31,6 +31,7 @@ const steps = [
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { getToken } = useAuth();
   const { user: clerkUser } = useUser();
 
@@ -40,6 +41,8 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+
+  const checkoutSuccess = searchParams.get("checkout") === "success";
 
   // Step 2: Profile
   const [firstName, setFirstName] = useState("");
@@ -56,6 +59,9 @@ export default function OnboardingPage() {
 
   // Check subscription status and PWA install prompt
   useEffect(() => {
+    let pollCount = 0;
+    let pollInterval: NodeJS.Timeout | null = null;
+
     async function checkStatus() {
       try {
         const token = await getToken();
@@ -68,19 +74,44 @@ export default function OnboardingPage() {
 
         // If already subscribed or founding member, skip to profile
         if (status.status === "ACTIVE" || status.status === "FOUNDING" || status.isFoundingMember) {
+          if (pollInterval) clearInterval(pollInterval);
           setCurrentStep(2);
           // Pre-fill from Clerk
           setFirstName(clerkUser?.firstName || "");
           setLastName(clerkUser?.lastName || "");
+          setCheckingSubscription(false);
+          // Clear the query param
+          if (checkoutSuccess) {
+            router.replace("/onboarding");
+          }
+        } else if (checkoutSuccess && pollCount < 10) {
+          // If returning from checkout, poll until subscription is active
+          pollCount++;
+          // Keep checking
+        } else {
+          setCheckingSubscription(false);
         }
       } catch (err) {
         console.error("Status check failed:", err);
-      } finally {
         setCheckingSubscription(false);
       }
     }
 
     checkStatus();
+
+    // If returning from checkout success, poll for subscription status
+    if (checkoutSuccess) {
+      pollInterval = setInterval(checkStatus, 1500);
+      // Stop polling after 15 seconds max
+      setTimeout(() => {
+        if (pollInterval) clearInterval(pollInterval);
+        setCheckingSubscription(false);
+      }, 15000);
+    }
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
 
     // Listen for PWA install prompt
     const handleBeforeInstall = (e: Event) => {
@@ -95,7 +126,7 @@ export default function OnboardingPage() {
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
     return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
-  }, [getToken, clerkUser]);
+  }, [getToken, clerkUser, checkoutSuccess, router]);
 
   // Pre-fill profile from Clerk when moving to step 2
   useEffect(() => {
@@ -223,7 +254,9 @@ export default function OnboardingPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted mt-4">Loading...</p>
+          <p className="text-muted mt-4">
+            {checkoutSuccess ? "Confirming your subscription..." : "Loading..."}
+          </p>
         </div>
       </div>
     );

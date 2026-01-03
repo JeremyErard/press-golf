@@ -82,8 +82,8 @@ export default async function billingRoutes(fastify: FastifyInstance) {
             quantity: 1,
           },
         ],
-        success_url: `${FRONTEND_URL}/?checkout=success`,
-        cancel_url: `${FRONTEND_URL}/?checkout=canceled`,
+        success_url: `${FRONTEND_URL}/onboarding?checkout=success`,
+        cancel_url: `${FRONTEND_URL}/onboarding?checkout=canceled`,
         metadata: {
           userId: dbUser.id,
         },
