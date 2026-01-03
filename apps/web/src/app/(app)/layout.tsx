@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { OnboardingCheck } from "@/components/handicap/onboarding-check";
@@ -13,6 +14,8 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   const { isLoaded } = useAuth();
+  const pathname = usePathname();
+  const isOnboarding = pathname?.startsWith("/onboarding");
 
   useEffect(() => {
     // Register service worker and set up PWA
@@ -33,7 +36,7 @@ export default function AppLayout({
 
   return (
     <OnboardingCheck>
-      <div className="min-h-screen pb-20 relative">
+      <div className={`min-h-screen relative ${isOnboarding ? "" : "pb-20"}`}>
         {/* Subtle golf course background */}
         <div className="fixed inset-0 -z-10">
           <Image
@@ -50,7 +53,7 @@ export default function AppLayout({
         <main className="max-w-lg mx-auto">
           {children}
         </main>
-        <BottomNav />
+        {!isOnboarding && <BottomNav />}
       </div>
     </OnboardingCheck>
   );

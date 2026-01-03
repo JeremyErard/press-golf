@@ -26,11 +26,22 @@ export function OnboardingCheck({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const status = await api.getHandicapStatus(token);
+        // Check subscription status first
+        const status = await api.getBillingStatus(token);
+        const isSubscribed = status.status === "ACTIVE" || status.status === "FOUNDING" || status.isFoundingMember;
 
-        // If no handicap set, redirect to onboarding
-        if (status.status === "none") {
-          router.push("/onboarding/handicap");
+        if (!isSubscribed) {
+          // Not subscribed - go to onboarding to subscribe
+          router.push("/onboarding");
+          return;
+        }
+
+        // Check if user has completed basic profile setup
+        const user = await api.getMe(token);
+
+        // If no firstName, redirect to onboarding (they're subscribed, skip to step 2)
+        if (!user.firstName) {
+          router.push("/onboarding");
           return;
         }
 
