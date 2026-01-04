@@ -73,10 +73,9 @@ async function main() {
           tees: {
             create: {
               name: 'Blue',
-              color: 'BLUE',
-              rating: 72.5,
-              slope: 130,
-              isPrimary: true,
+              color: '#0000FF',
+              courseRating: new Decimal(72.5),
+              slopeRating: 130,
             },
           },
         },
@@ -89,11 +88,9 @@ async function main() {
         await prisma.hole.create({
           data: {
             courseId: course.id,
-            teeId: course.tees[0].id,
             holeNumber: i + 1,
             par: pars[i],
             handicapRank: ((i * 7) % 18) + 1, // Distribute handicap ranks
-            yardage: 350 + Math.floor(Math.random() * 200),
           },
         });
       }
@@ -127,7 +124,7 @@ async function main() {
       users.map(async (user, index) => {
         // Calculate course handicap
         const courseHandicap = Math.round(
-          Number(user.handicapIndex) * (course!.tees[0].slope / 113)
+          Number(user.handicapIndex) * ((course!.tees[0].slopeRating || 113) / 113)
         );
 
         const rp = await prisma.roundPlayer.create({
