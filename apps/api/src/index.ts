@@ -12,6 +12,7 @@ import inviteRoutes from './routes/invites.js';
 import webhookRoutes from './routes/webhooks.js';
 import buddyRoutes from './routes/buddies.js';
 import handicapRoutes from './routes/handicap.js';
+import { adminRoutes } from './routes/admin.js';
 import { prisma } from './lib/prisma.js';
 
 // Simple in-memory metrics
@@ -206,6 +207,7 @@ await app.register(inviteRoutes, { prefix: '/api' });
 await app.register(webhookRoutes, { prefix: '/api' });
 await app.register(buddyRoutes, { prefix: '/api' });
 await app.register(handicapRoutes, { prefix: '/api/handicap' });
+await app.register(adminRoutes);
 
 // Start server
 const start = async () => {
