@@ -1,12 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { MapPin, Check, Flag } from "lucide-react";
+import { MapPin, Check, Flag, ChevronDown } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, Skeleton } from "@/components/ui";
-import { api, type CourseDetail } from "@/lib/api";
+import { api, type CourseDetail, type Tee } from "@/lib/api";
+
+// Helper to categorize tees as primary vs alternate
+function categorizeTees(tees: Tee[]): { primary: Tee[]; alternate: Tee[] } {
+  const alternate: Tee[] = [];
+  const primary: Tee[] = [];
+
+  for (const tee of tees) {
+    const name = tee.name.toLowerCase();
+    if (
+      name.includes("/") ||
+      name.includes("family") ||
+      name.includes("combo") ||
+      name.includes("(gold)") ||
+      name.includes("(white)") ||
+      name.includes("left #")
+    ) {
+      alternate.push(tee);
+    } else {
+      primary.push(tee);
+    }
+  }
+
+  primary.sort((a, b) => (b.totalYardage || 0) - (a.totalYardage || 0));
+  alternate.sort((a, b) => (b.totalYardage || 0) - (a.totalYardage || 0));
+
+  return { primary, alternate };
+}
 
 export default function CourseDetailPage() {
   const params = useParams();
@@ -14,6 +41,13 @@ export default function CourseDetailPage() {
   const [course, setCourse] = useState<CourseDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showAlternateTees, setShowAlternateTees] = useState(false);
+
+  // Categorize tees into primary and alternate
+  const { primary: primaryTees, alternate: alternateTees } = useMemo(() => {
+    if (!course?.tees) return { primary: [], alternate: [] };
+    return categorizeTees(course.tees);
+  }, [course?.tees]);
 
   useEffect(() => {
     async function fetchCourse() {
@@ -108,7 +142,8 @@ export default function CourseDetailPage() {
             </h3>
             <Card>
               <CardContent className="p-0 divide-y divide-border">
-                {course.tees.map((tee) => (
+                {/* Primary Tees */}
+                {primaryTees.map((tee) => (
                   <div
                     key={tee.id}
                     className="flex items-center justify-between p-lg"
@@ -139,6 +174,55 @@ export default function CourseDetailPage() {
                     </div>
                   </div>
                 ))}
+
+                {/* Alternate Tees (Expandable) */}
+                {alternateTees.length > 0 && (
+                  <>
+                    <button
+                      onClick={() => setShowAlternateTees(!showAlternateTees)}
+                      className="w-full flex items-center justify-between p-lg text-muted hover:text-foreground transition-colors"
+                    >
+                      <span className="text-sm font-medium">
+                        {showAlternateTees ? "Hide" : "Show"} {alternateTees.length} alternate tee{alternateTees.length > 1 ? "s" : ""}
+                      </span>
+                      <ChevronDown
+                        className={`h-4 w-4 transition-transform ${showAlternateTees ? "rotate-180" : ""}`}
+                      />
+                    </button>
+
+                    {showAlternateTees && alternateTees.map((tee) => (
+                      <div
+                        key={tee.id}
+                        className="flex items-center justify-between p-lg bg-surface/50"
+                      >
+                        <div className="flex items-center gap-md">
+                          <div
+                            className="w-4 h-4 rounded-full border-2"
+                            style={{
+                              backgroundColor: tee.color || "#888",
+                              borderColor: tee.color === "#FFFFFF" ? "#ccc" : tee.color || "#888",
+                            }}
+                          />
+                          <span className="font-medium text-foreground">
+                            {tee.name}
+                          </span>
+                        </div>
+                        <div className="text-right text-sm">
+                          {tee.totalYardage && (
+                            <p className="text-foreground">
+                              {tee.totalYardage.toLocaleString()} yds
+                            </p>
+                          )}
+                          {tee.courseRating && tee.slopeRating && (
+                            <p className="text-muted text-xs">
+                              {tee.courseRating} / {tee.slopeRating}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>

@@ -1,14 +1,43 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { ChevronRight, Check, MapPin } from "lucide-react";
+import { ChevronRight, ChevronDown, Check, MapPin } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Skeleton } from "@/components/ui";
 import { api, type Course, type Tee, type CourseDetail } from "@/lib/api";
 
 type Step = "course" | "tee" | "confirm";
+
+// Helper to categorize tees as primary vs alternate
+function categorizeTees(tees: Tee[]): { primary: Tee[]; alternate: Tee[] } {
+  const alternate: Tee[] = [];
+  const primary: Tee[] = [];
+
+  for (const tee of tees) {
+    const name = tee.name.toLowerCase();
+    // Alternate tees: combo tees (contain "/"), family tees, or flag variants
+    if (
+      name.includes("/") ||
+      name.includes("family") ||
+      name.includes("combo") ||
+      name.includes("(gold)") ||
+      name.includes("(white)") ||
+      name.includes("left #")
+    ) {
+      alternate.push(tee);
+    } else {
+      primary.push(tee);
+    }
+  }
+
+  // Sort primary by yardage descending (longest first)
+  primary.sort((a, b) => (b.totalYardage || 0) - (a.totalYardage || 0));
+  alternate.sort((a, b) => (b.totalYardage || 0) - (a.totalYardage || 0));
+
+  return { primary, alternate };
+}
 
 export default function NewRoundPage() {
   const router = useRouter();
@@ -20,6 +49,13 @@ export default function NewRoundPage() {
   const [selectedTee, setSelectedTee] = useState<Tee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [showAlternateTees, setShowAlternateTees] = useState(false);
+
+  // Categorize tees into primary and alternate
+  const { primary: primaryTees, alternate: alternateTees } = useMemo(() => {
+    if (!selectedCourse?.tees) return { primary: [], alternate: [] };
+    return categorizeTees(selectedCourse.tees);
+  }, [selectedCourse?.tees]);
 
   useEffect(() => {
     async function fetchCourses() {
@@ -157,7 +193,8 @@ export default function NewRoundPage() {
               </CardContent>
             </Card>
 
-            {selectedCourse.tees.map((tee) => (
+            {/* Primary Tees */}
+            {primaryTees.map((tee) => (
               <button
                 key={tee.id}
                 onClick={() => handleSelectTee(tee)}
@@ -177,7 +214,7 @@ export default function NewRoundPage() {
                           <p className="text-body font-medium">{tee.name}</p>
                           <div className="flex items-center gap-md text-caption text-muted">
                             {tee.totalYardage && (
-                              <span>{tee.totalYardage} yds</span>
+                              <span>{tee.totalYardage.toLocaleString()} yds</span>
                             )}
                             {tee.slopeRating && (
                               <span>Slope: {tee.slopeRating}</span>
@@ -194,6 +231,65 @@ export default function NewRoundPage() {
                 </Card>
               </button>
             ))}
+
+            {/* Alternate Tees (Expandable) */}
+            {alternateTees.length > 0 && (
+              <div className="mt-lg">
+                <button
+                  onClick={() => setShowAlternateTees(!showAlternateTees)}
+                  className="w-full flex items-center justify-between py-3 px-1 text-muted hover:text-foreground transition-colors"
+                >
+                  <span className="text-caption font-medium uppercase tracking-wide">
+                    {showAlternateTees ? "Hide" : "Show"} {alternateTees.length} more tee{alternateTees.length > 1 ? "s" : ""}
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${showAlternateTees ? "rotate-180" : ""}`}
+                  />
+                </button>
+
+                {showAlternateTees && (
+                  <div className="space-y-md mt-md">
+                    {alternateTees.map((tee) => (
+                      <button
+                        key={tee.id}
+                        onClick={() => handleSelectTee(tee)}
+                        className="w-full text-left"
+                      >
+                        <Card className="card-hover border-dashed">
+                          <CardContent className="p-lg">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-md">
+                                {tee.color && (
+                                  <div
+                                    className="w-6 h-6 rounded-full border-2 border-border"
+                                    style={{ backgroundColor: tee.color }}
+                                  />
+                                )}
+                                <div>
+                                  <p className="text-body font-medium">{tee.name}</p>
+                                  <div className="flex items-center gap-md text-caption text-muted">
+                                    {tee.totalYardage && (
+                                      <span>{tee.totalYardage.toLocaleString()} yds</span>
+                                    )}
+                                    {tee.slopeRating && (
+                                      <span>Slope: {tee.slopeRating}</span>
+                                    )}
+                                    {tee.courseRating && (
+                                      <span>Rating: {tee.courseRating}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <ChevronRight className="h-5 w-5 text-muted" />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
