@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useAuth } from "@clerk/nextjs";
 import { ArrowLeft, RefreshCw, Activity, Database, Users, Zap, AlertTriangle, CheckCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -47,7 +46,6 @@ interface HealthStatus {
 
 export default function StatusPage() {
   const router = useRouter();
-  const { getToken } = useAuth();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [loading, setLoading] = useState(true);

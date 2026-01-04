@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { Decimal } from '@prisma/client/runtime/library';
+import Anthropic from '@anthropic-ai/sdk';
 
 const TEST_USERS = [
   { clerkId: 'test_alice_001', email: 'test.alice@press.golf', firstName: 'Alice', lastName: 'Test', displayName: 'Alice T', handicapIndex: 12.5 },
@@ -420,6 +421,51 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
         success: false,
         error: String(error),
         results: results.join('\n'),
+      };
+    }
+  });
+
+  // Test Anthropic/Claude Vision integration
+  app.get('/admin/test-anthropic', async (request, reply) => {
+    try {
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        return {
+          success: false,
+          error: 'ANTHROPIC_API_KEY not configured',
+        };
+      }
+
+      const anthropic = new Anthropic({ apiKey });
+
+      // Simple test - just verify API connectivity
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 50,
+        messages: [
+          {
+            role: 'user',
+            content: 'Reply with exactly: "Anthropic API working"',
+          },
+        ],
+      });
+
+      const responseText = message.content
+        .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+        .map((block) => block.text)
+        .join('');
+
+      return {
+        success: true,
+        message: 'Anthropic API integration verified',
+        response: responseText,
+        model: message.model,
+        usage: message.usage,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: String(error),
       };
     }
   });
