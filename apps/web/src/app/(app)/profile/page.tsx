@@ -145,12 +145,12 @@ export default function ProfilePage() {
                     <p className="text-body font-medium">Subscription</p>
                     <p className="text-caption text-muted">
                       {isFoundingMember
-                        ? "Free forever"
+                        ? "Founding Member - Free forever"
                         : subscriptionStatus === "ACTIVE"
                         ? "Pro member"
                         : subscriptionStatus === "PAST_DUE"
                         ? "Payment issue"
-                        : "Manage your plan"}
+                        : "Subscription required"}
                     </p>
                   </div>
                 </div>

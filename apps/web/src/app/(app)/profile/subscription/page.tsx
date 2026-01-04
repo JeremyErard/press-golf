@@ -149,10 +149,10 @@ export default function SubscriptionPage() {
           ) : (
             <>
               <h2 className="text-xl font-bold text-foreground mb-2">
-                Free Plan
+                Subscription Required
               </h2>
               <p className="text-muted">
-                Upgrade to unlock all Press features and remove limitations.
+                Subscribe to access all Press features.
               </p>
             </>
           )}
