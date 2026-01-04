@@ -66,10 +66,9 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
             tees: {
               create: {
                 name: 'Blue',
-                color: 'BLUE',
-                rating: 72.5,
-                slope: 130,
-                isPrimary: true,
+                color: '#0000FF',
+                slopeRating: 130,
+                courseRating: new Decimal(72.5),
               },
             },
           },
@@ -81,11 +80,9 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
           await prisma.hole.create({
             data: {
               courseId: course.id,
-              teeId: course.tees[0].id,
               holeNumber: i + 1,
               par: pars[i],
               handicapRank: ((i * 7) % 18) + 1,
-              yardage: 350 + Math.floor(Math.random() * 200),
             },
           });
         }
@@ -115,10 +112,11 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
 
       // 4. Add players to round
       log('\n👥 Adding players to round...');
+      const slopeRating = course!.tees[0].slopeRating || 113;
       const roundPlayers = await Promise.all(
         users.map(async (user, index) => {
           const courseHandicap = Math.round(
-            Number(user.handicapIndex) * (course!.tees[0].slope / 113)
+            Number(user.handicapIndex) * (slopeRating / 113)
           );
 
           const rp = await prisma.roundPlayer.create({
@@ -153,10 +151,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
 
       // 6. Enter scores for all 18 holes
       log('\n📊 Entering random scores...');
-      const holes = await prisma.hole.findMany({
-        where: { courseId: course!.id },
-        orderBy: { holeNumber: 'asc' },
-      });
+      const holes = course!.holes.sort((a, b) => a.holeNumber - b.holeNumber);
 
       const allScores: Record<string, { hole: number; gross: number; net: number; putts: number }[]> = {};
       users.forEach(u => allScores[u.displayName!] = []);
@@ -221,7 +216,6 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
       log('\n🏆 NASSAU ($10 per segment)');
       log('-'.repeat(40));
 
-      const [p1, p2] = roundPlayers;
       const p1Scores = allScores[users[0].displayName!];
       const p2Scores = allScores[users[1].displayName!];
 
@@ -263,7 +257,6 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
       const skinWinners: Record<string, number> = {};
       users.forEach(u => skinWinners[u.displayName!] = 0);
       let carryover = 0;
-      const skinDetails: string[] = [];
 
       for (let h = 1; h <= 18; h++) {
         const holeScores = users.map(u => ({
@@ -277,9 +270,6 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
         if (winners.length === 1) {
           const skinValue = 5 + carryover;
           skinWinners[winners[0].name] += skinValue;
-          if (carryover > 0) {
-            skinDetails.push(`Hole ${h}: ${winners[0].name} wins $${skinValue} (includes $${carryover} carryover)`);
-          }
           carryover = 0;
         } else {
           carryover += 5;
@@ -435,7 +425,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Cleanup test data
-  app.delete('/admin/test-data', async (request, reply) => {
+  app.delete('/admin/test-data', async () => {
     try {
       // Delete test rounds
       const testRounds = await prisma.round.findMany({

@@ -16,7 +16,7 @@ import {
   type Player,
   type Hole,
   type WolfDecision,
-} from './game-calculations';
+} from './game-calculations.js';
 
 // =====================
 // RANDOM GENERATORS

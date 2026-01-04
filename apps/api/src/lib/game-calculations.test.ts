@@ -10,7 +10,7 @@ import {
   consolidateSettlements,
   type Player,
   type Hole,
-} from './game-calculations';
+} from './game-calculations.js';
 
 // =====================
 // TEST FIXTURES
