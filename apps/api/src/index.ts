@@ -12,6 +12,16 @@ import inviteRoutes from './routes/invites.js';
 import webhookRoutes from './routes/webhooks.js';
 import buddyRoutes from './routes/buddies.js';
 import handicapRoutes from './routes/handicap.js';
+import { prisma } from './lib/prisma.js';
+
+// Simple in-memory metrics
+const metrics = {
+  requestCount: 0,
+  errorCount: 0,
+  startTime: Date.now(),
+  lastRequestTime: Date.now(),
+  requestsPerMinute: [] as number[],
+};
 
 // Create Fastify instance
 const app = Fastify({
@@ -49,6 +59,16 @@ await app.register(clerkPlugin, {
   secretKey: process.env.CLERK_SECRET_KEY,
 });
 
+// Track request metrics
+app.addHook('onRequest', async () => {
+  metrics.requestCount++;
+  metrics.lastRequestTime = Date.now();
+});
+
+app.addHook('onError', async () => {
+  metrics.errorCount++;
+});
+
 // Add cache headers for GET requests to public endpoints
 app.addHook('onSend', async (request, reply) => {
   // Only add cache headers for GET requests
@@ -68,12 +88,113 @@ app.addHook('onSend', async (request, reply) => {
 
 // Health check endpoint
 app.get('/health', async () => {
+  // Check database connection
+  let dbStatus = 'ok';
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch {
+    dbStatus = 'error';
+  }
+
+  const uptimeSeconds = Math.floor((Date.now() - metrics.startTime) / 1000);
+  const memUsage = process.memoryUsage();
+
   return {
-    status: 'ok',
+    status: dbStatus === 'ok' ? 'healthy' : 'degraded',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
+    uptime: uptimeSeconds,
+    database: dbStatus,
+    memory: {
+      heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+      heapTotalMB: Math.round(memUsage.heapTotal / 1024 / 1024),
+      rssMB: Math.round(memUsage.rss / 1024 / 1024),
+    },
   };
 });
+
+// Metrics endpoint (for monitoring dashboards)
+app.get('/metrics', async () => {
+  const uptimeSeconds = Math.floor((Date.now() - metrics.startTime) / 1000);
+  const memUsage = process.memoryUsage();
+
+  // Get some basic stats from the database
+  let userCount = 0;
+  let activeRoundCount = 0;
+  let subscriberCount = 0;
+
+  try {
+    const [users, activeRounds, subscribers] = await Promise.all([
+      prisma.user.count(),
+      prisma.round.count({ where: { status: 'ACTIVE' } }),
+      prisma.user.count({ where: { subscriptionStatus: { in: ['ACTIVE', 'FOUNDING'] } } }),
+    ]);
+    userCount = users;
+    activeRoundCount = activeRounds;
+    subscriberCount = subscribers;
+  } catch {
+    // If DB query fails, continue with zeros
+  }
+
+  return {
+    timestamp: new Date().toISOString(),
+    uptime: {
+      seconds: uptimeSeconds,
+      formatted: formatUptime(uptimeSeconds),
+    },
+    requests: {
+      total: metrics.requestCount,
+      errors: metrics.errorCount,
+      errorRate: metrics.requestCount > 0
+        ? ((metrics.errorCount / metrics.requestCount) * 100).toFixed(2) + '%'
+        : '0%',
+    },
+    memory: {
+      heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+      heapTotalMB: Math.round(memUsage.heapTotal / 1024 / 1024),
+      rssMB: Math.round(memUsage.rss / 1024 / 1024),
+      percentUsed: ((memUsage.heapUsed / memUsage.heapTotal) * 100).toFixed(1) + '%',
+    },
+    users: {
+      total: userCount,
+      subscribers: subscriberCount,
+    },
+    rounds: {
+      active: activeRoundCount,
+    },
+    alerts: getAlerts(memUsage, metrics),
+  };
+});
+
+// Helper function to format uptime
+function formatUptime(seconds: number): string {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+// Check for concerning metrics
+function getAlerts(memUsage: NodeJS.MemoryUsage, metrics: { errorCount: number; requestCount: number }) {
+  const alerts: string[] = [];
+
+  const heapPercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
+  if (heapPercent > 85) {
+    alerts.push(`High memory usage: ${heapPercent.toFixed(1)}%`);
+  }
+
+  if (metrics.requestCount > 100) {
+    const errorRate = (metrics.errorCount / metrics.requestCount) * 100;
+    if (errorRate > 5) {
+      alerts.push(`High error rate: ${errorRate.toFixed(1)}%`);
+    }
+  }
+
+  return alerts.length > 0 ? alerts : ['All systems nominal'];
+}
 
 // API routes
 await app.register(userRoutes, { prefix: '/api/users' });
