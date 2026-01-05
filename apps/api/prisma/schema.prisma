@@ -42,6 +42,9 @@ model User {
   subscriptionEndsAt   DateTime?
   isFoundingMember     Boolean            @default(false)
 
+  // Onboarding
+  onboardingComplete Boolean @default(false)
+
   // Invites
   invitedByCode String? // Invite code they used to sign up
 

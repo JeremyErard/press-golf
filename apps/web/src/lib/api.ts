@@ -73,6 +73,10 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(data),
     }, token),
+  completeOnboarding: (token: string) =>
+    apiRequest<{ onboardingComplete: boolean }>("/users/me/complete-onboarding", {
+      method: "POST",
+    }, token),
 
   // Rounds
   getRounds: (token: string) => apiRequest<Round[]>("/rounds", {}, token),
@@ -337,6 +341,7 @@ export interface User {
   stripeCustomerId?: string;
   subscriptionStatus: "FREE" | "ACTIVE" | "PAST_DUE" | "CANCELED" | "FOUNDING";
   isFoundingMember: boolean;
+  onboardingComplete: boolean;
 }
 
 export interface Round {

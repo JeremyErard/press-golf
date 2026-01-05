@@ -169,6 +169,26 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // =====================
+  // POST /api/users/me/complete-onboarding
+  // Mark onboarding as complete
+  // =====================
+  app.post('/me/complete-onboarding', async (request, reply) => {
+    const user = getUser(request);
+
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id as string },
+      data: { onboardingComplete: true },
+    });
+
+    return {
+      success: true,
+      data: {
+        onboardingComplete: updatedUser.onboardingComplete,
+      },
+    };
+  });
+
+  // =====================
   // PATCH /api/users/me/payment-methods/:id/preferred
   // Set a payment method as preferred
   // =====================

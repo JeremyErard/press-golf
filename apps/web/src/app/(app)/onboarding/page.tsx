@@ -209,7 +209,8 @@ export default function OnboardingPage() {
         // Skip to done
         setCurrentStep(6);
       } else if (currentStep === 6) {
-        // Complete - go to dashboard
+        // Mark onboarding complete and go to dashboard
+        await api.completeOnboarding(token);
         router.push("/");
       }
     } catch (err) {

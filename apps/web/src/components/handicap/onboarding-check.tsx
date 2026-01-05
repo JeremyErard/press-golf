@@ -26,30 +26,20 @@ export function OnboardingCheck({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Check subscription status first
-        const status = await api.getBillingStatus(token);
-        const isSubscribed = status.status === "ACTIVE" || status.status === "FOUNDING" || status.isFoundingMember;
-
-        if (!isSubscribed) {
-          // Not subscribed - go to onboarding to subscribe
-          router.push("/onboarding");
-          return;
-        }
-
-        // Check if user has completed basic profile setup
+        // Get user to check onboarding status
         const user = await api.getMe(token);
 
-        // If no firstName, redirect to onboarding (they're subscribed, skip to step 2)
-        if (!user.firstName) {
+        // If onboarding is not complete, redirect to onboarding
+        if (!user.onboardingComplete) {
           router.push("/onboarding");
           return;
         }
 
         setChecked(true);
       } catch (err) {
-        // If API fails, don't block the user
+        // If API fails, redirect to onboarding to be safe
         console.error("Onboarding check failed:", err);
-        setChecked(true);
+        router.push("/onboarding");
       }
     }
 
