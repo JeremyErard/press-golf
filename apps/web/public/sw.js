@@ -1,10 +1,12 @@
 // Service Worker for Press PWA
-const CACHE_NAME = 'press-v1';
-const STATIC_CACHE_NAME = 'press-static-v1';
+const CACHE_VERSION = 'v2';
+const CACHE_NAME = `press-${CACHE_VERSION}`;
+const STATIC_CACHE_NAME = `press-static-${CACHE_VERSION}`;
 
 // Assets to cache immediately on install
 const PRECACHE_ASSETS = [
   '/',
+  '/offline',
   '/manifest.json',
 ];
 
@@ -25,7 +27,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
-          .filter((name) => name !== CACHE_NAME && name !== STATIC_CACHE_NAME)
+          .filter((name) => name.startsWith('press-') && name !== CACHE_NAME && name !== STATIC_CACHE_NAME)
           .map((name) => caches.delete(name))
       );
     })
@@ -34,7 +36,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch event - network first, fallback to cache
+// Fetch event - network first for pages, cache first for static assets
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -48,12 +50,15 @@ self.addEventListener('fetch', (event) => {
   // Skip Clerk auth requests
   if (url.hostname.includes('clerk')) return;
 
-  // For navigation requests, try network first
+  // Skip browser extension requests
+  if (url.protocol === 'chrome-extension:') return;
+
+  // For navigation requests (page loads)
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          // Cache successful responses
+          // Only cache successful responses
           if (response.status === 200) {
             const responseClone = response.clone();
             caches.open(CACHE_NAME).then((cache) => {
@@ -62,33 +67,68 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => {
-          // Fallback to cache
-          return caches.match(request).then((response) => {
-            return response || caches.match('/');
-          });
+        .catch(async () => {
+          // Network failed - try cache
+          const cachedResponse = await caches.match(request);
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // No cache, show offline page
+          const offlineResponse = await caches.match('/offline');
+          if (offlineResponse) {
+            return offlineResponse;
+          }
+          // Last resort - cached home page
+          return caches.match('/');
         })
     );
     return;
   }
 
-  // For other requests, try cache first, then network
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Return cache but also update in background
-        fetch(request).then((response) => {
+  // For static assets (images, fonts, etc.) - cache first, then network
+  if (
+    request.destination === 'image' ||
+    request.destination === 'font' ||
+    request.destination === 'style' ||
+    request.destination === 'script' ||
+    url.pathname.match(/\.(png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|css|js)$/)
+  ) {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => {
+        if (cachedResponse) {
+          // Update cache in background
+          fetch(request).then((response) => {
+            if (response.status === 200) {
+              caches.open(STATIC_CACHE_NAME).then((cache) => {
+                cache.put(request, response);
+              });
+            }
+          }).catch(() => {});
+          return cachedResponse;
+        }
+
+        // Not in cache, fetch and cache
+        return fetch(request).then((response) => {
           if (response.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, response);
+            const responseClone = response.clone();
+            caches.open(STATIC_CACHE_NAME).then((cache) => {
+              cache.put(request, responseClone);
             });
           }
+          return response;
+        }).catch(() => {
+          // Return empty response for failed static assets
+          return new Response('', { status: 404 });
         });
-        return cachedResponse;
-      }
+      })
+    );
+    return;
+  }
 
-      // Not in cache, fetch from network
-      return fetch(request).then((response) => {
+  // For other requests - network first with cache fallback
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
         if (response.status === 200) {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -96,8 +136,8 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return response;
-      });
-    })
+      })
+      .catch(() => caches.match(request))
   );
 });
 
@@ -105,5 +145,13 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+});
+
+// Background sync for offline score updates (future enhancement)
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-scores') {
+    // TODO: Implement score syncing when back online
+    console.log('Background sync triggered for scores');
   }
 });

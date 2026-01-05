@@ -56,6 +56,7 @@ model User {
   coursesCreated       Course[]
   roundsCreated        Round[]        @relation("RoundsCreated")
   roundPlayers         RoundPlayer[]
+  gamesCreated         Game[]         @relation("GamesCreated")
   settlementsOwed      Settlement[]   @relation("SettlementsOwed")
   settlementsReceiving Settlement[]   @relation("SettlementsReceiving")
   invitesSent          Invite[]       @relation("InvitesSent")
@@ -282,14 +283,18 @@ model HoleScore {
 // ===================
 
 model Game {
-  id          String   @id @default(cuid())
-  roundId     String
-  type        GameType
-  betAmount   Decimal  @db.Decimal(10, 2) // Per-unit bet amount
-  isAutoPress Boolean  @default(false)    // Auto-press when 2 down
-  createdAt   DateTime @default(now())
+  id             String   @id @default(cuid())
+  roundId        String
+  type           GameType
+  betAmount      Decimal  @db.Decimal(10, 2) // Per-unit bet amount
+  isAutoPress    Boolean  @default(false)    // Auto-press when 2 down
+  participantIds String[] // Subset of round players in this game (empty = all players)
+  createdById    String?  // Who created this game (null = round creator for legacy)
+  name           String?  // Optional custom name like "Foursome A Wolf"
+  createdAt      DateTime @default(now())
 
   round              Round                 @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  createdBy          User?                 @relation("GamesCreated", fields: [createdById], references: [id])
   results            GameResult[]
   wolfDecisions      WolfDecision[]
   vegasTeams         VegasTeam[]
@@ -297,9 +302,10 @@ model Game {
   bankerDecisions    BankerDecision[]
   presses            Press[]
 
-  @@unique([roundId, type]) // One game type per round
+  // Removed @@unique([roundId, type]) to allow multiple games of same type
   @@index([roundId])
   @@index([type])
+  @@index([createdById])
 }
 
 enum GameType {

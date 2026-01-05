@@ -1,7 +1,8 @@
 import { FastifyPluginAsync } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, getUser } from '../lib/auth.js';
-import { badRequest, notFound, forbidden } from '../lib/errors.js';
+import { badRequest, notFound, forbidden, sendError, ErrorCodes } from '../lib/errors.js';
+import { emitScoreUpdate, emitPlayerJoined } from './realtime.js';
 
 // Type definitions
 interface CreateRoundBody {
@@ -138,10 +139,7 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
       };
     } catch (error) {
       request.log.error(error, 'Failed to create round');
-      return reply.status(500).send({
-        success: false,
-        error: { code: 'ROUND_CREATION_FAILED', message: 'Failed to create round. Please try again.' },
-      });
+      return sendError(reply, 500, ErrorCodes.ROUND_CREATION_FAILED, 'Failed to create round. Please try again.');
     }
   });
 
@@ -238,6 +236,9 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
         position: round.players.length + 1,
       },
     });
+
+    // Emit real-time player joined event
+    emitPlayerJoined(round.id, user.id as string, (user.displayName as string | null) || (user.firstName as string | null) || null);
 
     // Return updated round
     const updatedRound = await prisma.round.findUnique({
@@ -457,6 +458,9 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
         putts: putts ?? null,
       },
     });
+
+    // Emit real-time score update for SSE subscribers
+    emitScoreUpdate(round.id, targetPlayer.userId, holeNumber, strokes);
 
     return {
       success: true,

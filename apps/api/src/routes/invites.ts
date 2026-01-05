@@ -146,6 +146,8 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         [invite.inviter.firstName, invite.inviter.lastName].filter(Boolean).join(" ") ||
         "A golfer";
 
+      // Only expose minimal round info to prevent information leakage
+      // Don't expose: round ID, bet amounts, player details
       return reply.send({
         success: true,
         data: {
@@ -156,14 +158,14 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
           },
           round: invite.round
             ? {
-                id: invite.round.id,
                 date: invite.round.date,
-                course: invite.round.course,
-                games: invite.round.games.map((g: { type: string; betAmount: unknown }) => ({
-                  type: g.type,
-                  betAmount: Number(g.betAmount),
-                })),
-                playerCount: invite.round._count.players,
+                course: {
+                  name: invite.round.course.name,
+                  city: invite.round.course.city,
+                  state: invite.round.course.state,
+                },
+                // Only show game types, not bet amounts
+                gameTypes: invite.round.games.map((g: { type: string }) => g.type),
               }
             : null,
         },

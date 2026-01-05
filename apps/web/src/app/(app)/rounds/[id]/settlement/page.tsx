@@ -15,6 +15,7 @@ import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
 import { api, type RoundDetail, type GameType, type ApiSettlement, type PaymentMethodType } from "@/lib/api";
 import { formatMoney, cn } from "@/lib/utils";
+import { toast } from "@/components/ui/sonner";
 
 const gameTypeLabels: Record<GameType, string> = {
   NASSAU: "Nassau",
@@ -39,6 +40,7 @@ export default function SettlementPage() {
   const [settlements, setSettlements] = useState<ApiSettlement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
+  const [confirmingPayment, setConfirmingPayment] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -55,6 +57,7 @@ export default function SettlementPage() {
         setSettlements(settlementsData);
       } catch (error) {
         console.error("Failed to fetch data:", error);
+        toast.error("Failed to load settlement data");
       } finally {
         setIsLoading(false);
       }
@@ -63,20 +66,37 @@ export default function SettlementPage() {
     fetchData();
   }, [getToken, roundId]);
 
-  // Calculate user's net position from settlements
-  const netPosition = useMemo(() => {
-    if (!user) return 0;
+  // Calculate user's position and settlement summary
+  const settlementSummary = useMemo(() => {
+    if (!user) return { net: 0, owed: 0, receivable: 0, paidCount: 0, pendingCount: 0 };
 
-    let net = 0;
+    let owed = 0;
+    let receivable = 0;
+    let paidCount = 0;
+    let pendingCount = 0;
+
     settlements.forEach(s => {
       if (s.toUserId === user.id) {
-        net += Number(s.amount);
+        receivable += Number(s.amount);
+        if (s.status === "PAID") paidCount++;
+        else pendingCount++;
       } else if (s.fromUserId === user.id) {
-        net -= Number(s.amount);
+        owed += Number(s.amount);
+        if (s.status === "PAID") paidCount++;
+        else pendingCount++;
       }
     });
-    return net;
+
+    return {
+      net: receivable - owed,
+      owed,
+      receivable,
+      paidCount,
+      pendingCount,
+    };
   }, [settlements, user]);
+
+  const netPosition = settlementSummary.net;
 
   const getPaymentLink = useCallback((type: string, handle: string, amount: number) => {
     const amountStr = Math.abs(amount).toFixed(2);
@@ -99,8 +119,9 @@ export default function SettlementPage() {
     }
   }, [getPaymentLink]);
 
-  const handleMarkPaid = useCallback(async (settlementId: string) => {
+  const handleConfirmMarkPaid = useCallback(async (settlementId: string) => {
     setMarkingPaid(settlementId);
+    setConfirmingPayment(null);
     try {
       const token = await getToken();
       if (!token) return;
@@ -111,8 +132,10 @@ export default function SettlementPage() {
       setSettlements(prev =>
         prev.map(s => s.id === settlementId ? updated : s)
       );
+      toast.success("Payment marked as paid");
     } catch (error) {
       console.error("Failed to mark settlement as paid:", error);
+      toast.error("Failed to mark payment as paid");
     } finally {
       setMarkingPaid(null);
     }
@@ -160,22 +183,46 @@ export default function SettlementPage() {
                 : "bg-error/10 border-error/30"
             )}
           >
-            <CardContent className="p-lg text-center">
-              <p className="text-caption text-muted mb-xs">Your Net Position</p>
-              <div className="flex items-center justify-center gap-sm">
-                {netPosition >= 0 ? (
-                  <TrendingUp className="h-8 w-8 text-success" />
-                ) : (
-                  <TrendingDown className="h-8 w-8 text-error" />
-                )}
-                <span
-                  className={cn(
-                    "text-hero font-bold",
-                    netPosition >= 0 ? "text-success" : "text-error"
+            <CardContent className="p-lg">
+              <div className="text-center mb-md">
+                <p className="text-caption text-muted mb-xs">Your Net Position</p>
+                <div className="flex items-center justify-center gap-sm">
+                  {netPosition >= 0 ? (
+                    <TrendingUp className="h-8 w-8 text-success" />
+                  ) : (
+                    <TrendingDown className="h-8 w-8 text-error" />
                   )}
-                >
-                  {formatMoney(netPosition)}
-                </span>
+                  <span
+                    className={cn(
+                      "text-hero font-bold",
+                      netPosition >= 0 ? "text-success" : "text-error"
+                    )}
+                  >
+                    {formatMoney(netPosition)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Summary breakdown */}
+              <div className="flex justify-between text-caption border-t border-border/50 pt-md">
+                <div className="text-center flex-1">
+                  <p className="text-muted">You Owe</p>
+                  <p className="font-semibold text-error">
+                    {formatMoney(settlementSummary.owed)}
+                  </p>
+                </div>
+                <div className="text-center flex-1 border-l border-border/50">
+                  <p className="text-muted">Owed to You</p>
+                  <p className="font-semibold text-success">
+                    {formatMoney(settlementSummary.receivable)}
+                  </p>
+                </div>
+                <div className="text-center flex-1 border-l border-border/50">
+                  <p className="text-muted">Status</p>
+                  <p className="font-semibold text-foreground">
+                    {settlementSummary.paidCount}/{settlementSummary.paidCount + settlementSummary.pendingCount} Paid
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -281,17 +328,45 @@ export default function SettlementPage() {
                               {otherName} hasn&apos;t set up payment methods yet
                             </p>
                           )}
-                          {/* Mark as paid button */}
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => handleMarkPaid(settlement.id)}
-                            disabled={markingPaid === settlement.id}
-                          >
-                            <Check className="h-4 w-4 mr-1" />
-                            {markingPaid === settlement.id ? "Marking..." : "Mark as Paid"}
-                          </Button>
+                          {/* Mark as paid button with confirmation */}
+                          {confirmingPayment === settlement.id ? (
+                            <div className="p-sm bg-warning/10 border border-warning/30 rounded-md">
+                              <p className="text-caption text-warning mb-sm">
+                                Confirm you&apos;ve paid ${Number(settlement.amount).toFixed(2)} to {otherName}?
+                              </p>
+                              <div className="flex gap-sm">
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  className="flex-1"
+                                  onClick={() => handleConfirmMarkPaid(settlement.id)}
+                                  disabled={markingPaid === settlement.id}
+                                >
+                                  <Check className="h-4 w-4 mr-1" />
+                                  {markingPaid === settlement.id ? "Confirming..." : "Yes, Paid"}
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="flex-1"
+                                  onClick={() => setConfirmingPayment(null)}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => setConfirmingPayment(settlement.id)}
+                              disabled={markingPaid === settlement.id}
+                            >
+                              <Check className="h-4 w-4 mr-1" />
+                              Mark as Paid
+                            </Button>
+                          )}
                         </div>
                       )}
                     </CardContent>

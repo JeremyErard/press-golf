@@ -1,7 +1,29 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import Stripe from "stripe";
+import crypto from "crypto";
 import { prisma } from "../lib/prisma.js";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe.js";
+
+// Clerk webhook secret from environment
+const CLERK_WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
+
+// Clerk webhook event types
+interface ClerkUserEvent {
+  data: {
+    id: string;
+    email_addresses: Array<{
+      id: string;
+      email_address: string;
+    }>;
+    primary_email_address_id: string;
+    first_name: string | null;
+    last_name: string | null;
+    image_url: string | null;
+    username: string | null;
+    public_metadata: Record<string, unknown>;
+  };
+  type: "user.created" | "user.updated" | "user.deleted";
+}
 
 export default async function webhookRoutes(fastify: FastifyInstance) {
   // Skip if Stripe not configured
@@ -76,8 +98,167 @@ export default async function webhookRoutes(fastify: FastifyInstance) {
       return reply.send({ received: true });
     }
   );
+
+  // =====================
+  // Clerk Webhook Handler - User Sync
+  // =====================
+  fastify.post(
+    "/webhooks/clerk",
+    {
+      config: {
+        rawBody: true,
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      if (!CLERK_WEBHOOK_SECRET) {
+        fastify.log.warn("Clerk webhook secret not configured");
+        return reply.code(400).send({ error: "Webhook not configured" });
+      }
+
+      // Verify webhook signature (Svix format)
+      const svixId = request.headers["svix-id"] as string;
+      const svixTimestamp = request.headers["svix-timestamp"] as string;
+      const svixSignature = request.headers["svix-signature"] as string;
+
+      if (!svixId || !svixTimestamp || !svixSignature) {
+        return reply.code(400).send({ error: "Missing Svix headers" });
+      }
+
+      // Verify timestamp is within 5 minutes
+      const timestampMs = parseInt(svixTimestamp, 10) * 1000;
+      const now = Date.now();
+      if (Math.abs(now - timestampMs) > 5 * 60 * 1000) {
+        return reply.code(400).send({ error: "Webhook timestamp expired" });
+      }
+
+      // Get raw body for signature verification
+      const rawBody = (request as FastifyRequest & { rawBody: string | Buffer }).rawBody;
+      const payload = typeof rawBody === "string" ? rawBody : rawBody.toString("utf8");
+
+      // Verify signature (simplified Svix verification)
+      const signedPayload = `${svixId}.${svixTimestamp}.${payload}`;
+      const secret = CLERK_WEBHOOK_SECRET.startsWith("whsec_")
+        ? Buffer.from(CLERK_WEBHOOK_SECRET.slice(6), "base64")
+        : Buffer.from(CLERK_WEBHOOK_SECRET, "base64");
+
+      const expectedSignature = crypto
+        .createHmac("sha256", secret)
+        .update(signedPayload)
+        .digest("base64");
+
+      // Extract signatures from header (format: v1,signature1 v1,signature2)
+      const signatures = svixSignature.split(" ").map((sig) => sig.split(",")[1]);
+      const isValid = signatures.some((sig) => sig === expectedSignature);
+
+      if (!isValid) {
+        fastify.log.error("Clerk webhook signature verification failed");
+        return reply.code(400).send({ error: "Invalid signature" });
+      }
+
+      // Parse event
+      let event: ClerkUserEvent;
+      try {
+        event = JSON.parse(payload) as ClerkUserEvent;
+      } catch {
+        return reply.code(400).send({ error: "Invalid JSON payload" });
+      }
+
+      fastify.log.info(`Clerk webhook: ${event.type}`);
+
+      try {
+        switch (event.type) {
+          case "user.created":
+          case "user.updated":
+            await handleClerkUserSync(event.data, fastify);
+            break;
+
+          case "user.deleted":
+            await handleClerkUserDeleted(event.data.id, fastify);
+            break;
+
+          default:
+            fastify.log.info(`Unhandled Clerk event type: ${(event as { type: string }).type}`);
+        }
+      } catch (err) {
+        fastify.log.error({ err, eventType: event.type }, "Error handling Clerk webhook event");
+        return reply.code(500).send({ error: "Webhook handler failed" });
+      }
+
+      return reply.send({ received: true });
+    }
+  );
 }
 
+// =====================
+// Clerk User Sync Handlers
+// =====================
+async function handleClerkUserSync(
+  data: ClerkUserEvent["data"],
+  fastify: FastifyInstance
+) {
+  // Get primary email
+  const primaryEmail = data.email_addresses.find(
+    (e) => e.id === data.primary_email_address_id
+  )?.email_address;
+
+  // Build display name
+  const displayName =
+    data.username ||
+    [data.first_name, data.last_name].filter(Boolean).join(" ") ||
+    null;
+
+  // Upsert user record - use clerkId as the unique identifier
+  await prisma.user.upsert({
+    where: { clerkId: data.id },
+    create: {
+      clerkId: data.id,
+      email: primaryEmail || `${data.id}@placeholder.press`,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      displayName,
+      avatarUrl: data.image_url,
+    },
+    update: {
+      // Only update if values are present (don't overwrite with null)
+      ...(primaryEmail && { email: primaryEmail }),
+      ...(data.first_name !== null && { firstName: data.first_name }),
+      ...(data.last_name !== null && { lastName: data.last_name }),
+      ...(displayName && { displayName }),
+      ...(data.image_url && { avatarUrl: data.image_url }),
+    },
+  });
+
+  fastify.log.info(
+    { clerkId: data.id, email: primaryEmail },
+    "Synced user from Clerk"
+  );
+}
+
+async function handleClerkUserDeleted(clerkId: string, fastify: FastifyInstance) {
+  // Soft delete: mark user as inactive but preserve data for settlements
+  // You may want to adjust this based on your data retention policy
+  try {
+    await prisma.user.update({
+      where: { clerkId },
+      data: {
+        email: `deleted_${clerkId}@deleted.press`,
+        firstName: null,
+        lastName: null,
+        displayName: "Deleted User",
+        avatarUrl: null,
+      },
+    });
+
+    fastify.log.info({ clerkId }, "Handled Clerk user deletion");
+  } catch (error) {
+    // User might not exist in our DB yet
+    fastify.log.warn({ clerkId }, "User not found for deletion - may not exist in DB");
+  }
+}
+
+// =====================
+// Stripe Handlers
+// =====================
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.userId;
   if (!userId) return;

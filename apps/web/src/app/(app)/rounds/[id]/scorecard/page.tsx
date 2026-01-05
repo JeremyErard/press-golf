@@ -8,6 +8,9 @@ import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
 import { api, type RoundDetail, type PressStatus, type PressSegment } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useRealtimeScores, type RealtimeScoreUpdate, type RealtimePlayerJoined } from "@/hooks/use-realtime-scores";
+import { ConnectionStatusIndicator } from "@/components/connection-status";
+import { toast } from "@/components/ui/sonner";
 
 export default function ScorecardPage() {
   const params = useParams();
@@ -26,6 +29,7 @@ export default function ScorecardPage() {
   // Local scores state for optimistic updates
   const [localScores, setLocalScores] = useState<Record<string, Record<number, number>>>({});
 
+  // Fetch press status for Nassau/Match Play games
   const fetchPressStatus = useCallback(async () => {
     try {
       const token = await getToken();
@@ -36,6 +40,79 @@ export default function ScorecardPage() {
       console.error("Failed to fetch press status:", error);
     }
   }, [getToken, roundId]);
+
+  // Handle real-time score updates from other players
+  const handleRealtimeScoreUpdate = useCallback((update: RealtimeScoreUpdate) => {
+    // Find the player by userId
+    const player = round?.players.find(p => p.userId === update.userId);
+    if (!player) return;
+
+    // Only update if this is from another device/player
+    // (our own updates are already applied optimistically)
+    setLocalScores((prev) => {
+      const currentScore = prev[player.id]?.[update.holeNumber];
+      // Skip if score matches (we likely submitted this)
+      if (currentScore === update.strokes) return prev;
+
+      return {
+        ...prev,
+        [player.id]: {
+          ...prev[player.id],
+          [update.holeNumber]: update.strokes ?? 0,
+        },
+      };
+    });
+
+    // Refresh press status when scores change
+    if (round?.games.some(g => g.type === "NASSAU" || g.type === "MATCH_PLAY")) {
+      fetchPressStatus();
+    }
+  }, [round, fetchPressStatus]);
+
+  // Handle player joined events
+  const handlePlayerJoined = useCallback((player: RealtimePlayerJoined) => {
+    // Refresh round data to get the new player
+    async function refresh() {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const data = await api.getRound(token, roundId);
+        setRound(data);
+
+        // Update local scores for new player
+        setLocalScores((prev) => {
+          const newScores = { ...prev };
+          const newPlayer = data.players.find(p => p.userId === player.userId);
+          if (newPlayer) {
+            newScores[newPlayer.id] = {};
+            newPlayer.scores?.forEach((score) => {
+              if (score.strokes !== null && score.strokes !== undefined) {
+                newScores[newPlayer.id][score.holeNumber] = score.strokes;
+              }
+            });
+          }
+          return newScores;
+        });
+      } catch (error) {
+        console.error("Failed to refresh round after player joined:", error);
+      }
+    }
+    refresh();
+  }, [getToken, roundId]);
+
+  // Handle round completed event
+  const handleRoundCompleted = useCallback(() => {
+    router.push(`/rounds/${roundId}/settlement`);
+  }, [router, roundId]);
+
+  // Real-time score updates via SSE
+  const { connectionStatus, reconnect } = useRealtimeScores({
+    roundId,
+    enabled: round?.status === "ACTIVE",
+    onScoreUpdate: handleRealtimeScoreUpdate,
+    onPlayerJoined: handlePlayerJoined,
+    onRoundCompleted: handleRoundCompleted,
+  });
 
   useEffect(() => {
     async function fetchRound() {
@@ -103,6 +180,7 @@ export default function ScorecardPage() {
         }
       } catch (error) {
         console.error("Failed to save score:", error);
+        toast.error("Failed to save score");
         // Revert on error
         setLocalScores((prev) => ({
           ...prev,
@@ -131,10 +209,12 @@ export default function ScorecardPage() {
           parentPressId,
         });
 
+        toast.success("Press created");
         // Refresh press status
         fetchPressStatus();
       } catch (error) {
         console.error("Failed to create press:", error);
+        toast.error("Failed to create press");
       } finally {
         setIsPressing(false);
       }
@@ -150,9 +230,11 @@ export default function ScorecardPage() {
 
       // Finalize the round - this calculates results, creates settlements, and marks round as COMPLETED
       await api.finalizeRound(token, roundId);
+      toast.success("Round completed!");
       router.push(`/rounds/${roundId}/settlement`);
     } catch (error) {
       console.error("Failed to finish round:", error);
+      toast.error("Failed to finish round");
       setIsFinishing(false);
     }
   }, [getToken, roundId, router]);
@@ -217,7 +299,19 @@ export default function ScorecardPage() {
 
   return (
     <div className="pb-24">
-      <Header title={`Hole ${currentHole}`} showBack />
+      <Header
+        title={`Hole ${currentHole}`}
+        showBack
+        rightAction={
+          round.status === "ACTIVE" && (
+            <ConnectionStatusIndicator
+              status={connectionStatus}
+              onReconnect={reconnect}
+              showLabel
+            />
+          )
+        }
+      />
 
       {/* Hole Navigation */}
       <div className="sticky top-14 z-30 glass border-b border-border">

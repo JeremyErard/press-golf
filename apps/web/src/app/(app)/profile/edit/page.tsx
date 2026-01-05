@@ -1,10 +1,57 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { ArrowLeft, Loader2, Check } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { toast } from "@/components/ui/sonner";
+import { Input } from "@/components/ui/input";
+
+// Simple validation functions
+const validatePhone = (phone: string): string | null => {
+  if (!phone) return null; // Optional field
+  const cleaned = phone.replace(/\D/g, "");
+  if (cleaned.length < 10 || cleaned.length > 15) {
+    return "Phone number must be 10-15 digits";
+  }
+  return null;
+};
+
+const validateGhinNumber = (ghin: string): string | null => {
+  if (!ghin) return null; // Optional field
+  if (!/^\d{7}$/.test(ghin)) {
+    return "GHIN number must be exactly 7 digits";
+  }
+  return null;
+};
+
+const validateDisplayName = (name: string): string | null => {
+  if (!name) return null; // Optional field
+  if (name.length > 30) {
+    return "Display name must be 30 characters or less";
+  }
+  return null;
+};
+
+const validateHandicapIndex = (handicap: string): string | null => {
+  if (!handicap) return null; // Optional field
+  const num = parseFloat(handicap);
+  if (isNaN(num)) {
+    return "Handicap must be a number";
+  }
+  if (num < -10 || num > 54) {
+    return "Handicap must be between -10 and 54";
+  }
+  return null;
+};
+
+interface FormErrors {
+  phone?: string | null;
+  ghinNumber?: string | null;
+  displayName?: string | null;
+  handicapIndex?: string | null;
+}
 
 export default function EditProfilePage() {
   const router = useRouter();
@@ -13,14 +60,16 @@ export default function EditProfilePage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
   const [ghinNumber, setGhinNumber] = useState("");
+  const [handicapIndex, setHandicapIndex] = useState("");
+
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     async function fetchProfile() {
@@ -33,9 +82,10 @@ export default function EditProfilePage() {
         setDisplayName(user.displayName || "");
         setPhone(user.phone || "");
         setGhinNumber(user.ghinNumber || "");
+        setHandicapIndex(user.handicapIndex?.toString() || "");
       } catch (err) {
         console.error("Failed to fetch profile:", err);
-        setError("Failed to load profile");
+        toast.error("Failed to load profile");
       } finally {
         setLoading(false);
       }
@@ -43,10 +93,49 @@ export default function EditProfilePage() {
     fetchProfile();
   }, [getToken, clerkUser]);
 
+  const validateForm = useCallback((): boolean => {
+    const newErrors: FormErrors = {
+      phone: validatePhone(phone),
+      ghinNumber: validateGhinNumber(ghinNumber),
+      displayName: validateDisplayName(displayName),
+      handicapIndex: validateHandicapIndex(handicapIndex),
+    };
+    setErrors(newErrors);
+    return !Object.values(newErrors).some(Boolean);
+  }, [phone, ghinNumber, displayName, handicapIndex]);
+
+  const handleBlur = (field: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+
+    // Validate on blur
+    if (field === "phone") {
+      setErrors((prev) => ({ ...prev, phone: validatePhone(phone) }));
+    } else if (field === "ghinNumber") {
+      setErrors((prev) => ({ ...prev, ghinNumber: validateGhinNumber(ghinNumber) }));
+    } else if (field === "displayName") {
+      setErrors((prev) => ({ ...prev, displayName: validateDisplayName(displayName) }));
+    } else if (field === "handicapIndex") {
+      setErrors((prev) => ({ ...prev, handicapIndex: validateHandicapIndex(handicapIndex) }));
+    }
+  };
+
   const handleSave = async () => {
+    // Mark all fields as touched
+    setTouched({
+      firstName: true,
+      lastName: true,
+      displayName: true,
+      phone: true,
+      ghinNumber: true,
+      handicapIndex: true,
+    });
+
+    if (!validateForm()) {
+      toast.error("Please fix validation errors before saving");
+      return;
+    }
+
     setSaving(true);
-    setError(null);
-    setSuccess(false);
 
     try {
       const token = await getToken();
@@ -58,14 +147,13 @@ export default function EditProfilePage() {
         displayName: displayName || undefined,
         phone: phone || undefined,
         ghinNumber: ghinNumber || undefined,
+        handicapIndex: handicapIndex ? parseFloat(handicapIndex) : undefined,
       });
 
-      setSuccess(true);
-      setTimeout(() => {
-        router.push("/profile");
-      }, 1000);
+      toast.success("Profile saved successfully");
+      router.push("/profile");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save profile");
+      toast.error(err instanceof Error ? err.message : "Failed to save profile");
     } finally {
       setSaving(false);
     }
@@ -102,88 +190,77 @@ export default function EditProfilePage() {
       </div>
 
       <div className="p-4 space-y-6">
-        {error && (
-          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="p-4 rounded-xl bg-brand/10 border border-brand/20 text-brand text-sm flex items-center gap-2">
-            <Check className="w-4 h-4" />
-            Profile saved successfully!
-          </div>
-        )}
-
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-muted mb-2">
-              First Name
-            </label>
-            <input
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              placeholder="Your first name"
-              className="w-full px-4 py-3 rounded-xl bg-card border border-border text-foreground placeholder:text-muted focus:outline-none focus:border-brand"
-            />
-          </div>
+          <Input
+            label="First Name"
+            type="text"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            placeholder="Your first name"
+          />
+
+          <Input
+            label="Last Name"
+            type="text"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            placeholder="Your last name"
+          />
 
           <div>
-            <label className="block text-sm font-medium text-muted mb-2">
-              Last Name
-            </label>
-            <input
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              placeholder="Your last name"
-              className="w-full px-4 py-3 rounded-xl bg-card border border-border text-foreground placeholder:text-muted focus:outline-none focus:border-brand"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-muted mb-2">
-              Display Name
-            </label>
-            <input
+            <Input
+              label="Display Name"
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
+              onBlur={() => handleBlur("displayName")}
               placeholder="How others see you"
-              className="w-full px-4 py-3 rounded-xl bg-card border border-border text-foreground placeholder:text-muted focus:outline-none focus:border-brand"
+              error={touched.displayName ? errors.displayName ?? undefined : undefined}
             />
             <p className="text-xs text-muted mt-1">
-              Optional nickname shown to other players
+              Optional nickname shown to other players (max 30 characters)
+            </p>
+          </div>
+
+          <Input
+            label="Phone Number"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            onBlur={() => handleBlur("phone")}
+            placeholder="+1 (555) 123-4567"
+            error={touched.phone ? errors.phone ?? undefined : undefined}
+          />
+
+          <div>
+            <Input
+              label="GHIN Number"
+              type="text"
+              value={ghinNumber}
+              onChange={(e) => setGhinNumber(e.target.value)}
+              onBlur={() => handleBlur("ghinNumber")}
+              placeholder="Your GHIN ID"
+              error={touched.ghinNumber ? errors.ghinNumber ?? undefined : undefined}
+              maxLength={7}
+            />
+            <p className="text-xs text-muted mt-1">
+              Your official USGA handicap ID (7 digits)
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-muted mb-2">
-              Phone Number
-            </label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+1 (555) 123-4567"
-              className="w-full px-4 py-3 rounded-xl bg-card border border-border text-foreground placeholder:text-muted focus:outline-none focus:border-brand"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-muted mb-2">
-              GHIN Number
-            </label>
-            <input
-              type="text"
-              value={ghinNumber}
-              onChange={(e) => setGhinNumber(e.target.value)}
-              placeholder="Your GHIN ID"
-              className="w-full px-4 py-3 rounded-xl bg-card border border-border text-foreground placeholder:text-muted focus:outline-none focus:border-brand"
+            <Input
+              label="Handicap Index"
+              type="number"
+              value={handicapIndex}
+              onChange={(e) => setHandicapIndex(e.target.value)}
+              onBlur={() => handleBlur("handicapIndex")}
+              placeholder="e.g., 8.5"
+              error={touched.handicapIndex ? errors.handicapIndex ?? undefined : undefined}
+              step="0.1"
             />
             <p className="text-xs text-muted mt-1">
-              Your official USGA handicap ID
+              Your current handicap index (-10 to 54)
             </p>
           </div>
         </div>

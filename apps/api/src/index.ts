@@ -13,7 +13,9 @@ import webhookRoutes from './routes/webhooks.js';
 import buddyRoutes from './routes/buddies.js';
 import handicapRoutes from './routes/handicap.js';
 import { adminRoutes } from './routes/admin.js';
+import { realtimeRoutes } from './routes/realtime.js';
 import { prisma } from './lib/prisma.js';
+import { registerRateLimiting } from './middleware/rate-limit.js';
 
 // Simple in-memory metrics
 const metrics = {
@@ -59,6 +61,9 @@ await app.register(clerkPlugin, {
   publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
   secretKey: process.env.CLERK_SECRET_KEY,
 });
+
+// Register rate limiting (after auth so we can use user ID)
+await registerRateLimiting(app);
 
 // Track request metrics
 app.addHook('onRequest', async () => {
@@ -207,6 +212,7 @@ await app.register(inviteRoutes, { prefix: '/api' });
 await app.register(webhookRoutes, { prefix: '/api' });
 await app.register(buddyRoutes, { prefix: '/api' });
 await app.register(handicapRoutes, { prefix: '/api/handicap' });
+await app.register(realtimeRoutes, { prefix: '/api/realtime' });
 await app.register(adminRoutes);
 
 // Start server

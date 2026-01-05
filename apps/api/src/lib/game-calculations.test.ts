@@ -8,6 +8,7 @@ import {
   calculateStableford,
   calculateSnake,
   consolidateSettlements,
+  GameCalculationError,
   type Player,
   type Hole,
 } from './game-calculations.js';
@@ -173,6 +174,14 @@ describe('calculateNassau', () => {
 describe('calculateSkins', () => {
   const holes = createHoles();
 
+  it('handles empty players array gracefully', () => {
+    const result = calculateSkins([], holes, 5);
+
+    expect(result.skins).toHaveLength(0);
+    expect(result.totalPot).toBe(0);
+    expect(result.carryover).toBe(0);
+  });
+
   it('awards skin to sole lowest score', () => {
     const players = [
       createPlayer('p1', 'Alice', 10, [{ holeNumber: 1, strokes: 3 }]),
@@ -265,6 +274,66 @@ describe('calculateSkins', () => {
 describe('calculateWolf', () => {
   const holes = createHoles();
 
+  it('handles empty players array gracefully', () => {
+    const result = calculateWolf([], holes, [], 5);
+
+    expect(result.holes).toHaveLength(0);
+    expect(result.standings).toHaveLength(0);
+    expect(result.betAmount).toBe(5);
+  });
+
+  it('calculates blind wolf with 4x multiplier when wolf wins (zero-sum)', () => {
+    const players = [
+      createPlayer('p1', 'Alice', 10, [{ holeNumber: 1, strokes: 3 }]), // Wolf, best score
+      createPlayer('p2', 'Bob', 10, [{ holeNumber: 1, strokes: 5 }]),
+      createPlayer('p3', 'Charlie', 10, [{ holeNumber: 1, strokes: 5 }]),
+      createPlayer('p4', 'Dave', 10, [{ holeNumber: 1, strokes: 5 }]),
+    ];
+
+    // Blind wolf declaration - isBlind: true
+    const decisions = [{ holeNumber: 1, wolfUserId: 'p1', partnerUserId: null, isLoneWolf: true, isBlind: true }];
+    const result = calculateWolf(players, holes, decisions, 5);
+
+    expect(result.holes[0].winnerId).toBe('wolf');
+    expect(result.holes[0].isLoneWolf).toBe(true);
+    expect(result.holes[0].isBlindWolf).toBe(true);
+    // Blind wolf wins 4x the bet = $20 (4 × $5)
+    expect(result.standings.find(s => s.userId === 'p1')?.points).toBe(20);
+    // Each opponent loses $20/3 = $6.67 (zero-sum: wolf wins what opponents lose)
+    const opponentLoss = 20 / 3;
+    expect(result.standings.find(s => s.userId === 'p2')?.points).toBeCloseTo(-opponentLoss, 2);
+    expect(result.standings.find(s => s.userId === 'p3')?.points).toBeCloseTo(-opponentLoss, 2);
+    expect(result.standings.find(s => s.userId === 'p4')?.points).toBeCloseTo(-opponentLoss, 2);
+    // Verify zero-sum
+    const total = result.standings.reduce((sum, s) => sum + s.points, 0);
+    expect(Math.abs(total)).toBeLessThan(0.01);
+  });
+
+  it('calculates blind wolf with 4x multiplier when pack wins (zero-sum)', () => {
+    const players = [
+      createPlayer('p1', 'Alice', 10, [{ holeNumber: 1, strokes: 7 }]), // Wolf, worst score
+      createPlayer('p2', 'Bob', 10, [{ holeNumber: 1, strokes: 4 }]),
+      createPlayer('p3', 'Charlie', 10, [{ holeNumber: 1, strokes: 5 }]),
+      createPlayer('p4', 'Dave', 10, [{ holeNumber: 1, strokes: 5 }]),
+    ];
+
+    const decisions = [{ holeNumber: 1, wolfUserId: 'p1', partnerUserId: null, isLoneWolf: true, isBlind: true }];
+    const result = calculateWolf(players, holes, decisions, 5);
+
+    expect(result.holes[0].winnerId).toBe('pack');
+    expect(result.holes[0].isBlindWolf).toBe(true);
+    // Blind wolf loses 4x the bet = -$20
+    expect(result.standings.find(s => s.userId === 'p1')?.points).toBe(-20);
+    // Each pack member wins $20/3 = $6.67 (zero-sum)
+    const opponentWin = 20 / 3;
+    expect(result.standings.find(s => s.userId === 'p2')?.points).toBeCloseTo(opponentWin, 2);
+    expect(result.standings.find(s => s.userId === 'p3')?.points).toBeCloseTo(opponentWin, 2);
+    expect(result.standings.find(s => s.userId === 'p4')?.points).toBeCloseTo(opponentWin, 2);
+    // Verify zero-sum
+    const total = result.standings.reduce((sum, s) => sum + s.points, 0);
+    expect(Math.abs(total)).toBeLessThan(0.01);
+  });
+
   it('rotates wolf correctly', () => {
     const scores = [{ holeNumber: 1, strokes: 4 }];
     const players = [
@@ -354,6 +423,14 @@ describe('calculateWolf', () => {
 // =====================
 describe('calculateNines', () => {
   const holes = createHoles();
+
+  it('handles empty players array gracefully', () => {
+    const result = calculateNines([], holes, 1);
+
+    expect(result.holes).toHaveLength(0);
+    expect(result.standings).toHaveLength(0);
+    expect(result.betAmount).toBe(1);
+  });
 
   it('distributes 9 points per hole in 4-player game', () => {
     const players = [
@@ -523,6 +600,14 @@ describe('calculateMatchPlay', () => {
 // =====================
 describe('calculateStableford', () => {
   const holes = createHoles();
+
+  it('handles empty players array gracefully', () => {
+    const result = calculateStableford([], holes, 1);
+
+    expect(result.holes).toHaveLength(0);
+    expect(result.standings).toHaveLength(0);
+    expect(result.betAmount).toBe(1);
+  });
 
   it('calculates points correctly for each score type', () => {
     // Hole 1 is par 4
@@ -743,5 +828,423 @@ describe('consolidateSettlements', () => {
     const result = consolidateSettlements(settlements);
 
     expect(result[0].amount).toBe(16.11);
+  });
+});
+
+// =====================
+// GAME CALCULATION ERROR TESTS
+// =====================
+describe('GameCalculationError', () => {
+  it('creates error with code and message', () => {
+    const error = new GameCalculationError('TEST_ERROR', 'This is a test error');
+
+    expect(error.code).toBe('TEST_ERROR');
+    expect(error.message).toBe('This is a test error');
+    expect(error.name).toBe('GameCalculationError');
+  });
+
+  it('is instanceof Error', () => {
+    const error = new GameCalculationError('MISSING_HANDICAPS', 'Players missing handicaps');
+
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toBeInstanceOf(GameCalculationError);
+  });
+
+  it('preserves stack trace', () => {
+    const error = new GameCalculationError('SOME_CODE', 'Some message');
+
+    expect(error.stack).toBeDefined();
+    expect(error.stack).toContain('GameCalculationError');
+  });
+});
+
+// =====================
+// EDGE CASE TESTS FOR SAFEMIN BEHAVIOR
+// =====================
+describe('safeMin behavior (via public functions)', () => {
+  const holes = createHoles();
+
+  it('Wolf handles lone wolf with only 2 players (no opposing team after partner selection)', () => {
+    // Edge case: 2 players, wolf picks partner - no one left to oppose
+    const players = [
+      createPlayer('p1', 'Alice', 10, [{ holeNumber: 1, strokes: 4 }]),
+      createPlayer('p2', 'Bob', 10, [{ holeNumber: 1, strokes: 5 }]),
+    ];
+
+    const decisions = [{ holeNumber: 1, wolfUserId: 'p1', partnerUserId: 'p2', isLoneWolf: false, isBlind: false }];
+    const result = calculateWolf(players, holes, decisions, 5);
+
+    // Should handle gracefully - no opposing team, no winner
+    expect(result.holes[0].winnerId).toBeNull();
+    expect(result.holes[0].otherTeamScore).toBeNull();
+  });
+
+  it('Wolf handles single player gracefully', () => {
+    const players = [
+      createPlayer('p1', 'Alice', 10, [{ holeNumber: 1, strokes: 4 }]),
+    ];
+
+    const decisions = [{ holeNumber: 1, wolfUserId: 'p1', partnerUserId: null, isLoneWolf: true, isBlind: false }];
+    const result = calculateWolf(players, holes, decisions, 5);
+
+    // Should handle gracefully - lone wolf but no opponents
+    expect(result.holes[0].winnerId).toBeNull();
+    expect(result.holes[0].otherTeamScore).toBeNull();
+  });
+
+  it('Skins handles single player', () => {
+    const players = [
+      createPlayer('p1', 'Alice', 10, [{ holeNumber: 1, strokes: 4 }]),
+    ];
+
+    const result = calculateSkins(players, holes, 5);
+
+    // Single player automatically wins all skins they score
+    expect(result.skins[0].winnerId).toBe('p1');
+    expect(result.skins[0].value).toBe(5);
+  });
+});
+
+// =====================
+// LARGE GROUP TESTS (16 Players - Max Case)
+// =====================
+describe('Large Group Tests (16 players)', () => {
+  const holes = createHoles();
+
+  // Helper to create 16 players with varied scores
+  const create16Players = () => {
+    const players: Player[] = [];
+    for (let i = 1; i <= 16; i++) {
+      const scores = Array.from({ length: 18 }, (_, h) => ({
+        holeNumber: h + 1,
+        strokes: 4 + (i % 3), // Varied scores: 4, 5, 6 based on player index
+        putts: 2 + (i % 2) as number, // Varied putts: 2 or 3
+      }));
+      players.push(
+        createPlayer(`p${i}`, `Player ${i}`, 10 + (i % 5), scores)
+      );
+    }
+    return players;
+  };
+
+  describe('Games that SUPPORT 16 players', () => {
+    it('Skins with 16 players - calculates all holes', () => {
+      const players = create16Players();
+      const result = calculateSkins(players, holes, 5);
+
+      // Should have results for all 18 holes
+      expect(result.skins).toHaveLength(18);
+
+      // Total pot should be correctly calculated
+      expect(result.totalPot).toBeGreaterThanOrEqual(0);
+    });
+
+    it('Nines with 16 players - handles but does not distribute points (designed for 2-4 players)', () => {
+      const players = create16Players();
+      const result = calculateNines(players, holes, 1);
+
+      // All 16 players in standings (game runs but doesn't calculate properly for 16 players)
+      expect(result.standings).toHaveLength(16);
+
+      // NOTE: Nines is designed for 2-4 players only. With 16 players,
+      // points are not distributed properly (no point distribution defined).
+      // This is expected behavior - the game runs but results are meaningless.
+    });
+
+    it('Stableford with 16 players - all players scored', () => {
+      const players = create16Players();
+      const result = calculateStableford(players, holes, 5);
+
+      // All 16 players in standings
+      expect(result.standings).toHaveLength(16);
+
+      // Zero-sum money (with floating-point tolerance)
+      const totalMoney = result.standings.reduce((sum, s) => sum + s.money, 0);
+      expect(totalMoney).toBeCloseTo(0, 10);
+    });
+
+    it('Snake with 16 players - snake holder pays all others', () => {
+      // Create players where player 16 has the last 3-putt
+      const players = create16Players();
+      // Ensure p16 has a 3-putt on hole 18
+      players[15].scores[17] = { holeNumber: 18, strokes: 6, putts: 3 };
+
+      const result = calculateSnake(players, 5);
+
+      expect(result.snakeHolder).toBe('p16');
+
+      // Snake holder pays $5 to each of 15 other players = -$75
+      const snakeHolderStanding = result.standings.find(s => s.userId === 'p16');
+      expect(snakeHolderStanding?.money).toBe(-75);
+
+      // Each other player receives $5
+      const otherPlayers = result.standings.filter(s => s.userId !== 'p16');
+      expect(otherPlayers.every(s => s.money === 5)).toBe(true);
+
+      // Zero-sum
+      const totalMoney = result.standings.reduce((sum, s) => sum + s.money, 0);
+      expect(totalMoney).toBe(0);
+    });
+
+    it('Wolf with 16 players - runs but designed for 3-4 players', () => {
+      const players = create16Players();
+
+      // Wolf rotates through all 16 players: P1 on hole 1, P2 on hole 2, etc.
+      const decisions = Array.from({ length: 18 }, (_, h) => ({
+        holeNumber: h + 1,
+        wolfUserId: `p${(h % 16) + 1}`,
+        partnerUserId: `p${((h + 1) % 16) + 1}`, // Pick next player as partner
+        isLoneWolf: false,
+        isBlind: false,
+      }));
+
+      const result = calculateWolf(players, holes, decisions, 5);
+
+      // All 18 holes should have results
+      expect(result.holes).toHaveLength(18);
+
+      // All 16 players in standings
+      expect(result.standings).toHaveLength(16);
+
+      // NOTE: Wolf is designed for 3-4 players. With 16 players, points may not
+      // be zero-sum because the team dynamics don't scale properly.
+      // This is expected - in practice, use participant filtering to run Wolf
+      // with 4-player foursomes instead.
+    });
+  });
+
+  describe('Games that REJECT 16 players', () => {
+    it('Nassau rejects 16 players', () => {
+      const players = create16Players();
+      const result = calculateNassau(players, holes, 10);
+
+      expect(result.front.status).toBe('Nassau requires exactly 2 players');
+      expect(result.back.status).toBe('Nassau requires exactly 2 players');
+      expect(result.overall.status).toBe('Nassau requires exactly 2 players');
+    });
+
+    it('Match Play rejects 16 players', () => {
+      const players = create16Players();
+      const result = calculateMatchPlay(players, holes, 10);
+
+      expect(result.error).toBe('Match Play requires exactly 2 players');
+      expect(result.standings).toHaveLength(0);
+    });
+  });
+
+  describe('Zero-sum invariant across SUPPORTED player counts', () => {
+    // Use deterministic scores instead of random to ensure test reliability
+    const createPlayersWithScores = (numPlayers: number) => {
+      const players: Player[] = [];
+      for (let i = 1; i <= numPlayers; i++) {
+        const scores = Array.from({ length: 18 }, (_, h) => ({
+          holeNumber: h + 1,
+          strokes: 4 + ((i + h) % 3), // Deterministic variation
+          putts: 2 + ((i + h) % 2), // Deterministic variation
+        }));
+        players.push(createPlayer(`p${i}`, `Player ${i}`, 10, scores));
+      }
+      return players;
+    };
+
+    // Nines only supports 2, 3, or 4 players
+    [2, 3, 4].forEach(numPlayers => {
+      it(`Nines maintains zero-sum with ${numPlayers} players`, () => {
+        const players = createPlayersWithScores(numPlayers);
+        const result = calculateNines(players, holes, 1);
+        const totalMoney = result.standings.reduce((sum, s) => sum + s.totalMoney, 0);
+        expect(totalMoney).toBeCloseTo(0, 10);
+      });
+    });
+
+    // Stableford works with any number of players
+    [2, 4, 8, 12, 16].forEach(numPlayers => {
+      it(`Stableford maintains zero-sum with ${numPlayers} players`, () => {
+        const players = createPlayersWithScores(numPlayers);
+        const result = calculateStableford(players, holes, 5);
+        const totalMoney = result.standings.reduce((sum, s) => sum + s.money, 0);
+        expect(totalMoney).toBeCloseTo(0, 10);
+      });
+    });
+
+    // Snake works with any number of players
+    [2, 4, 8, 12, 16].forEach(numPlayers => {
+      it(`Snake maintains zero-sum with ${numPlayers} players`, () => {
+        const players = createPlayersWithScores(numPlayers);
+        // Ensure at least one 3-putt
+        players[0].scores[0] = { holeNumber: 1, strokes: 5, putts: 3 };
+        const result = calculateSnake(players, 5);
+        const totalMoney = result.standings.reduce((sum, s) => sum + s.money, 0);
+        expect(totalMoney).toBe(0);
+      });
+    });
+
+    // Wolf is designed for 4 players (2v2 teams)
+    it('Wolf maintains zero-sum points with 4 players', () => {
+      const players = createPlayersWithScores(4);
+      const decisions = Array.from({ length: 18 }, (_, h) => ({
+        holeNumber: h + 1,
+        wolfUserId: `p${(h % 4) + 1}`,
+        partnerUserId: `p${((h + 1) % 4) + 1}`,
+        isLoneWolf: false,
+        isBlind: false,
+      }));
+      const result = calculateWolf(players, holes, decisions, 5);
+      const totalPoints = result.standings.reduce((sum, s) => sum + s.points, 0);
+      expect(totalPoints).toBe(0);
+    });
+  });
+
+  describe('Performance with 16 players', () => {
+    it('calculates Skins in reasonable time', () => {
+      const players = create16Players();
+      const start = performance.now();
+      calculateSkins(players, holes, 5);
+      const duration = performance.now() - start;
+      // Should complete in under 100ms
+      expect(duration).toBeLessThan(100);
+    });
+
+    it('calculates Nines in reasonable time', () => {
+      const players = create16Players();
+      const start = performance.now();
+      calculateNines(players, holes, 1);
+      const duration = performance.now() - start;
+      expect(duration).toBeLessThan(100);
+    });
+
+    it('calculates Wolf in reasonable time', () => {
+      const players = create16Players();
+      const decisions = Array.from({ length: 18 }, (_, h) => ({
+        holeNumber: h + 1,
+        wolfUserId: `p${(h % 16) + 1}`,
+        partnerUserId: null,
+        isLoneWolf: true,
+        isBlind: false,
+      }));
+      const start = performance.now();
+      calculateWolf(players, holes, decisions, 5);
+      const duration = performance.now() - start;
+      expect(duration).toBeLessThan(100);
+    });
+  });
+
+  describe('Player subset filtering (nested games)', () => {
+    // Simulate the hierarchical game structure:
+    // - 16 players in round
+    // - Subset games for foursomes and 1v1 matches
+
+    it('filters 2 players from 16 for Nassau', () => {
+      const allPlayers = create16Players();
+
+      // Filter to just players 1 and 2 for a 1v1 Nassau
+      const nassauPlayers = allPlayers.filter(p => ['p1', 'p2'].includes(p.userId));
+
+      expect(nassauPlayers).toHaveLength(2);
+
+      const result = calculateNassau(nassauPlayers, holes, 10);
+
+      // Should calculate successfully with 2 players
+      expect(result.front.status).not.toBe('Nassau requires exactly 2 players');
+      // Both players should have their scores considered
+    });
+
+    it('filters 4 players from 16 for Wolf foursome', () => {
+      const allPlayers = create16Players();
+
+      // Filter to foursome A (players 1-4)
+      const foursomePlayers = allPlayers.filter(p =>
+        ['p1', 'p2', 'p3', 'p4'].includes(p.userId)
+      );
+
+      expect(foursomePlayers).toHaveLength(4);
+
+      const decisions = Array.from({ length: 18 }, (_, h) => ({
+        holeNumber: h + 1,
+        wolfUserId: `p${(h % 4) + 1}`,
+        partnerUserId: `p${((h + 1) % 4) + 1}`,
+        isLoneWolf: false,
+        isBlind: false,
+      }));
+
+      const result = calculateWolf(foursomePlayers, holes, decisions, 5);
+
+      // Should have exactly 4 players in standings
+      expect(result.standings).toHaveLength(4);
+      expect(result.standings.map(s => s.userId).sort()).toEqual(['p1', 'p2', 'p3', 'p4'].sort());
+
+      // Zero-sum within the foursome
+      const totalPoints = result.standings.reduce((sum, s) => sum + s.points, 0);
+      expect(totalPoints).toBe(0);
+    });
+
+    it('filters 4 players from 16 for Nines', () => {
+      const allPlayers = create16Players();
+
+      // Filter to foursome B (players 5-8)
+      const foursomePlayers = allPlayers.filter(p =>
+        ['p5', 'p6', 'p7', 'p8'].includes(p.userId)
+      );
+
+      expect(foursomePlayers).toHaveLength(4);
+
+      const result = calculateNines(foursomePlayers, holes, 1);
+
+      // Should have exactly 4 players in standings
+      expect(result.standings).toHaveLength(4);
+
+      // 18 holes × 9 points = 162 total points distributed among 4 players
+      const totalPoints = result.standings.reduce((sum, s) => sum + s.total, 0);
+      expect(totalPoints).toBe(162);
+
+      // Zero-sum money
+      const totalMoney = result.standings.reduce((sum, s) => sum + s.totalMoney, 0);
+      expect(totalMoney).toBeCloseTo(0, 10);
+    });
+
+    it('runs Skins for 8 players (two foursomes combined)', () => {
+      const allPlayers = create16Players();
+
+      // Filter to players 1-8 (two foursomes)
+      const eightPlayers = allPlayers.filter(p =>
+        ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8'].includes(p.userId)
+      );
+
+      expect(eightPlayers).toHaveLength(8);
+
+      const result = calculateSkins(eightPlayers, holes, 5);
+
+      // Should calculate all 18 holes
+      expect(result.skins).toHaveLength(18);
+    });
+
+    it('multiple game calculations use same score data', () => {
+      const allPlayers = create16Players();
+
+      // Same player p1 participates in multiple games
+      const p1p2 = allPlayers.filter(p => ['p1', 'p2'].includes(p.userId));
+      const foursome = allPlayers.filter(p => ['p1', 'p2', 'p3', 'p4'].includes(p.userId));
+
+      // Calculate Nassau between p1 and p2
+      const nassauResult = calculateNassau(p1p2, holes, 10);
+
+      // Calculate Wolf for the foursome
+      const decisions = Array.from({ length: 18 }, (_, h) => ({
+        holeNumber: h + 1,
+        wolfUserId: `p${(h % 4) + 1}`,
+        partnerUserId: null,
+        isLoneWolf: true,
+        isBlind: false,
+      }));
+      const wolfResult = calculateWolf(foursome, holes, decisions, 5);
+
+      // Both calculations should succeed
+      expect(nassauResult.front).toBeDefined();
+      expect(wolfResult.standings).toHaveLength(4);
+
+      // Player p1 appears in both results
+      const p1InWolf = wolfResult.standings.find(s => s.userId === 'p1');
+      expect(p1InWolf).toBeDefined();
+    });
   });
 });

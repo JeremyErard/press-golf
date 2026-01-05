@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, getUser } from '../lib/auth.js';
-import { badRequest, notFound, forbidden } from '../lib/errors.js';
+import { badRequest, notFound, forbidden, sendError, ErrorCodes } from '../lib/errors.js';
 import { Decimal } from '@prisma/client/runtime/library';
 
 interface CreateGameBody {
@@ -9,6 +9,8 @@ interface CreateGameBody {
   type: 'NASSAU' | 'SKINS' | 'MATCH_PLAY' | 'WOLF' | 'NINES' | 'STABLEFORD' | 'BINGO_BANGO_BONGO' | 'VEGAS' | 'SNAKE' | 'BANKER';
   betAmount: number;
   isAutoPress?: boolean;
+  participantIds?: string[]; // Subset of round players (empty/undefined = all players)
+  name?: string; // Optional custom game name like "Foursome A Wolf"
   // Vegas team assignments
   vegasTeams?: {
     team1: [string, string]; // [player1Id, player2Id]
@@ -37,7 +39,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
     preHandler: requireAuth,
   }, async (request, reply) => {
     const user = getUser(request);
-    const { roundId, type, betAmount, isAutoPress } = request.body;
+    const { roundId, type, betAmount, isAutoPress, participantIds, name } = request.body;
 
     if (!roundId || !type || betAmount === undefined) {
       return badRequest(reply, 'Round ID, type, and bet amount are required');
@@ -72,13 +74,35 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       return forbidden(reply, 'You must be a player in this round');
     }
 
-    // Check if game type already exists for this round
-    const existingGame = await prisma.game.findUnique({
-      where: { roundId_type: { roundId, type } },
-    });
+    // Get the round player userIds
+    const roundPlayerIds = round.players.map(p => p.userId);
 
-    if (existingGame) {
-      return badRequest(reply, `A ${type} game already exists for this round`);
+    // Validate participantIds if provided
+    const gameParticipantIds = participantIds && participantIds.length > 0 ? participantIds : [];
+
+    if (gameParticipantIds.length > 0) {
+      // Verify all participantIds are in the round
+      const invalidParticipants = gameParticipantIds.filter(id => !roundPlayerIds.includes(id));
+      if (invalidParticipants.length > 0) {
+        return badRequest(reply, `Invalid participants: ${invalidParticipants.join(', ')}. All participants must be in the round.`);
+      }
+
+      // Verify the creator is a participant (if participants are specified)
+      if (!gameParticipantIds.includes(user.id as string)) {
+        return badRequest(reply, 'You must include yourself as a participant in the game');
+      }
+
+      // Validate player count for game type
+      const playerCount = gameParticipantIds.length;
+      if ((type === 'NASSAU' || type === 'MATCH_PLAY') && playerCount !== 2) {
+        return badRequest(reply, `${type} requires exactly 2 players`);
+      }
+      if (type === 'VEGAS' && playerCount !== 4) {
+        return badRequest(reply, 'Vegas requires exactly 4 players');
+      }
+      if ((type === 'WOLF' || type === 'NINES') && (playerCount < 3 || playerCount > 4)) {
+        return badRequest(reply, `${type} works best with 3-4 players`);
+      }
     }
 
     const game = await prisma.game.create({
@@ -87,6 +111,9 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         type,
         betAmount: new Decimal(betAmount),
         isAutoPress: isAutoPress ?? false,
+        participantIds: gameParticipantIds,
+        createdById: user.id as string,
+        name: name || null,
       },
     });
 
@@ -313,36 +340,44 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       const betAmount = Number(game.betAmount);
       const holes = round.course?.holes || [];
 
+      // Filter players by participantIds if specified, otherwise use all players
+      const gamePlayers = game.participantIds && game.participantIds.length > 0
+        ? round.players.filter(p => game.participantIds.includes(p.userId))
+        : round.players;
+
+      // Use game.id as key for results to support multiple games of same type
+      const gameKey = game.id;
+
       switch (game.type) {
         case 'NASSAU':
-          results.nassau = calculateNassau(round.players, holes, betAmount);
+          results.nassau = { ...results.nassau, [gameKey]: { ...calculateNassau(gamePlayers, holes, betAmount), gameId: game.id, name: game.name, participantIds: game.participantIds } };
           break;
         case 'SKINS':
-          results.skins = calculateSkins(round.players, holes, betAmount);
+          results.skins = { ...results.skins, [gameKey]: { ...calculateSkins(gamePlayers, holes, betAmount), gameId: game.id, name: game.name, participantIds: game.participantIds } };
           break;
         case 'MATCH_PLAY':
-          results.matchPlay = calculateMatchPlay(round.players, holes, betAmount);
+          results.matchPlay = { ...results.matchPlay, [gameKey]: { ...calculateMatchPlay(gamePlayers, holes, betAmount), gameId: game.id, name: game.name, participantIds: game.participantIds } };
           break;
         case 'WOLF':
-          results.wolf = calculateWolf(round.players, holes, wolfDecisions, betAmount);
+          results.wolf = { ...results.wolf, [gameKey]: { ...calculateWolf(gamePlayers, holes, wolfDecisions, betAmount), gameId: game.id, name: game.name, participantIds: game.participantIds } };
           break;
         case 'NINES':
-          results.nines = calculateNines(round.players, holes, betAmount);
+          results.nines = { ...results.nines, [gameKey]: { ...calculateNines(gamePlayers, holes, betAmount), gameId: game.id, name: game.name, participantIds: game.participantIds } };
           break;
         case 'STABLEFORD':
-          results.stableford = calculateStableford(round.players, holes, betAmount);
+          results.stableford = { ...results.stableford, [gameKey]: { ...calculateStableford(gamePlayers, holes, betAmount), gameId: game.id, name: game.name, participantIds: game.participantIds } };
           break;
         case 'BINGO_BANGO_BONGO':
-          results.bingoBangoBongo = calculateBingoBangoBongo(round.players, bbbPoints, betAmount);
+          results.bingoBangoBongo = { ...results.bingoBangoBongo, [gameKey]: { ...calculateBingoBangoBongo(gamePlayers, bbbPoints, betAmount), gameId: game.id, name: game.name, participantIds: game.participantIds } };
           break;
         case 'VEGAS':
-          results.vegas = calculateVegas(round.players, holes, vegasTeams, betAmount);
+          results.vegas = { ...results.vegas, [gameKey]: { ...calculateVegas(gamePlayers, holes, vegasTeams, betAmount), gameId: game.id, name: game.name, participantIds: game.participantIds } };
           break;
         case 'SNAKE':
-          results.snake = calculateSnake(round.players, betAmount);
+          results.snake = { ...results.snake, [gameKey]: { ...calculateSnake(gamePlayers, betAmount), gameId: game.id, name: game.name, participantIds: game.participantIds } };
           break;
         case 'BANKER':
-          results.banker = calculateBanker(round.players, holes, bankerDecisions, betAmount);
+          results.banker = { ...results.banker, [gameKey]: { ...calculateBanker(gamePlayers, holes, bankerDecisions, betAmount), gameId: game.id, name: game.name, participantIds: game.participantIds } };
           break;
       }
     }
@@ -393,7 +428,22 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         games: {
           include: {
             presses: {
-              where: { status: 'ACTIVE' },
+              where: { status: 'ACTIVE', parentPressId: null }, // Only top-level presses
+              include: {
+                childPresses: {
+                  where: { status: 'ACTIVE' },
+                  include: {
+                    childPresses: {
+                      where: { status: 'ACTIVE' },
+                      include: {
+                        childPresses: {
+                          where: { status: 'ACTIVE' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -408,6 +458,81 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       return forbidden(reply, 'Only the round creator can finalize');
     }
 
+    // Helper type for press with children
+    type PressWithChildren = typeof round.games[0]['presses'][0] & {
+      childPresses?: PressWithChildren[];
+    };
+
+    // Recursive function to process a press and all its children
+    const processPress = async (
+      press: PressWithChildren,
+      calcResult: (startHole: number, endHole: number) => { winnerId: string | null; loserId?: string | null; margin: number },
+      baseBetAmount: number,
+      segment: 'FRONT' | 'BACK' | 'OVERALL' | 'MATCH'
+    ): Promise<Array<{ fromUserId: string; toUserId: string; amount: number }>> => {
+      const pressSettlements: Array<{ fromUserId: string; toUserId: string; amount: number }> = [];
+
+      const endHole = segment === 'FRONT' ? 9 : 18;
+      const pressResult = calcResult(press.startHole, endHole);
+      const pressAmount = baseBetAmount * Number(press.betMultiplier);
+
+      // Determine press outcome
+      let pressStatus: 'WON' | 'LOST' | 'PUSHED';
+      if (pressResult.winnerId === null) {
+        pressStatus = 'PUSHED';
+      } else if (pressResult.winnerId === press.initiatedById) {
+        pressStatus = 'WON';
+      } else {
+        pressStatus = 'LOST';
+      }
+
+      // Update press status
+      await prisma.press.update({
+        where: { id: press.id },
+        data: { status: pressStatus },
+      });
+
+      // Add settlement if there's a winner
+      if (pressResult.winnerId && pressResult.loserId) {
+        pressSettlements.push({
+          fromUserId: pressResult.loserId,
+          toUserId: pressResult.winnerId,
+          amount: pressAmount,
+        });
+
+        // Create press results
+        const winnerRoundPlayer = round.players.find(p => p.userId === pressResult.winnerId);
+        const loserRoundPlayer = round.players.find(p => p.userId === pressResult.loserId);
+
+        if (winnerRoundPlayer && loserRoundPlayer) {
+          await prisma.pressResult.createMany({
+            data: [
+              {
+                pressId: press.id,
+                roundPlayerId: winnerRoundPlayer.id,
+                netAmount: new Decimal(pressAmount),
+              },
+              {
+                pressId: press.id,
+                roundPlayerId: loserRoundPlayer.id,
+                netAmount: new Decimal(-pressAmount),
+              },
+            ],
+          });
+        }
+      }
+
+      // Recursively process child presses (press-the-press)
+      if (press.childPresses && press.childPresses.length > 0) {
+        for (const childPress of press.childPresses) {
+          const childSettlements = await processPress(childPress, calcResult, baseBetAmount, segment);
+          pressSettlements.push(...childSettlements);
+        }
+      }
+
+      return pressSettlements;
+    };
+
     // Audit log: finalization attempt
     request.log.info({
       action: 'ROUND_FINALIZE_ATTEMPT',
@@ -417,62 +542,59 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       gameCount: round.games.length,
     }, 'User attempting to finalize round');
 
-    // Prevent duplicate finalization
+    // Quick pre-check (not authoritative - full check is inside transaction)
     if (round.status === 'COMPLETED') {
       return badRequest(reply, 'Round has already been finalized');
-    }
-
-    // Check if settlements already exist for this round
-    const existingSettlements = await prisma.settlement.count({
-      where: { roundId },
-    });
-    if (existingSettlements > 0) {
-      return badRequest(reply, 'Settlements already exist for this round');
     }
 
     // Calculate all game results
     const settlements: Array<{ fromUserId: string; toUserId: string; amount: number }> = [];
     const holes = round.course?.holes || [];
 
-    // Helper to calculate match result for a range of holes
-    const calcPressResult = (startHole: number, endHole: number) => {
-      if (round.players.length !== 2) return { winnerId: null, margin: 0 };
-
-      const [p1, p2] = round.players;
-      const minHandicap = Math.min(p1.courseHandicap || 0, p2.courseHandicap || 0);
-      let p1Up = 0;
-
-      for (let h = startHole; h <= endHole; h++) {
-        const p1Score = p1.scores.find(s => s.holeNumber === h);
-        const p2Score = p2.scores.find(s => s.holeNumber === h);
-
-        if (!p1Score?.strokes || !p2Score?.strokes) continue;
-
-        const hole = holes.find(ho => ho.holeNumber === h);
-        const p1Strokes = p1Score.strokes - (hole && hole.handicapRank <= ((p1.courseHandicap || 0) - minHandicap) ? 1 : 0);
-        const p2Strokes = p2Score.strokes - (hole && hole.handicapRank <= ((p2.courseHandicap || 0) - minHandicap) ? 1 : 0);
-
-        if (p1Strokes < p2Strokes) p1Up++;
-        else if (p2Strokes < p1Strokes) p1Up--;
-      }
-
-      return {
-        winnerId: p1Up > 0 ? p1.userId : p1Up < 0 ? p2.userId : null,
-        loserId: p1Up > 0 ? p2.userId : p1Up < 0 ? p1.userId : null,
-        margin: Math.abs(p1Up),
-      };
-    };
-
     for (const game of round.games) {
+      // Filter players by participantIds if specified, otherwise use all players
+      const gamePlayers = game.participantIds && game.participantIds.length > 0
+        ? round.players.filter(p => game.participantIds.includes(p.userId))
+        : round.players;
+
+      // Create calcPressResult for this specific game's players
+      const gameCalcPressResult = (startHole: number, endHole: number) => {
+        if (gamePlayers.length !== 2) return { winnerId: null, loserId: null, margin: 0 };
+
+        const [p1, p2] = gamePlayers;
+        const minHandicap = Math.min(p1.courseHandicap || 0, p2.courseHandicap || 0);
+        let p1Up = 0;
+
+        for (let h = startHole; h <= endHole; h++) {
+          const p1Score = p1.scores.find(s => s.holeNumber === h);
+          const p2Score = p2.scores.find(s => s.holeNumber === h);
+
+          if (!p1Score?.strokes || !p2Score?.strokes) continue;
+
+          const hole = holes.find(ho => ho.holeNumber === h);
+          const p1Strokes = p1Score.strokes - (hole && hole.handicapRank <= ((p1.courseHandicap || 0) - minHandicap) ? 1 : 0);
+          const p2Strokes = p2Score.strokes - (hole && hole.handicapRank <= ((p2.courseHandicap || 0) - minHandicap) ? 1 : 0);
+
+          if (p1Strokes < p2Strokes) p1Up++;
+          else if (p2Strokes < p1Strokes) p1Up--;
+        }
+
+        return {
+          winnerId: p1Up > 0 ? p1.userId : p1Up < 0 ? p2.userId : null,
+          loserId: p1Up > 0 ? p2.userId : p1Up < 0 ? p1.userId : null,
+          margin: Math.abs(p1Up),
+        };
+      };
+
       if (game.type === 'NASSAU') {
-        const nassauResult = calculateNassau(round.players, holes, Number(game.betAmount));
+        const nassauResult = calculateNassau(gamePlayers, holes, Number(game.betAmount));
 
         // Add settlements for each segment
         for (const segment of ['front', 'back', 'overall'] as const) {
           const result = nassauResult[segment];
           if (result.winnerId && result.margin > 0) {
             // Find the loser (the other player in 2-player Nassau)
-            const loserId = round.players.find(p => p.userId !== result.winnerId)?.userId;
+            const loserId = gamePlayers.find(p => p.userId !== result.winnerId)?.userId;
             if (loserId) {
               settlements.push({
                 fromUserId: loserId,
@@ -483,61 +605,20 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
           }
         }
 
-        // Calculate press settlements
+        // Calculate press settlements recursively (handles press-the-press)
         for (const press of game.presses) {
-          const endHole = press.segment === 'FRONT' ? 9 : 18;
-          const pressResult = calcPressResult(press.startHole, endHole);
-          const pressAmount = Number(game.betAmount) * Number(press.betMultiplier);
-
-          // Determine press outcome from initiator's perspective
-          let pressStatus: 'WON' | 'LOST' | 'PUSHED';
-          if (pressResult.winnerId === null) {
-            pressStatus = 'PUSHED';
-          } else if (pressResult.winnerId === press.initiatedById) {
-            pressStatus = 'WON';
-          } else {
-            pressStatus = 'LOST';
-          }
-
-          // Update press status
-          await prisma.press.update({
-            where: { id: press.id },
-            data: { status: pressStatus },
-          });
-
-          // Add settlement if there's a winner
-          if (pressResult.winnerId && pressResult.loserId) {
-            settlements.push({
-              fromUserId: pressResult.loserId,
-              toUserId: pressResult.winnerId,
-              amount: pressAmount,
-            });
-
-            // Create press results
-            const winnerRoundPlayer = round.players.find(p => p.userId === pressResult.winnerId);
-            const loserRoundPlayer = round.players.find(p => p.userId === pressResult.loserId);
-
-            if (winnerRoundPlayer && loserRoundPlayer) {
-              await prisma.pressResult.createMany({
-                data: [
-                  {
-                    pressId: press.id,
-                    roundPlayerId: winnerRoundPlayer.id,
-                    netAmount: new Decimal(pressAmount),
-                  },
-                  {
-                    pressId: press.id,
-                    roundPlayerId: loserRoundPlayer.id,
-                    netAmount: new Decimal(-pressAmount),
-                  },
-                ],
-              });
-            }
-          }
+          const segment = press.segment as 'FRONT' | 'BACK' | 'OVERALL';
+          const pressSettlements = await processPress(
+            press as PressWithChildren,
+            gameCalcPressResult,
+            Number(game.betAmount),
+            segment
+          );
+          settlements.push(...pressSettlements);
         }
       } else if (game.type === 'MATCH_PLAY') {
         // Handle Match Play with presses
-        const matchResult = calcPressResult(1, 18);
+        const matchResult = gameCalcPressResult(1, 18);
         const betAmount = Number(game.betAmount);
 
         if (matchResult.winnerId && matchResult.loserId) {
@@ -548,55 +629,18 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
           });
         }
 
-        // Calculate press settlements for Match Play
+        // Calculate press settlements for Match Play recursively (handles press-the-press)
         for (const press of game.presses) {
-          const pressResult = calcPressResult(press.startHole, 18);
-          const pressAmount = betAmount * Number(press.betMultiplier);
-
-          let pressStatus: 'WON' | 'LOST' | 'PUSHED';
-          if (pressResult.winnerId === null) {
-            pressStatus = 'PUSHED';
-          } else if (pressResult.winnerId === press.initiatedById) {
-            pressStatus = 'WON';
-          } else {
-            pressStatus = 'LOST';
-          }
-
-          await prisma.press.update({
-            where: { id: press.id },
-            data: { status: pressStatus },
-          });
-
-          if (pressResult.winnerId && pressResult.loserId) {
-            settlements.push({
-              fromUserId: pressResult.loserId,
-              toUserId: pressResult.winnerId,
-              amount: pressAmount,
-            });
-
-            const winnerRoundPlayer = round.players.find(p => p.userId === pressResult.winnerId);
-            const loserRoundPlayer = round.players.find(p => p.userId === pressResult.loserId);
-
-            if (winnerRoundPlayer && loserRoundPlayer) {
-              await prisma.pressResult.createMany({
-                data: [
-                  {
-                    pressId: press.id,
-                    roundPlayerId: winnerRoundPlayer.id,
-                    netAmount: new Decimal(pressAmount),
-                  },
-                  {
-                    pressId: press.id,
-                    roundPlayerId: loserRoundPlayer.id,
-                    netAmount: new Decimal(-pressAmount),
-                  },
-                ],
-              });
-            }
-          }
+          const pressSettlements = await processPress(
+            press as PressWithChildren,
+            gameCalcPressResult,
+            betAmount,
+            'MATCH'
+          );
+          settlements.push(...pressSettlements);
         }
       } else if (game.type === 'SKINS') {
-        const skinsResult = calculateSkins(round.players, round.course?.holes || [], Number(game.betAmount));
+        const skinsResult = calculateSkins(gamePlayers, round.course?.holes || [], Number(game.betAmount));
 
         // Aggregate skins winnings per player
         const skinsByPlayer: Record<string, number> = {};
@@ -608,15 +652,15 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
 
         // Create settlements from losers to winners
         const totalPot = skinsResult.skins.reduce((sum, s) => sum + s.value, 0);
-        const perPlayerShare = totalPot / round.players.length;
+        const perPlayerShare = totalPot / gamePlayers.length;
 
-        for (const player of round.players) {
+        for (const player of gamePlayers) {
           const won = skinsByPlayer[player.userId] || 0;
           const net = won - perPlayerShare;
 
           if (net < 0) {
             // This player owes money
-            for (const winner of round.players) {
+            for (const winner of gamePlayers) {
               const winnerNet = (skinsByPlayer[winner.userId] || 0) - perPlayerShare;
               if (winnerNet > 0 && winner.userId !== player.userId) {
                 // Calculate proportional amount
@@ -650,10 +694,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       }
       if (s.amount < 0) {
         request.log.error({ amount: s.amount }, 'Negative settlement amount calculated');
-        return reply.status(500).send({
-          success: false,
-          error: { code: 'INVALID_SETTLEMENT', message: 'Invalid settlement calculation. Please try again.' },
-        });
+        return sendError(reply, 500, ErrorCodes.INVALID_SETTLEMENT, 'Invalid settlement calculation. Please try again.');
       }
     }
 
@@ -679,8 +720,33 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Create settlement records and mark round as completed in a transaction
+    // The transaction ensures atomicity and prevents race conditions
     try {
       const createdSettlements = await prisma.$transaction(async (tx) => {
+        // CRITICAL: Re-check round status inside transaction to prevent race conditions
+        // This ensures only ONE concurrent request can finalize the round
+        const currentRound = await tx.round.findUnique({
+          where: { id: roundId },
+          select: { status: true },
+        });
+
+        if (!currentRound) {
+          throw new Error('ROUND_NOT_FOUND');
+        }
+
+        if (currentRound.status === 'COMPLETED') {
+          throw new Error('ROUND_ALREADY_COMPLETED');
+        }
+
+        // Check if any settlements already exist for this round
+        const existingCount = await tx.settlement.count({
+          where: { roundId },
+        });
+
+        if (existingCount > 0) {
+          throw new Error('SETTLEMENTS_ALREADY_EXIST');
+        }
+
         const settlements = [];
         for (const [key, amount] of Object.entries(consolidated)) {
           if (amount > 0) {
@@ -734,11 +800,23 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         },
       };
     } catch (error) {
+      // Handle specific race condition errors with appropriate responses
+      if (error instanceof Error) {
+        if (error.message === 'ROUND_NOT_FOUND') {
+          return notFound(reply, 'Round not found');
+        }
+        if (error.message === 'ROUND_ALREADY_COMPLETED') {
+          request.log.warn({ roundId, userId: user.id }, 'Attempted to finalize already-completed round (race condition prevented)');
+          return badRequest(reply, 'Round has already been finalized');
+        }
+        if (error.message === 'SETTLEMENTS_ALREADY_EXIST') {
+          request.log.warn({ roundId, userId: user.id }, 'Attempted to create duplicate settlements (race condition prevented)');
+          return badRequest(reply, 'Settlements already exist for this round');
+        }
+      }
+
       request.log.error({ error, roundId, userId: user.id }, 'Failed to finalize round');
-      return reply.status(500).send({
-        success: false,
-        error: { code: 'FINALIZATION_FAILED', message: 'Failed to finalize round. Please try again.' },
-      });
+      return sendError(reply, 500, ErrorCodes.FINALIZATION_FAILED, 'Failed to finalize round. Please try again.');
     }
   });
 
@@ -749,7 +827,20 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { roundId: string } }>('/settlements/:roundId', {
     preHandler: requireAuth,
   }, async (request, reply) => {
+    const user = getUser(request);
     const { roundId } = request.params;
+
+    // Verify user is a participant in this round
+    const roundPlayer = await prisma.roundPlayer.findFirst({
+      where: {
+        roundId,
+        userId: user.id as string,
+      },
+    });
+
+    if (!roundPlayer) {
+      return forbidden(reply, 'You are not a participant in this round');
+    }
 
     const settlements = await prisma.settlement.findMany({
       where: { roundId },

@@ -648,6 +648,202 @@ describe('Randomized Game Calculations', () => {
         expect(totalPoints).toBe(0);
       }
     });
+
+    it('4-player round with multiple games (Wolf + Skins + Nines) settles correctly', () => {
+      for (let i = 0; i < 20; i++) {
+        const holes = createRandomHoles();
+        const betAmount = randomBetAmount();
+        const players = Array.from({ length: 4 }, (_, j) =>
+          createRandomPlayer(`p${j + 1}`, `Player${j + 1}`, holes)
+        );
+
+        // Wolf decisions
+        const wolfDecisions: WolfDecision[] = holes.map((_, holeIdx) => {
+          const wolfIndex = holeIdx % 4;
+          const isLoneWolf = Math.random() > 0.7;
+          const possiblePartners = [0, 1, 2, 3].filter(x => x !== wolfIndex);
+          const partnerIndex = isLoneWolf ? null : possiblePartners[Math.floor(Math.random() * 3)];
+
+          return {
+            holeNumber: holeIdx + 1,
+            wolfUserId: `p${wolfIndex + 1}`,
+            partnerUserId: partnerIndex !== null ? `p${partnerIndex + 1}` : null,
+            isLoneWolf,
+            isBlind: Math.random() > 0.9,
+          };
+        });
+
+        // Calculate all games
+        const wolfResult = calculateWolf(players, holes, wolfDecisions, betAmount);
+        const skinsResult = calculateSkins(players, holes, betAmount);
+        const ninesResult = calculateNines(players, holes, betAmount);
+
+        // Verify Wolf is zero-sum
+        const wolfTotal = wolfResult.standings.reduce((sum, s) => sum + s.points, 0);
+        expect(Math.abs(wolfTotal)).toBeLessThan(0.01);
+
+        // Verify Nines is zero-sum (total points = 9 * 18 holes = 162)
+        const ninesTotal = ninesResult.standings.reduce((sum, s) => sum + s.total, 0);
+        expect(Math.abs(ninesTotal - 162)).toBeLessThan(0.01);
+
+        // Verify Skins pot equals money distributed
+        const skinsWon = skinsResult.skins.reduce((sum, s) => sum + s.value, 0);
+        expect(skinsWon + skinsResult.carryover).toBe(betAmount * 18);
+
+        // Consolidate all settlements from all games
+        const allSettlements: Array<{ fromUserId: string; toUserId: string; amount: number }> = [];
+
+        // Wolf settlements
+        for (const standing of wolfResult.standings) {
+          if (standing.points < 0) {
+            // This player owes money - distribute to winners proportionally
+            const winners = wolfResult.standings.filter(s => s.points > 0);
+            const totalWinnings = winners.reduce((sum, w) => sum + w.points, 0);
+            for (const winner of winners) {
+              const share = (winner.points / totalWinnings) * Math.abs(standing.points);
+              if (share > 0) {
+                allSettlements.push({
+                  fromUserId: standing.userId,
+                  toUserId: winner.userId,
+                  amount: share,
+                });
+              }
+            }
+          }
+        }
+
+        // Consolidate and verify
+        const consolidated = consolidateSettlements(allSettlements);
+
+        // No self-payments
+        for (const s of consolidated) {
+          expect(s.fromUserId).not.toBe(s.toUserId);
+          expect(s.amount).toBeGreaterThan(0);
+        }
+      }
+    });
+
+    it('3-player round with Skins + Nines + Snake settles correctly', () => {
+      for (let i = 0; i < 20; i++) {
+        const holes = createRandomHoles();
+        const betAmount = randomBetAmount();
+        const players = Array.from({ length: 3 }, (_, j) =>
+          createRandomPlayer(`p${j + 1}`, `Player${j + 1}`, holes)
+        );
+
+        // Add random 3-putts for Snake
+        for (const player of players) {
+          for (const score of player.scores) {
+            // 15% chance of 3-putt
+            if (Math.random() < 0.15) {
+              score.putts = 3;
+            } else {
+              score.putts = Math.random() < 0.7 ? 2 : 1;
+            }
+          }
+        }
+
+        const skinsResult = calculateSkins(players, holes, betAmount);
+        const ninesResult = calculateNines(players, holes, betAmount);
+        const snakeResult = calculateSnake(players, betAmount);
+
+        // Verify Nines is zero-sum (total should be 162 for 18 holes)
+        const ninesTotal = ninesResult.standings.reduce((sum, s) => sum + s.total, 0);
+        expect(Math.abs(ninesTotal - 162)).toBeLessThan(0.01);
+
+        // Verify Snake is zero-sum
+        const snakeTotal = snakeResult.standings.reduce((sum, s) => sum + s.money, 0);
+        expect(Math.abs(snakeTotal)).toBeLessThan(0.01);
+
+        // All three games should produce valid results
+        expect(skinsResult.skins.length).toBe(18);
+        expect(ninesResult.holes.length).toBe(18);
+        expect(snakeResult.standings.length).toBe(3);
+      }
+    });
+
+    it('2-player round with all applicable games settles correctly', () => {
+      for (let i = 0; i < 20; i++) {
+        const holes = createRandomHoles();
+        const betAmount = randomBetAmount();
+        const players = [
+          createRandomPlayer('p1', 'Alice', holes),
+          createRandomPlayer('p2', 'Bob', holes),
+        ];
+
+        // Add putts for Snake
+        for (const player of players) {
+          for (const score of player.scores) {
+            score.putts = Math.random() < 0.1 ? 3 : 2;
+          }
+        }
+
+        // Calculate all 2-player games
+        const nassauResult = calculateNassau(players, holes, betAmount);
+        const skinsResult = calculateSkins(players, holes, betAmount);
+        const matchResult = calculateMatchPlay(players, holes, betAmount);
+        const stablefordResult = calculateStableford(players, holes, betAmount);
+        const snakeResult = calculateSnake(players, betAmount);
+
+        // Collect all settlements
+        const settlements: Array<{ fromUserId: string; toUserId: string; amount: number }> = [];
+
+        // Nassau: 3 separate bets
+        for (const segment of ['front', 'back', 'overall'] as const) {
+          const result = nassauResult[segment];
+          if (result.winnerId) {
+            const loserId = result.winnerId === 'p1' ? 'p2' : 'p1';
+            settlements.push({ fromUserId: loserId, toUserId: result.winnerId, amount: betAmount });
+          }
+        }
+
+        // Match Play
+        if (matchResult.standings && matchResult.standings.length === 2) {
+          const winner = matchResult.standings.find(s => s.money > 0);
+          const loser = matchResult.standings.find(s => s.money < 0);
+          if (winner && loser) {
+            settlements.push({ fromUserId: loser.userId, toUserId: winner.userId, amount: Math.abs(loser.money) });
+          }
+        }
+
+        // Stableford
+        if (stablefordResult.standings.length === 2) {
+          const winner = stablefordResult.standings.find(s => s.money > 0);
+          const loser = stablefordResult.standings.find(s => s.money < 0);
+          if (winner && loser) {
+            settlements.push({ fromUserId: loser.userId, toUserId: winner.userId, amount: Math.abs(loser.money) });
+          }
+        }
+
+        // Snake
+        if (snakeResult.snakeHolder) {
+          const loser = snakeResult.snakeHolder;
+          const winner = loser === 'p1' ? 'p2' : 'p1';
+          settlements.push({ fromUserId: loser, toUserId: winner, amount: betAmount });
+        }
+
+        // Consolidate all settlements
+        const consolidated = consolidateSettlements(settlements);
+
+        // Verify zero-sum across all games
+        let p1Net = 0;
+        let p2Net = 0;
+        for (const s of consolidated) {
+          if (s.fromUserId === 'p1') p1Net -= s.amount;
+          if (s.toUserId === 'p1') p1Net += s.amount;
+          if (s.fromUserId === 'p2') p2Net -= s.amount;
+          if (s.toUserId === 'p2') p2Net += s.amount;
+        }
+
+        // Must be zero-sum
+        expect(Math.abs(p1Net + p2Net)).toBeLessThan(0.01);
+
+        // No self-payments
+        for (const s of consolidated) {
+          expect(s.fromUserId).not.toBe(s.toUserId);
+        }
+      }
+    });
   });
 });
 

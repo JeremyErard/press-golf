@@ -3,6 +3,36 @@
  * These are extracted to be unit testable.
  */
 
+// Custom error class for game calculation errors
+export class GameCalculationError extends Error {
+  constructor(
+    public code: string,
+    message: string
+  ) {
+    super(message);
+    this.name = 'GameCalculationError';
+  }
+}
+
+// Safe Math.min that handles empty arrays
+function safeMin(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return Math.min(...values);
+}
+
+// Validate that all players have handicaps when required
+function validateHandicaps(players: Array<{ courseHandicap: number | null }>, requireHandicaps: boolean = false): void {
+  if (!requireHandicaps) return;
+
+  const missingHandicaps = players.filter(p => p.courseHandicap === null || p.courseHandicap === undefined);
+  if (missingHandicaps.length > 0) {
+    throw new GameCalculationError(
+      'MISSING_HANDICAPS',
+      `Handicapped play requires all players to have handicaps set. ${missingHandicaps.length} player(s) missing handicap.`
+    );
+  }
+}
+
 // Type definitions for calculation inputs
 export interface Player {
   userId: string;
@@ -129,8 +159,13 @@ export function calculateSkins(
   const skins: Array<{ hole: number; winnerId: string | null; value: number; carried: number }> = [];
   let carryover = 0;
 
+  // Guard against empty players array
+  if (players.length === 0) {
+    return { skins, totalPot: 0, carryover: 0 };
+  }
+
   // Calculate minimum handicap for net scoring
-  const minHandicap = Math.min(...players.map(p => p.courseHandicap || 0));
+  const minHandicap = safeMin(players.map(p => p.courseHandicap || 0)) ?? 0;
 
   for (let h = 1; h <= 18; h++) {
     const hole = holes.find(hole => hole.holeNumber === h);
@@ -194,6 +229,7 @@ export function calculateWolf(
     wolfUserId: string;
     partnerUserId: string | null;
     isLoneWolf: boolean;
+    isBlindWolf: boolean;
     wolfTeamScore: number | null;
     otherTeamScore: number | null;
     winnerId: string | null;
@@ -203,7 +239,12 @@ export function calculateWolf(
   const playerPoints: Record<string, number> = {};
   players.forEach(p => playerPoints[p.userId] = 0);
 
-  const minHandicap = Math.min(...players.map(p => p.courseHandicap || 0));
+  // Guard against empty players array
+  if (players.length === 0) {
+    return { holes: results, standings: [], betAmount };
+  }
+
+  const minHandicap = safeMin(players.map(p => p.courseHandicap || 0)) ?? 0;
 
   // Get net score for a player on a hole
   const getNetScore = (userId: string, holeNum: number): number | null => {
@@ -228,6 +269,7 @@ export function calculateWolf(
     const wolfUserId = decision?.wolfUserId || players[wolfIndex]?.userId;
     const partnerUserId = decision?.partnerUserId || null;
     const isLoneWolf = decision?.isLoneWolf ?? !partnerUserId;
+    const isBlindWolf = decision?.isBlind ?? false;
 
     // Get all net scores
     const netScores: Record<string, number | null> = {};
@@ -243,6 +285,7 @@ export function calculateWolf(
         wolfUserId,
         partnerUserId,
         isLoneWolf,
+        isBlindWolf,
         wolfTeamScore: null,
         otherTeamScore: null,
         winnerId: null,
@@ -253,42 +296,59 @@ export function calculateWolf(
 
     // Calculate team scores (best ball)
     let wolfTeamScore: number;
-    let otherTeamScore: number;
+    let otherTeamScore: number | null;
 
     if (isLoneWolf) {
       // Lone wolf vs all others
       wolfTeamScore = netScores[wolfUserId]!;
-      otherTeamScore = Math.min(
-        ...players
-          .filter(p => p.userId !== wolfUserId)
-          .map(p => netScores[p.userId]!)
-      );
+      const otherScores = players
+        .filter(p => p.userId !== wolfUserId)
+        .map(p => netScores[p.userId]!);
+      otherTeamScore = safeMin(otherScores);
     } else {
       // Wolf + partner vs others
       wolfTeamScore = Math.min(netScores[wolfUserId]!, netScores[partnerUserId!]!);
-      otherTeamScore = Math.min(
-        ...players
-          .filter(p => p.userId !== wolfUserId && p.userId !== partnerUserId)
-          .map(p => netScores[p.userId]!)
-      );
+      const otherScores = players
+        .filter(p => p.userId !== wolfUserId && p.userId !== partnerUserId)
+        .map(p => netScores[p.userId]!);
+      otherTeamScore = safeMin(otherScores);
+    }
+
+    // Handle edge case where there's no opposing team
+    if (otherTeamScore === null) {
+      results.push({
+        hole: h,
+        wolfUserId,
+        partnerUserId,
+        isLoneWolf,
+        isBlindWolf,
+        wolfTeamScore,
+        otherTeamScore: null,
+        winnerId: null,
+        points: 0,
+      });
+      continue;
     }
 
     // Determine winner and points
     let winnerId: string | null = null;
     let holePoints = betAmount;
 
-    // Lone wolf doubles/triples the bet
+    // Lone wolf multiplier: 3x standard, 4x for blind wolf
     if (isLoneWolf) {
-      holePoints = betAmount * (players.length - 1);
+      const multiplier = isBlindWolf ? 4 : (players.length - 1);
+      holePoints = betAmount * multiplier;
     }
 
     if (wolfTeamScore < otherTeamScore) {
       winnerId = 'wolf';
       // Wolf team wins
       if (isLoneWolf) {
+        const numOpponents = players.length - 1;
+        const perOpponentAmount = holePoints / numOpponents;
         playerPoints[wolfUserId] += holePoints;
         players.filter(p => p.userId !== wolfUserId).forEach(p => {
-          playerPoints[p.userId] -= betAmount;
+          playerPoints[p.userId] -= perOpponentAmount;
         });
       } else {
         playerPoints[wolfUserId] += betAmount;
@@ -301,9 +361,11 @@ export function calculateWolf(
       winnerId = 'pack';
       // Pack wins
       if (isLoneWolf) {
+        const numOpponents = players.length - 1;
+        const perOpponentAmount = holePoints / numOpponents;
         playerPoints[wolfUserId] -= holePoints;
         players.filter(p => p.userId !== wolfUserId).forEach(p => {
-          playerPoints[p.userId] += betAmount;
+          playerPoints[p.userId] += perOpponentAmount;
         });
       } else {
         playerPoints[wolfUserId] -= betAmount;
@@ -320,6 +382,7 @@ export function calculateWolf(
       wolfUserId,
       partnerUserId,
       isLoneWolf,
+      isBlindWolf,
       wolfTeamScore,
       otherTeamScore,
       winnerId,
@@ -350,7 +413,12 @@ export function calculateNines(
   const numPlayers = players.length;
   const POINTS_PER_HOLE = 9;
 
-  const minHandicap = Math.min(...players.map(p => p.courseHandicap || 0));
+  // Guard against empty players array
+  if (numPlayers === 0) {
+    return { holes: [], standings: [], betAmount };
+  }
+
+  const minHandicap = safeMin(players.map(p => p.courseHandicap || 0)) ?? 0;
 
   const playerPoints: Record<string, { front: number; back: number; total: number }> = {};
   players.forEach(p => playerPoints[p.userId] = { front: 0, back: 0, total: 0 });
@@ -570,7 +638,12 @@ export function calculateStableford(
   holes: Hole[],
   betAmount: number
 ) {
-  const minHandicap = Math.min(...players.map(p => p.courseHandicap || 0));
+  // Guard against empty players array
+  if (players.length === 0) {
+    return { holes: [], standings: [], betAmount };
+  }
+
+  const minHandicap = safeMin(players.map(p => p.courseHandicap || 0)) ?? 0;
 
   const playerPoints: Record<string, { front: number; back: number; total: number }> = {};
   players.forEach(p => playerPoints[p.userId] = { front: 0, back: 0, total: 0 });

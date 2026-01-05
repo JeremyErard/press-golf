@@ -3,7 +3,7 @@ import multipart from '@fastify/multipart';
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, getUser } from '../lib/auth.js';
-import { badRequest, notFound, forbidden } from '../lib/errors.js';
+import { badRequest, notFound, forbidden, sendError, ErrorCodes } from '../lib/errors.js';
 import { fetchWebpage, extractCourseData, findScorecardLinks, fetchPdf, extractCourseDataFromPdf } from '../lib/claude.js';
 
 const anthropic = new Anthropic({
@@ -252,10 +252,7 @@ Extract as much data as you can see. If some fields are not visible, omit them b
       });
     } catch (error) {
       request.log.error(error, 'Failed to extract scorecard from image');
-      return reply.status(500).send({
-        success: false,
-        error: 'Failed to process image',
-      });
+      return sendError(reply, 500, ErrorCodes.IMAGE_PROCESSING_FAILED, 'Failed to process image');
     }
   });
 
@@ -552,10 +549,7 @@ Extract as much data as you can see. If some fields are not visible, omit them b
     };
     } catch (error) {
       request.log.error(error, 'Failed to create course');
-      return reply.status(500).send({
-        success: false,
-        error: { code: 'COURSE_CREATION_FAILED', message: 'Failed to create course. Please try again.' },
-      });
+      return sendError(reply, 500, ErrorCodes.COURSE_CREATION_FAILED, 'Failed to create course. Please try again.');
     }
   });
 
