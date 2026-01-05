@@ -76,6 +76,7 @@ export const api = {
   completeOnboarding: (token: string) =>
     apiRequest<{ onboardingComplete: boolean }>("/users/me/complete-onboarding", {
       method: "POST",
+      body: JSON.stringify({}),
     }, token),
 
   // Rounds
@@ -166,6 +167,7 @@ export const api = {
   finalizeRound: (token: string, roundId: string) =>
     apiRequest<{ settlements: ApiSettlement[] }>(`/games/${roundId}/finalize`, {
       method: "POST",
+      body: JSON.stringify({}),
     }, token),
 
   // Scores
@@ -179,10 +181,12 @@ export const api = {
   createCheckoutSession: (token: string) =>
     apiRequest<{ url: string }>("/billing/checkout", {
       method: "POST",
+      body: JSON.stringify({}),
     }, token),
   createPortalSession: (token: string) =>
     apiRequest<{ url: string }>("/billing/portal", {
       method: "POST",
+      body: JSON.stringify({}),
     }, token),
   getBillingStatus: (token: string) =>
     apiRequest<BillingStatus>("/billing/status", {}, token),
@@ -198,6 +202,7 @@ export const api = {
   acceptInvite: (token: string, code: string) =>
     apiRequest<Round>(`/invites/${code}/accept`, {
       method: "POST",
+      body: JSON.stringify({}),
     }, token),
 
   // Press
@@ -230,10 +235,12 @@ export const api = {
   addBuddyToRound: (token: string, roundId: string, buddyUserId: string) =>
     apiRequest<RoundPlayer>(`/rounds/${roundId}/add-buddy/${buddyUserId}`, {
       method: "POST",
+      body: JSON.stringify({}),
     }, token),
   addBuddiesFromRound: (token: string, roundId: string) =>
     apiRequest<{ added: number; message: string }>(`/buddies/from-round/${roundId}`, {
       method: "POST",
+      body: JSON.stringify({}),
     }, token),
 
   // Handicap
@@ -301,6 +308,7 @@ export const api = {
   requestHandicapApproval: (token: string, roundId: string) =>
     apiRequest<ApprovalRequest>(`/handicap/request-approval/${roundId}`, {
       method: "POST",
+      body: JSON.stringify({}),
     }, token),
 
   // Payment Methods
