@@ -34,7 +34,8 @@ import {
   Input,
 } from "@/components/ui";
 import { api, type RoundDetail, type GameType, type Buddy } from "@/lib/api";
-import { formatDate, cn } from "@/lib/utils";
+import { formatDate, cn, getTeeColor } from "@/lib/utils";
+import { BettingIllustration } from "@/components/illustrations";
 
 // Remove framer-motion - causes hydration issues with Clerk
 
@@ -362,12 +363,10 @@ export default function RoundDetailPage() {
                 <div>
                   <p className="text-caption text-muted">Tees</p>
                   <div className="flex items-center gap-sm">
-                    {round.tee.color && (
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: round.tee.color }}
-                      />
-                    )}
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: getTeeColor(round.tee.name, round.tee.color) }}
+                    />
                     <p className="text-body font-medium">{round.tee.name}</p>
                   </div>
                 </div>
@@ -513,10 +512,13 @@ export default function RoundDetailPage() {
               </CardContent>
             </Card>
           ) : (
-            <Card>
-              <CardContent className="p-lg text-center">
-                <p className="text-muted">No games added yet</p>
-                <p className="text-caption text-subtle mt-xs">
+            <Card className="glass-card">
+              <CardContent className="py-10 px-6 text-center">
+                <div className="w-24 h-24 mx-auto mb-4 animate-float">
+                  <BettingIllustration className="w-full h-full" />
+                </div>
+                <p className="text-white font-semibold">No games added yet</p>
+                <p className="text-gray-400 text-sm mt-2">
                   Add games to start betting
                 </p>
               </CardContent>
@@ -601,7 +603,7 @@ export default function RoundDetailPage() {
             {selectedGameType && (
               <div className="space-y-3">
                 <label className="text-sm font-medium text-muted">
-                  Bet Amount (per unit)
+                  Bet Amount (per bet)
                 </label>
                 <div className="flex items-center gap-3">
                   <span className="text-2xl text-white">$</span>

@@ -3,10 +3,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { ChevronRight, ChevronDown, Check, MapPin } from "lucide-react";
+import { ChevronRight, ChevronDown, Check, MapPin, Search } from "lucide-react";
 import { Header } from "@/components/layout/header";
-import { Button, Card, CardContent, Skeleton } from "@/components/ui";
+import { Button, Card, CardContent, Skeleton, Input } from "@/components/ui";
 import { api, type Course, type Tee, type CourseDetail } from "@/lib/api";
+import { getTeeColor } from "@/lib/utils";
 
 type Step = "course" | "tee" | "confirm";
 
@@ -50,6 +51,20 @@ export default function NewRoundPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [showAlternateTees, setShowAlternateTees] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
+
+  // Filter courses by search query
+  const filteredCourses = useMemo(() => {
+    if (!searchQuery.trim()) return courses;
+    const query = searchQuery.toLowerCase();
+    return courses.filter(
+      (course) =>
+        course.name.toLowerCase().includes(query) ||
+        course.city?.toLowerCase().includes(query) ||
+        course.state?.toLowerCase().includes(query)
+    );
+  }, [courses, searchQuery]);
 
   // Categorize tees into primary and alternate
   const { primary: primaryTees, alternate: alternateTees } = useMemo(() => {
@@ -102,6 +117,7 @@ export default function NewRoundPage() {
       const round = await api.createRound(token, {
         courseId: selectedCourse.id,
         teeId: selectedTee.id,
+        date: selectedDate,
       });
 
       router.push(`/rounds/${round.id}`);
@@ -129,14 +145,26 @@ export default function NewRoundPage() {
         {/* Step: Select Course */}
         {step === "course" && (
           <div className="space-y-md">
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
+              <Input
+                type="text"
+                placeholder="Search courses..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
             {isLoading ? (
               <>
                 {[1, 2, 3, 4].map((i) => (
                   <Skeleton key={i} className="h-20 w-full" />
                 ))}
               </>
-            ) : courses.length > 0 ? (
-              courses.map((course) => (
+            ) : filteredCourses.length > 0 ? (
+              filteredCourses.map((course) => (
                 <button
                   key={course.id}
                   onClick={() => handleSelectCourse(course)}
@@ -164,6 +192,15 @@ export default function NewRoundPage() {
                   </Card>
                 </button>
               ))
+            ) : searchQuery ? (
+              <Card>
+                <CardContent className="p-xl text-center">
+                  <p className="text-muted">No courses found</p>
+                  <p className="text-caption text-subtle mt-xs">
+                    Try a different search term
+                  </p>
+                </CardContent>
+              </Card>
             ) : (
               <Card>
                 <CardContent className="p-xl text-center">
@@ -204,12 +241,10 @@ export default function NewRoundPage() {
                   <CardContent className="p-lg">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-md">
-                        {tee.color && (
-                          <div
-                            className="w-6 h-6 rounded-full border-2 border-border"
-                            style={{ backgroundColor: tee.color }}
-                          />
-                        )}
+                        <div
+                          className="w-6 h-6 rounded-full border-2 border-border"
+                          style={{ backgroundColor: getTeeColor(tee.name, tee.color) }}
+                        />
                         <div>
                           <p className="text-body font-medium">{tee.name}</p>
                           <div className="flex items-center gap-md text-caption text-muted">
@@ -259,12 +294,10 @@ export default function NewRoundPage() {
                           <CardContent className="p-lg">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-md">
-                                {tee.color && (
-                                  <div
-                                    className="w-6 h-6 rounded-full border-2 border-border"
-                                    style={{ backgroundColor: tee.color }}
-                                  />
-                                )}
+                                <div
+                                  className="w-6 h-6 rounded-full border-2 border-border"
+                                  style={{ backgroundColor: getTeeColor(tee.name, tee.color) }}
+                                />
                                 <div>
                                   <p className="text-body font-medium">{tee.name}</p>
                                   <div className="flex items-center gap-md text-caption text-muted">
@@ -305,18 +338,21 @@ export default function NewRoundPage() {
                 <div>
                   <p className="text-caption text-muted">Tees</p>
                   <div className="flex items-center gap-sm">
-                    {selectedTee.color && (
-                      <div
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: selectedTee.color }}
-                      />
-                    )}
+                    <div
+                      className="w-4 h-4 rounded-full"
+                      style={{ backgroundColor: getTeeColor(selectedTee.name, selectedTee.color) }}
+                    />
                     <p className="text-body font-medium">{selectedTee.name}</p>
                   </div>
                 </div>
                 <div>
                   <p className="text-caption text-muted">Date</p>
-                  <p className="text-body font-medium">Today</p>
+                  <Input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="mt-1"
+                  />
                 </div>
               </CardContent>
             </Card>

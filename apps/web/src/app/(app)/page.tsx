@@ -7,6 +7,7 @@ import Image from "next/image";
 import { ChevronRight, Play } from "lucide-react";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
 import { PendingApprovals } from "@/components/handicap/pending-approvals";
+import { GolferIllustration } from "@/components/illustrations";
 import { api, type Round, type RoundDetail, type CalculateResultsResponse } from "@/lib/api";
 import { formatDate, formatMoney } from "@/lib/utils";
 
@@ -117,6 +118,14 @@ export default function DashboardPage() {
             } catch {
               // Results might not be available yet
             }
+          } else if (round.status === "SETUP") {
+            // Get setup round details for course name
+            try {
+              const detail = await api.getRound(token, round.id);
+              roundWithEarnings.courseName = detail.course.name;
+            } catch {
+              // Ignore errors for setup rounds
+            }
           }
 
           roundsWithEarnings.push(roundWithEarnings);
@@ -134,7 +143,9 @@ export default function DashboardPage() {
   }, [getToken, user?.id]);
 
   const activeRound = rounds.find((r) => r.status === "ACTIVE");
+  const setupRounds = rounds.filter((r) => r.status === "SETUP");
   const recentRounds = rounds.filter((r) => r.status === "COMPLETED").slice(0, 3);
+  const hasAnyRounds = rounds.length > 0;
 
   // Calculate career earnings from all completed rounds
   const careerEarnings = useMemo(() => {
@@ -192,9 +203,9 @@ export default function DashboardPage() {
   // Get greeting based on time of day
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning,";
-    if (hour < 17) return "Good Afternoon,";
-    return "Good Evening,";
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
   };
 
   return (
@@ -279,7 +290,7 @@ export default function DashboardPage() {
         {/* Active Round Card (if exists) */}
         {activeRound && activeRoundStatus && (
           <Link href={`/rounds/${activeRound.id}/scorecard`}>
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#111d32] to-[#0f1a2e] border border-white/5 shadow-lg">
+            <div className="relative overflow-hidden rounded-2xl glass-card-hover animate-fade-in-up">
               {/* Course Image Background */}
               <div className="absolute inset-0 opacity-40">
                 <Image
@@ -298,10 +309,16 @@ export default function DashboardPage() {
               {/* Content */}
               <div className="relative z-10 p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-500 text-[10px] font-bold text-black">
+                  <span className="relative flex items-center justify-center w-6 h-6 rounded-full bg-amber-500 text-[10px] font-bold text-black pulse-active">
                     {activeRoundStatus.currentHole}
+                    <span className="absolute inset-0 rounded-full bg-amber-500 animate-ping opacity-30" />
                   </span>
                   <span className="text-amber-400 text-sm font-semibold">Hole {activeRoundStatus.currentHole}</span>
+                  <span className="flex h-2 w-2 ml-1">
+                    <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
+                  <span className="text-green-400 text-xs">LIVE</span>
                 </div>
 
                 <h3 className="text-white font-bold text-lg mb-1">
@@ -333,12 +350,50 @@ export default function DashboardPage() {
         {!activeRound && (
           <Link href="/rounds/new">
             <Button
-              className="w-full h-14 text-base font-semibold bg-brand hover:bg-brand-dark shadow-lg shadow-green-500/20 transition-all hover:shadow-green-500/30 hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full h-14 text-base font-semibold bg-brand hover:bg-brand-dark shadow-lg shadow-green-500/20 transition-all hover:shadow-green-500/30 hover:scale-[1.02] active:scale-[0.98] btn-ripple"
               size="lg"
             >
               Start a Round
             </Button>
           </Link>
+        )}
+
+        {/* Setup Rounds Section - Rounds waiting to start */}
+        {setupRounds.length > 0 && (
+          <div className="pt-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white">Rounds in Setup</h2>
+            </div>
+            <div className="space-y-3">
+              {setupRounds.map((round, index) => (
+                <Link key={round.id} href={`/rounds/${round.id}`}>
+                  <Card
+                    className="glass-card-hover border-l-4 border-l-amber-500 animate-fade-in-up"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-white font-semibold">
+                            {round.courseName || "Round Setup"}
+                          </p>
+                          <p className="text-sm text-gray-400 mt-0.5">
+                            {formatDate(round.date)} • {round._count?.players || 0} player{(round._count?.players || 0) !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
+                            Setup
+                          </Badge>
+                          <ChevronRight className="h-5 w-5 text-gray-500" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Recent Rounds Section */}
@@ -361,9 +416,12 @@ export default function DashboardPage() {
             </div>
           ) : recentRounds.length > 0 ? (
             <div className="space-y-3">
-              {recentRounds.map((round) => (
+              {recentRounds.map((round, index) => (
                 <Link key={round.id} href={`/rounds/${round.id}`}>
-                  <Card className="bg-[#111d32] border-white/5 hover:bg-[#1a2942] transition-all hover:border-white/10 shadow-lg">
+                  <Card
+                    className="glass-card-hover animate-fade-in-up"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
@@ -371,7 +429,7 @@ export default function DashboardPage() {
                             {round.courseName || formatDate(round.date)}
                           </p>
                           <p className="text-sm text-gray-400 mt-0.5">
-                            {formatDate(round.date)} • {round._count?.players || 0} players
+                            {formatDate(round.date)} • {round._count?.players || 0} player{(round._count?.players || 0) !== 1 ? "s" : ""}
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
@@ -388,15 +446,13 @@ export default function DashboardPage() {
                 </Link>
               ))}
             </div>
-          ) : (
-            <Card className="bg-gradient-to-br from-[#111d32] to-[#0d1825] border-white/5 overflow-hidden">
+          ) : !hasAnyRounds ? (
+            <Card className="glass-card overflow-hidden">
               <CardContent className="py-8 px-5">
-                {/* Welcome message */}
+                {/* Welcome message with floating illustration */}
                 <div className="text-center mb-6">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-brand/20 to-green-600/20 flex items-center justify-center ring-1 ring-brand/30">
-                    <svg className="w-8 h-8 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-                    </svg>
+                  <div className="w-24 h-24 mx-auto mb-4 animate-float">
+                    <GolferIllustration className="w-full h-full" />
                   </div>
                   <h3 className="text-white font-semibold text-lg">Welcome to Press!</h3>
                   <p className="text-gray-400 text-sm mt-1">Get started with these quick steps</p>
@@ -433,13 +489,15 @@ export default function DashboardPage() {
                 </div>
               </CardContent>
             </Card>
+          ) : (
+            <p className="text-gray-500 text-sm text-center py-4">No completed rounds yet</p>
           )}
         </div>
 
         {/* Quick Stats Row */}
         <div className="grid grid-cols-2 gap-4 pt-2">
           <Link href="/courses">
-            <Card className="bg-[#111d32] border-white/5 hover:bg-[#1a2942] transition-all hover:border-white/10 shadow-lg h-full">
+            <Card className="glass-card-hover h-full">
               <CardContent className="p-4">
                 <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center mb-3">
                   <svg className="w-5 h-5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -453,7 +511,7 @@ export default function DashboardPage() {
             </Card>
           </Link>
           <Link href="/rounds">
-            <Card className="bg-[#111d32] border-white/5 hover:bg-[#1a2942] transition-all hover:border-white/10 shadow-lg h-full">
+            <Card className="glass-card-hover h-full">
               <CardContent className="p-4">
                 <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center mb-3">
                   <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
