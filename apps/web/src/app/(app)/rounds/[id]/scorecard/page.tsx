@@ -466,7 +466,7 @@ export default function ScorecardPage() {
       </div>
 
       {/* Bottom Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 glass border-t border-border">
+      <div className="fixed bottom-16 left-0 right-0 z-40 glass border-t border-border">
         <div className="flex gap-3 p-4 max-w-lg mx-auto">
           <Button
             variant="secondary"

@@ -299,8 +299,10 @@ export function ScorecardGrid({
             const front = calculateTotal(player.id, frontNine.map((h) => h.holeNumber));
             const back = calculateTotal(player.id, backNine.map((h) => h.holeNumber));
             const total = front + back;
-            const parTotal = calculateParTotal(holes);
-            const diff = total - parTotal;
+            // Only calculate par for holes that have been played
+            const holesPlayed = holes.filter((h) => scores[player.id]?.[h.holeNumber]);
+            const parPlayed = holesPlayed.reduce((sum, h) => sum + h.par, 0);
+            const diff = total > 0 && parPlayed > 0 ? total - parPlayed : 0;
             const isCurrentPlayer = player.id === currentPlayerId;
 
             return (
