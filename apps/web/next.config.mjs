@@ -6,6 +6,18 @@ const nextConfig = {
   },
   // Disable static page generation for error pages to avoid React context issues
   output: 'standalone',
+  // Allow external images from course websites
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'arcadiabluffs.com' },
+      { protocol: 'https', hostname: 'www.desertmountain.com' },
+      { protocol: 'https', hostname: 'www.egyptvalley.com' },
+      { protocol: 'https', hostname: 'www.cascadehillscc.com' },
+      { protocol: 'https', hostname: 'dhgc.org' },
+      { protocol: 'https', hostname: 'highpointegolf.com' },
+      { protocol: 'https', hostname: 'www.kingsleyclub.com' },
+    ],
+  },
 };
 
 export default nextConfig;

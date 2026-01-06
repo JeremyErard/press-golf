@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
+import Image from "next/image";
 import { Plus, Search, MapPin, ChevronRight, Check } from "lucide-react";
 import { Button, Card, CardContent, Skeleton } from "@/components/ui";
 import { Header } from "@/components/layout/header";
 import { CourseMapIllustration } from "@/components/illustrations";
-import { CourseThumbnail } from "@/components/course-image";
 import { api, type Course } from "@/lib/api";
 
 export default function CoursesPage() {
@@ -80,18 +80,33 @@ export default function CoursesPage() {
                 
               >
                 <Link href={`/courses/${course.id}`}>
-                  <Card className="glass-card-hover animate-fade-in-up" style={{ animationDelay: `${_index * 30}ms` }}>
-                    <CardContent className="p-lg">
-                      <div className="flex items-center gap-md">
-                        {/* Course Thumbnail */}
-                        <CourseThumbnail
-                          courseName={course.name}
-                          heroImageUrl={course.heroImageUrl}
-                          className="w-12 h-12 flex-shrink-0"
+                  <Card
+                    className="relative overflow-hidden rounded-xl animate-fade-in-up group"
+                    style={{ animationDelay: `${_index * 30}ms` }}
+                  >
+                    {/* Hero Image Background */}
+                    <div className="absolute inset-0">
+                      {course.heroImageUrl ? (
+                        <Image
+                          src={course.heroImageUrl}
+                          alt={course.name}
+                          fill
+                          className="object-cover transition-transform duration-300 group-hover:scale-105"
+                          sizes="(max-width: 768px) 100vw, 600px"
                         />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
+                      )}
+                      {/* Glass overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
+                    </div>
+
+                    {/* Content */}
+                    <CardContent className="relative z-10 p-lg py-6">
+                      <div className="flex items-center justify-between">
                         <div className="space-y-xs flex-1 min-w-0">
                           <div className="flex items-center gap-sm">
-                            <p className="text-body font-medium truncate">
+                            <p className="text-body font-semibold text-white truncate drop-shadow-md">
                               {course.name}
                             </p>
                             {course.isVerified && (
@@ -101,9 +116,9 @@ export default function CoursesPage() {
                             )}
                           </div>
                           {(course.city || course.state) && (
-                            <div className="flex items-center gap-xs text-caption text-muted">
+                            <div className="flex items-center gap-xs text-caption text-white/80">
                               <MapPin className="h-3.5 w-3.5" />
-                              <span>
+                              <span className="drop-shadow-sm">
                                 {[course.city, course.state]
                                   .filter(Boolean)
                                   .join(", ")}
@@ -111,7 +126,7 @@ export default function CoursesPage() {
                             </div>
                           )}
                         </div>
-                        <ChevronRight className="h-5 w-5 text-muted flex-shrink-0" />
+                        <ChevronRight className="h-5 w-5 text-white/70 flex-shrink-0 transition-transform group-hover:translate-x-1" />
                       </div>
                     </CardContent>
                   </Card>
