@@ -3,10 +3,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { Minus, Plus, Check, AlertCircle, TrendingUp, TrendingDown, Minus as TiedIcon } from "lucide-react";
+import { Minus, Plus, Check, AlertCircle, TrendingUp, TrendingDown, Minus as TiedIcon, Camera } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
 import { api, type RoundDetail, type PressStatus, type PressSegment } from "@/lib/api";
+import { ScorecardPhotoReview } from "@/components/scorecard/photo-review";
 import { cn } from "@/lib/utils";
 import { useRealtimeScores, type RealtimeScoreUpdate, type RealtimePlayerJoined } from "@/hooks/use-realtime-scores";
 import { ConnectionStatusIndicator } from "@/components/connection-status";
@@ -25,6 +26,7 @@ export default function ScorecardPage() {
   const [pressStatus, setPressStatus] = useState<PressStatus[]>([]);
   const [isPressing, setIsPressing] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [showPhotoReview, setShowPhotoReview] = useState(false);
 
   // Local scores state for optimistic updates
   const [localScores, setLocalScores] = useState<Record<string, Record<number, number>>>({});
@@ -239,6 +241,28 @@ export default function ScorecardPage() {
     }
   }, [getToken, roundId, router]);
 
+  // Handle scores saved from photo review
+  const handlePhotoScoresSaved = useCallback((scores: { holeNumber: number; strokes: number }[]) => {
+    // Find current user's player ID
+    const currentPlayer = round?.players[0]; // First player is typically the current user
+    if (!currentPlayer) return;
+
+    // Update local scores
+    setLocalScores((prev) => {
+      const newScores = { ...prev };
+      if (!newScores[currentPlayer.id]) {
+        newScores[currentPlayer.id] = {};
+      }
+      scores.forEach((score) => {
+        newScores[currentPlayer.id][score.holeNumber] = score.strokes;
+      });
+      return newScores;
+    });
+
+    // Close the modal
+    setShowPhotoReview(false);
+  }, [round]);
+
   const getPlayerTotal = (playerId: string, holes: number[]) => {
     return holes.reduce((sum, hole) => sum + (localScores[playerId]?.[hole] || 0), 0);
   };
@@ -304,11 +328,20 @@ export default function ScorecardPage() {
         showBack
         rightAction={
           round.status === "ACTIVE" && (
-            <ConnectionStatusIndicator
-              status={connectionStatus}
-              onReconnect={reconnect}
-              showLabel
-            />
+            <div className="flex items-center gap-sm">
+              <button
+                onClick={() => setShowPhotoReview(true)}
+                className="p-2 rounded-lg hover:bg-surface transition-colors"
+                aria-label="Scan scorecard"
+              >
+                <Camera className="h-5 w-5 text-muted" />
+              </button>
+              <ConnectionStatusIndicator
+                status={connectionStatus}
+                onReconnect={reconnect}
+                showLabel
+              />
+            </div>
           )
         }
       />
@@ -614,6 +647,15 @@ export default function ScorecardPage() {
           )}
         </div>
       </div>
+
+      {/* Scorecard Photo Review Modal */}
+      <ScorecardPhotoReview
+        roundId={roundId}
+        holeCount={18}
+        onScoresSaved={handlePhotoScoresSaved}
+        onClose={() => setShowPhotoReview(false)}
+        open={showPhotoReview}
+      />
     </div>
   );
 }

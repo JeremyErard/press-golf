@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useUser, useClerk, useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import {
@@ -11,9 +11,10 @@ import {
   Crown,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
-import { Card, CardContent, Avatar, Button, Badge } from "@/components/ui";
+import { Card, CardContent, Button, Badge } from "@/components/ui";
 import { HandicapCard } from "@/components/handicap/handicap-card";
-import { api, type BillingStatus } from "@/lib/api";
+import { AvatarEditor } from "@/components/profile/avatar-editor";
+import { api, type BillingStatus, type User as ApiUser } from "@/lib/api";
 
 export default function ProfilePage() {
   const { user, isLoaded } = useUser();
@@ -22,23 +23,32 @@ export default function ProfilePage() {
   const router = useRouter();
 
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
+  const [apiUser, setApiUser] = useState<ApiUser | null>(null);
+
+  const fetchUserData = useCallback(async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const [status, userData] = await Promise.all([
+        api.getBillingStatus(token),
+        api.getMe(token),
+      ]);
+      setBillingStatus(status);
+      setApiUser(userData);
+    } catch (error) {
+      console.error("Failed to fetch user data:", error);
+    }
+  }, [getToken]);
 
   useEffect(() => {
-    async function fetchBillingStatus() {
-      try {
-        const token = await getToken();
-        if (!token) return;
-        const status = await api.getBillingStatus(token);
-        setBillingStatus(status);
-      } catch (error) {
-        console.error("Failed to fetch billing status:", error);
-      }
-    }
-
     if (isLoaded) {
-      fetchBillingStatus();
+      fetchUserData();
     }
-  }, [getToken, isLoaded]);
+  }, [fetchUserData, isLoaded]);
+
+  const handleAvatarUpdated = useCallback((newUrl: string) => {
+    setApiUser((prev) => (prev ? { ...prev, avatarUrl: newUrl } : null));
+  }, []);
 
   if (!isLoaded) {
     return (
@@ -65,14 +75,14 @@ export default function ProfilePage() {
           <Card>
             <CardContent className="p-lg">
               <div className="flex items-center gap-lg">
-                <Avatar
-                  src={user?.imageUrl}
-                  name={user?.fullName || "User"}
-                  size="lg"
+                <AvatarEditor
+                  currentAvatarUrl={apiUser?.avatarUrl || user?.imageUrl}
+                  displayName={apiUser?.displayName || user?.fullName}
+                  onAvatarUpdated={handleAvatarUpdated}
                 />
                 <div className="flex-1 min-w-0">
                   <h2 className="text-h2 font-semibold truncate">
-                    {user?.fullName || "Golfer"}
+                    {apiUser?.displayName || user?.fullName || "Golfer"}
                   </h2>
                   <p className="text-caption text-muted truncate">
                     {user?.primaryEmailAddress?.emailAddress}

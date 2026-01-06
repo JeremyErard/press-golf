@@ -34,6 +34,7 @@ model User {
   handicapVerifiedAt     DateTime?
   handicapSource         HandicapSource?
   handicapPendingApproval Boolean @default(false)
+  handicapProofUrl       String?  // Screenshot/photo proof of handicap
 
   // Stripe Subscription
   stripeCustomerId     String?            @unique

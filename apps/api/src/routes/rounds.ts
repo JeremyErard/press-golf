@@ -1,8 +1,15 @@
 import { FastifyPluginAsync } from 'fastify';
+import multipart from '@fastify/multipart';
+import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, getUser } from '../lib/auth.js';
 import { badRequest, notFound, forbidden, sendError, ErrorCodes } from '../lib/errors.js';
 import { emitScoreUpdate, emitPlayerJoined } from './realtime.js';
+import { uploadScorecardPhoto, validateImage } from '../lib/blob.js';
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
 // Type definitions
 interface CreateRoundBody {
@@ -22,7 +29,24 @@ interface UpdateScoreBody {
   playerId?: string; // Optional: score for another player in the round
 }
 
+interface ExtractedScore {
+  holeNumber: number;
+  strokes: number;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+interface ConfirmScorecardBody {
+  scores: { holeNumber: number; strokes: number }[];
+}
+
 export const roundRoutes: FastifyPluginAsync = async (app) => {
+  // Register multipart for file uploads
+  await app.register(multipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB max
+    },
+  });
+
   // =====================
   // GET /api/rounds
   // List user's rounds
@@ -566,5 +590,336 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
       success: true,
       data: updatedRound,
     };
+  });
+
+  // =====================
+  // POST /api/rounds/:id/scorecard-photo
+  // Upload scorecard photo and extract scores using Claude Vision
+  // =====================
+  app.post<{ Params: { id: string } }>('/:id/scorecard-photo', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { id: roundId } = request.params;
+
+    // Get the uploaded file
+    const data = await request.file();
+    if (!data) {
+      return badRequest(reply, 'No image file provided');
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
+    if (!allowedTypes.includes(data.mimetype)) {
+      return badRequest(reply, 'Invalid file type. Please upload a JPEG, PNG, WebP, GIF, or HEIC image.');
+    }
+
+    // Get round and verify access
+    const round = await prisma.round.findUnique({
+      where: { id: roundId },
+      include: {
+        players: true,
+        course: {
+          include: {
+            holes: {
+              orderBy: { holeNumber: 'asc' },
+            },
+          },
+        },
+      },
+    });
+
+    if (!round) {
+      return notFound(reply, 'Round not found');
+    }
+
+    const currentPlayer = round.players.find(p => p.userId === (user.id as string));
+    if (!currentPlayer) {
+      return forbidden(reply, 'You are not a player in this round');
+    }
+
+    // Read file into buffer
+    const buffer = await data.toBuffer();
+    const base64Image = buffer.toString('base64');
+    const mediaType = data.mimetype as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+    const filename = data.filename || 'scorecard.jpg';
+
+    // Upload to blob storage first
+    let imageUrl: string | null = null;
+    try {
+      const uploadResult = await uploadScorecardPhoto(buffer, filename, roundId, currentPlayer.id);
+      imageUrl = uploadResult.url;
+    } catch (uploadError) {
+      request.log.warn(uploadError, 'Failed to upload scorecard photo');
+      // Continue without saving - extraction still works
+    }
+
+    try {
+      // Get course hole count
+      const holeCount = round.course.holes.length || 18;
+
+      // Use Claude Vision to extract scores
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: mediaType,
+                  data: base64Image,
+                },
+              },
+              {
+                type: 'text',
+                text: `Extract the golf scores from this scorecard image.
+
+This scorecard is for a ${holeCount}-hole course. Look for:
+- Individual hole scores (strokes per hole)
+- Look for a row of numbers corresponding to holes 1-${holeCount}
+- Common score values are 3-8 strokes per hole
+- Ignore totals, handicaps, and other non-score values
+
+Return ONLY a JSON object with this format:
+{
+  "found": true,
+  "playerName": "Player name if visible or null",
+  "scores": [
+    { "holeNumber": 1, "strokes": 5, "confidence": "high" },
+    { "holeNumber": 2, "strokes": 4, "confidence": "high" },
+    ...
+  ],
+  "needsReview": false
+}
+
+Set needsReview to true if:
+- Any scores are unclear or hard to read
+- Any confidence levels are "low"
+- The image quality is poor
+
+If you cannot extract scores, return:
+{
+  "found": false,
+  "reason": "explanation"
+}
+
+Confidence should be: high, medium, or low`,
+              },
+            ],
+          },
+        ],
+      });
+
+      // Extract text from response
+      const responseText = message.content
+        .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+        .map((block) => block.text)
+        .join('');
+
+      // Parse JSON from response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        return reply.send({
+          success: false,
+          error: 'Could not parse scores from image',
+        });
+      }
+
+      const extracted = JSON.parse(jsonMatch[0]);
+
+      if (!extracted.found) {
+        return reply.send({
+          success: false,
+          error: extracted.reason || 'Could not find scores in image',
+        });
+      }
+
+      // Validate extracted scores
+      const validScores = (extracted.scores || []).filter((s: ExtractedScore) =>
+        s.holeNumber >= 1 && s.holeNumber <= 18 && s.strokes >= 1 && s.strokes <= 20
+      );
+
+      return reply.send({
+        success: true,
+        data: {
+          imageUrl,
+          playerName: extracted.playerName || null,
+          extractedScores: validScores,
+          needsReview: extracted.needsReview || validScores.some((s: ExtractedScore) => s.confidence !== 'high'),
+        },
+      });
+    } catch (error) {
+      request.log.error(error, 'Failed to extract scores from scorecard image');
+      return sendError(reply, 500, ErrorCodes.IMAGE_PROCESSING_FAILED, 'Failed to process scorecard image');
+    }
+  });
+
+  // =====================
+  // POST /api/rounds/:id/confirm-scorecard
+  // Confirm extracted scores and save to database
+  // =====================
+  app.post<{ Params: { id: string }; Body: ConfirmScorecardBody }>('/:id/confirm-scorecard', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { id: roundId } = request.params;
+    const { scores } = request.body;
+
+    if (!scores || !Array.isArray(scores) || scores.length === 0) {
+      return badRequest(reply, 'No scores provided');
+    }
+
+    // Validate all scores
+    for (const score of scores) {
+      if (score.holeNumber < 1 || score.holeNumber > 18) {
+        return badRequest(reply, `Invalid hole number: ${score.holeNumber}`);
+      }
+      if (score.strokes < 1 || score.strokes > 20) {
+        return badRequest(reply, `Invalid strokes for hole ${score.holeNumber}: ${score.strokes}`);
+      }
+    }
+
+    // Get round and verify access
+    const round = await prisma.round.findUnique({
+      where: { id: roundId },
+      include: { players: true },
+    });
+
+    if (!round) {
+      return notFound(reply, 'Round not found');
+    }
+
+    const currentPlayer = round.players.find(p => p.userId === (user.id as string));
+    if (!currentPlayer) {
+      return forbidden(reply, 'You are not a player in this round');
+    }
+
+    if (round.status !== 'ACTIVE') {
+      return badRequest(reply, 'Round must be active to submit scores');
+    }
+
+    // Save all scores in a transaction
+    const savedScores = await prisma.$transaction(
+      scores.map(score =>
+        prisma.holeScore.upsert({
+          where: {
+            roundPlayerId_holeNumber: {
+              roundPlayerId: currentPlayer.id,
+              holeNumber: score.holeNumber,
+            },
+          },
+          update: {
+            strokes: score.strokes,
+          },
+          create: {
+            roundPlayerId: currentPlayer.id,
+            holeNumber: score.holeNumber,
+            strokes: score.strokes,
+          },
+        })
+      )
+    );
+
+    // Emit real-time updates for each score
+    for (const score of scores) {
+      emitScoreUpdate(roundId, currentPlayer.userId, score.holeNumber, score.strokes);
+    }
+
+    return reply.send({
+      success: true,
+      data: {
+        savedCount: savedScores.length,
+        scores: savedScores,
+      },
+    });
+  });
+
+  // =====================
+  // POST /api/rounds/:id/add-buddy/:buddyUserId
+  // Add a buddy to a round (round creator only)
+  // =====================
+  app.post<{ Params: { id: string; buddyUserId: string } }>('/:id/add-buddy/:buddyUserId', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { id: roundId, buddyUserId } = request.params;
+
+    // Get round
+    const round = await prisma.round.findUnique({
+      where: { id: roundId },
+      include: {
+        tee: true,
+        players: true,
+      },
+    });
+
+    if (!round) {
+      return notFound(reply, 'Round not found');
+    }
+
+    // Check if requester is the round creator
+    if (round.createdById !== (user.id as string)) {
+      return forbidden(reply, 'Only the round creator can add buddies');
+    }
+
+    // Check if round is still in SETUP
+    if (round.status !== 'SETUP') {
+      return badRequest(reply, 'Cannot add players after the round has started');
+    }
+
+    // Check max players
+    if (round.players.length >= 4) {
+      return badRequest(reply, 'Round is full (max 4 players)');
+    }
+
+    // Check if buddy is already in round
+    if (round.players.some(p => p.userId === buddyUserId)) {
+      return badRequest(reply, 'This player is already in the round');
+    }
+
+    // Get buddy user
+    const buddyUser = await prisma.user.findUnique({
+      where: { id: buddyUserId },
+      select: { id: true, handicapIndex: true, displayName: true, firstName: true },
+    });
+
+    if (!buddyUser) {
+      return notFound(reply, 'User not found');
+    }
+
+    // Calculate course handicap
+    let courseHandicap: number | null = null;
+    if (buddyUser.handicapIndex && round.tee.slopeRating) {
+      courseHandicap = Math.round(
+        Number(buddyUser.handicapIndex) * (round.tee.slopeRating / 113)
+      );
+    }
+
+    // Add to round
+    const roundPlayer = await prisma.roundPlayer.create({
+      data: {
+        roundId,
+        userId: buddyUserId,
+        courseHandicap,
+        position: round.players.length + 1,
+      },
+      include: {
+        user: {
+          select: { id: true, displayName: true, firstName: true, avatarUrl: true },
+        },
+      },
+    });
+
+    // Emit player joined event
+    emitPlayerJoined(roundId, buddyUserId, buddyUser.displayName || buddyUser.firstName || null);
+
+    return reply.send({
+      success: true,
+      data: roundPlayer,
+    });
   });
 };

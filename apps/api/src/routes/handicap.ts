@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, getUser } from '../lib/auth.js';
 import { badRequest, notFound, forbidden, sendError, ErrorCodes } from '../lib/errors.js';
+import { uploadHandicapProof, validateImage, deleteImage } from '../lib/blob.js';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -12,6 +13,7 @@ const anthropic = new Anthropic({
 interface VerifyHandicapBody {
   handicapIndex: number;
   source: 'GHIN' | 'USGA' | 'CLUB' | 'OTHER';
+  proofUrl?: string;
 }
 
 interface ManualHandicapBody {
@@ -139,12 +141,24 @@ Confidence should be: high, medium, or low`,
         });
       }
 
+      // Upload proof image to blob storage
+      let proofUrl: string | null = null;
+      try {
+        const filename = data.filename || 'handicap-proof.jpg';
+        const result = await uploadHandicapProof(buffer, filename, user.id as string);
+        proofUrl = result.url;
+      } catch (uploadError) {
+        request.log.warn(uploadError, 'Failed to upload handicap proof image');
+        // Continue without proof URL - extraction still succeeded
+      }
+
       return reply.send({
         success: true,
         data: {
           handicapIndex: handicap,
           source: extracted.source || 'OTHER',
           confidence: extracted.confidence || 'medium',
+          proofUrl,
         },
       });
     } catch (error) {
@@ -159,7 +173,7 @@ Confidence should be: high, medium, or low`,
   // =====================
   app.post<{ Body: VerifyHandicapBody }>('/verify', async (request, reply) => {
     const user = getUser(request);
-    const { handicapIndex, source } = request.body;
+    const { handicapIndex, source, proofUrl } = request.body;
 
     // Validate handicap (USGA: +9.9 to 54.0)
     if (typeof handicapIndex !== 'number' || handicapIndex < -9.9 || handicapIndex > 54.0) {
@@ -171,7 +185,13 @@ Confidence should be: high, medium, or low`,
       return badRequest(reply, 'Invalid source. Must be GHIN, USGA, CLUB, or OTHER.');
     }
 
-    // Update user with verified handicap
+    // Get current user to check for old proof URL
+    const currentUser = await prisma.user.findUnique({
+      where: { id: user.id as string },
+      select: { handicapProofUrl: true },
+    });
+
+    // Update user with verified handicap and proof
     const updatedUser = await prisma.user.update({
       where: { id: user.id as string },
       data: {
@@ -179,8 +199,16 @@ Confidence should be: high, medium, or low`,
         handicapSource: source as 'GHIN' | 'USGA' | 'CLUB' | 'OTHER',
         handicapVerifiedAt: new Date(),
         handicapPendingApproval: false,
+        handicapProofUrl: proofUrl || null,
       },
     });
+
+    // Delete old proof image if exists and different from new one
+    if (currentUser?.handicapProofUrl && currentUser.handicapProofUrl !== proofUrl) {
+      deleteImage(currentUser.handicapProofUrl).catch((err) => {
+        request.log.warn(err, 'Failed to delete old handicap proof');
+      });
+    }
 
     return reply.send({
       success: true,
@@ -188,6 +216,7 @@ Confidence should be: high, medium, or low`,
         handicapIndex: updatedUser.handicapIndex,
         handicapSource: updatedUser.handicapSource,
         handicapVerifiedAt: updatedUser.handicapVerifiedAt,
+        handicapProofUrl: updatedUser.handicapProofUrl,
         isVerified: true,
       },
     });

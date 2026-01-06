@@ -1,7 +1,9 @@
 import { FastifyPluginAsync } from 'fastify';
+import multipart from '@fastify/multipart';
 import { prisma } from '../lib/prisma.js';
 import { requireAuth, getUser } from '../lib/auth.js';
 import { badRequest, notFound } from '../lib/errors.js';
+import { validateImage, uploadAvatar, deleteImage } from '../lib/blob.js';
 
 // Type definitions for request bodies
 interface UpdateProfileBody {
@@ -20,6 +22,13 @@ interface CreatePaymentMethodBody {
 }
 
 export const userRoutes: FastifyPluginAsync = async (app) => {
+  // Register multipart for file uploads
+  await app.register(multipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB max
+    },
+  });
+
   // All user routes require authentication
   app.addHook('preHandler', requireAuth);
 
@@ -185,6 +194,92 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
       data: {
         onboardingComplete: updatedUser.onboardingComplete,
       },
+    };
+  });
+
+  // =====================
+  // POST /api/users/me/avatar
+  // Upload/update user avatar image
+  // =====================
+  app.post('/me/avatar', async (request, reply) => {
+    const user = getUser(request);
+
+    // Get the uploaded file
+    const data = await request.file();
+    if (!data) {
+      return badRequest(reply, 'No file uploaded');
+    }
+
+    // Read file buffer
+    const buffer = await data.toBuffer();
+    const filename = data.filename || 'avatar.jpg';
+    const mimeType = data.mimetype || 'image/jpeg';
+
+    // Validate the image
+    const validation = validateImage(buffer, mimeType, filename);
+    if (!validation.valid) {
+      return badRequest(reply, validation.error || 'Invalid image');
+    }
+
+    // Get current user to check for existing avatar
+    const currentUser = await prisma.user.findUnique({
+      where: { id: user.id as string },
+      select: { avatarUrl: true },
+    });
+
+    // Upload new avatar
+    const result = await uploadAvatar(buffer, filename, user.id as string);
+
+    // Update user with new avatar URL
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id as string },
+      data: { avatarUrl: result.url },
+    });
+
+    // Delete old avatar if exists (non-blocking)
+    if (currentUser?.avatarUrl) {
+      deleteImage(currentUser.avatarUrl).catch((err) => {
+        console.error('Failed to delete old avatar:', err);
+      });
+    }
+
+    return {
+      success: true,
+      data: {
+        avatarUrl: updatedUser.avatarUrl,
+      },
+    };
+  });
+
+  // =====================
+  // DELETE /api/users/me/avatar
+  // Remove user avatar
+  // =====================
+  app.delete('/me/avatar', async (request, reply) => {
+    const user = getUser(request);
+
+    // Get current user
+    const currentUser = await prisma.user.findUnique({
+      where: { id: user.id as string },
+      select: { avatarUrl: true },
+    });
+
+    if (!currentUser?.avatarUrl) {
+      return badRequest(reply, 'No avatar to delete');
+    }
+
+    // Delete from blob storage
+    await deleteImage(currentUser.avatarUrl);
+
+    // Clear avatar URL in database
+    await prisma.user.update({
+      where: { id: user.id as string },
+      data: { avatarUrl: null },
+    });
+
+    return {
+      success: true,
+      data: { deleted: true },
     };
   });
 

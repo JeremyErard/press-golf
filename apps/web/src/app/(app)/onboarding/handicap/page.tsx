@@ -12,6 +12,7 @@ interface ExtractedData {
   handicapIndex: number;
   source: HandicapSource;
   confidence: "high" | "medium" | "low";
+  proofUrl?: string | null;
 }
 
 export default function HandicapOnboardingPage() {
@@ -67,7 +68,12 @@ export default function HandicapOnboardingPage() {
       const token = await getToken();
       if (!token) throw new Error("Not authenticated");
 
-      await api.verifyHandicap(token, extractedData.handicapIndex, extractedData.source);
+      await api.verifyHandicap(
+        token,
+        extractedData.handicapIndex,
+        extractedData.source,
+        extractedData.proofUrl
+      );
       setStep("success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save handicap");

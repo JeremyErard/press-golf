@@ -272,12 +272,12 @@ export const api = {
     return json.data;
   },
 
-  verifyHandicap: (token: string, handicapIndex: number, source: HandicapSource) =>
-    apiRequest<{ handicapIndex: number; handicapSource: HandicapSource; handicapVerifiedAt: string; isVerified: boolean }>(
+  verifyHandicap: (token: string, handicapIndex: number, source: HandicapSource, proofUrl?: string | null) =>
+    apiRequest<{ handicapIndex: number; handicapSource: HandicapSource; handicapVerifiedAt: string; handicapProofUrl?: string; isVerified: boolean }>(
       "/handicap/verify",
       {
         method: "POST",
-        body: JSON.stringify({ handicapIndex, source }),
+        body: JSON.stringify({ handicapIndex, source, proofUrl }),
       },
       token
     ),
@@ -329,6 +329,69 @@ export const api = {
   setPreferredPaymentMethod: (token: string, id: string) =>
     apiRequest<PaymentMethod>(`/users/me/payment-methods/${id}/preferred`, {
       method: "PATCH",
+    }, token),
+
+  // Avatar
+  uploadAvatar: async (token: string, file: File): Promise<{ avatarUrl: string }> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+    const response = await fetch(`${API_URL}/users/me/avatar`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+      credentials: "include",
+    });
+
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new ApiError(
+        json.error?.code || "UPLOAD_FAILED",
+        json.error?.message || "Failed to upload avatar",
+        response.status
+      );
+    }
+    return json.data;
+  },
+
+  deleteAvatar: (token: string) =>
+    apiRequest<{ deleted: boolean }>("/users/me/avatar", {
+      method: "DELETE",
+    }, token),
+
+  // Scorecard Photo
+  uploadScorecardPhoto: async (token: string, roundId: string, file: File): Promise<ScorecardExtraction> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+    const response = await fetch(`${API_URL}/rounds/${roundId}/scorecard-photo`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+      credentials: "include",
+    });
+
+    const json = await response.json();
+    if (!response.ok || !json.success) {
+      throw new ApiError(
+        json.error?.code || "EXTRACTION_FAILED",
+        json.error?.message || json.error || "Failed to extract scores from scorecard",
+        response.status
+      );
+    }
+    return json.data;
+  },
+
+  confirmScorecardScores: (token: string, roundId: string, scores: { holeNumber: number; strokes: number }[]) =>
+    apiRequest<{ savedCount: number; scores: HoleScore[] }>(`/rounds/${roundId}/confirm-scorecard`, {
+      method: "POST",
+      body: JSON.stringify({ scores }),
     }, token),
 };
 
@@ -710,6 +773,18 @@ export interface ExtractedHandicap {
   handicapIndex: number;
   source: HandicapSource;
   confidence: "high" | "medium" | "low";
+  proofUrl?: string | null;
+}
+
+export interface ScorecardExtraction {
+  imageUrl: string | null;
+  playerName: string | null;
+  extractedScores: {
+    holeNumber: number;
+    strokes: number;
+    confidence: "high" | "medium" | "low";
+  }[];
+  needsReview: boolean;
 }
 
 export interface HandicapApproval {
