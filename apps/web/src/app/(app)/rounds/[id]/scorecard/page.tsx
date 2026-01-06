@@ -399,21 +399,21 @@ export default function ScorecardPage() {
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header with Hero Image */}
-      <header className="sticky top-0 z-50">
+      <header className="sticky top-0 z-50 h-16">
         {/* Hero image background */}
         <div
-          className="absolute inset-0 h-24 bg-cover bg-center"
+          className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage: round.course.heroImageUrl
               ? `url(${round.course.heroImageUrl})`
               : 'linear-gradient(to right, #1a1a2e, #16213e)'
           }}
         >
-          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/50 to-black/70" />
         </div>
 
         {/* Header content */}
-        <div className="relative flex items-center justify-between px-4 h-14">
+        <div className="relative flex items-center justify-between px-4 h-16">
           <div className="flex items-center gap-3">
             <Link href={`/rounds/${roundId}`}>
               <Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:bg-white/20">

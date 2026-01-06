@@ -269,10 +269,16 @@ export function ScorecardGrid({
         onValueChange={(v) => setActiveTab(v as "front" | "back")}
       >
         <TabsList className="w-full">
-          <TabsTrigger value="front" className="flex-1">
+          <TabsTrigger
+            value="front"
+            className="flex-1 data-[state=active]:bg-brand data-[state=active]:text-white"
+          >
             Front 9
           </TabsTrigger>
-          <TabsTrigger value="back" className="flex-1">
+          <TabsTrigger
+            value="back"
+            className="flex-1 data-[state=active]:bg-brand data-[state=active]:text-white"
+          >
             Back 9
           </TabsTrigger>
         </TabsList>
