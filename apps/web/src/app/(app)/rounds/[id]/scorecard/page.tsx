@@ -3,10 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { Check, AlertCircle, Camera, ChevronLeft } from "lucide-react";
+import { Check, ChevronLeft } from "lucide-react";
 import { Button, Skeleton } from "@/components/ui";
 import { api, type RoundDetail, type PressStatus, type PressSegment, type GameLiveStatus } from "@/lib/api";
-import { ScorecardPhotoReview } from "@/components/scorecard/photo-review";
 import { ScorecardGrid } from "@/components/scorecard/scorecard-grid";
 import { ScoreEntryModal } from "@/components/scorecard/score-entry-modal";
 import { GamesSummary } from "@/components/scorecard/games-summary";
@@ -35,7 +34,6 @@ export default function ScorecardPage() {
   const [gameLiveStatus, setGameLiveStatus] = useState<GameLiveStatus[]>([]);
   const [isPressing, setIsPressing] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
-  const [showPhotoReview, setShowPhotoReview] = useState(false);
 
   // Score entry modal state
   const [scoreModalOpen, setScoreModalOpen] = useState(false);
@@ -262,26 +260,6 @@ export default function ScorecardPage() {
     }
   }, [getToken, roundId, router]);
 
-  // Handle scores saved from photo review
-  const handlePhotoScoresSaved = useCallback((scores: { holeNumber: number; strokes: number }[]) => {
-    const currentPlayer = round?.players.find(p => p.userId === userId);
-    if (!currentPlayer) return;
-
-    setLocalScores((prev) => {
-      const newScores = { ...prev };
-      if (!newScores[currentPlayer.id]) {
-        newScores[currentPlayer.id] = {};
-      }
-      scores.forEach((score) => {
-        newScores[currentPlayer.id][score.holeNumber] = score.strokes;
-      });
-      return newScores;
-    });
-
-    setShowPhotoReview(false);
-    fetchGameStatus();
-  }, [round, userId, fetchGameStatus]);
-
   // Check if all players have scores for all 18 holes
   const allScoresComplete = round?.players.every(player => {
     for (let hole = 1; hole <= 18; hole++) {
@@ -291,20 +269,6 @@ export default function ScorecardPage() {
     }
     return true;
   }) ?? false;
-
-  // Count missing scores
-  const getMissingScoresCount = () => {
-    if (!round) return 0;
-    let missing = 0;
-    round.players.forEach(player => {
-      for (let hole = 1; hole <= 18; hole++) {
-        if (!localScores[player.id]?.[hole]) {
-          missing++;
-        }
-      }
-    });
-    return missing;
-  };
 
   // Get hole data from round
   const getHoles = (): HoleData[] => {
@@ -473,44 +437,23 @@ export default function ScorecardPage() {
           />
         )}
 
-        {/* Incomplete Scores Warning */}
-        {!allScoresComplete && getMissingScoresCount() <= 36 && (
-          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-warning">
-              <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              <p className="text-sm">
-                {getMissingScoresCount()} score{getMissingScoresCount() !== 1 ? "s" : ""} remaining
-              </p>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Bottom Action Bar */}
-      <div className="fixed bottom-16 left-0 right-0 z-40 glass border-t border-border">
-        <div className="flex gap-3 p-4 max-w-lg mx-auto">
-          <Button
-            variant="secondary"
-            onClick={() => setShowPhotoReview(true)}
-            className="flex-1"
-          >
-            <Camera className="h-4 w-4 mr-2" />
-            Scan Scorecard
-          </Button>
-          <Button
-            onClick={handleFinishRound}
-            disabled={isFinishing || !allScoresComplete}
-            className="flex-1"
-          >
-            <Check className="h-4 w-4 mr-2" />
-            {isFinishing
-              ? "Finishing..."
-              : !allScoresComplete
-              ? `${getMissingScoresCount()} missing`
-              : "Finish Round"}
-          </Button>
+      {/* Finish Round Button - Only shown when all scores are complete */}
+      {allScoresComplete && (
+        <div className="fixed bottom-16 left-0 right-0 z-40 glass border-t border-border">
+          <div className="p-4 max-w-lg mx-auto">
+            <Button
+              onClick={handleFinishRound}
+              disabled={isFinishing}
+              className="w-full"
+            >
+              <Check className="h-4 w-4 mr-2" />
+              {isFinishing ? "Finishing..." : "Finish Round"}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Score Entry Modal */}
       {selectedHoleData && (
@@ -532,14 +475,6 @@ export default function ScorecardPage() {
         />
       )}
 
-      {/* Scorecard Photo Review Modal */}
-      <ScorecardPhotoReview
-        roundId={roundId}
-        holeCount={18}
-        onScoresSaved={handlePhotoScoresSaved}
-        onClose={() => setShowPhotoReview(false)}
-        open={showPhotoReview}
-      />
     </div>
   );
 }
