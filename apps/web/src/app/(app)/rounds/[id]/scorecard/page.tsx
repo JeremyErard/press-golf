@@ -3,57 +3,77 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { Minus, Plus, Check, AlertCircle, TrendingUp, TrendingDown, Minus as TiedIcon, Camera } from "lucide-react";
-import { Header } from "@/components/layout/header";
-import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
-import { api, type RoundDetail, type PressStatus, type PressSegment } from "@/lib/api";
+import { Check, AlertCircle, Camera, ChevronLeft } from "lucide-react";
+import { Button, Skeleton } from "@/components/ui";
+import { api, type RoundDetail, type PressStatus, type PressSegment, type GameLiveStatus } from "@/lib/api";
 import { ScorecardPhotoReview } from "@/components/scorecard/photo-review";
+import { ScorecardGrid } from "@/components/scorecard/scorecard-grid";
+import { ScoreEntryModal } from "@/components/scorecard/score-entry-modal";
+import { GamesSummary } from "@/components/scorecard/games-summary";
 import { cn } from "@/lib/utils";
 import { useRealtimeScores, type RealtimeScoreUpdate, type RealtimePlayerJoined } from "@/hooks/use-realtime-scores";
-import { ConnectionStatusIndicator } from "@/components/connection-status";
 import { toast } from "@/components/ui/sonner";
+import Link from "next/link";
+
+interface HoleData {
+  holeNumber: number;
+  par: number;
+  handicapRank: number;
+  yardage?: number;
+}
 
 export default function ScorecardPage() {
   const params = useParams();
   const router = useRouter();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const roundId = params.id as string;
 
   const [round, setRound] = useState<RoundDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentHole, setCurrentHole] = useState(1);
   const [savingScore, setSavingScore] = useState<string | null>(null);
   const [pressStatus, setPressStatus] = useState<PressStatus[]>([]);
+  const [gameLiveStatus, setGameLiveStatus] = useState<GameLiveStatus[]>([]);
   const [isPressing, setIsPressing] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
   const [showPhotoReview, setShowPhotoReview] = useState(false);
 
+  // Score entry modal state
+  const [scoreModalOpen, setScoreModalOpen] = useState(false);
+  const [selectedScore, setSelectedScore] = useState<{
+    playerId: string;
+    holeNumber: number;
+    currentScore: number;
+  } | null>(null);
+
   // Local scores state for optimistic updates
   const [localScores, setLocalScores] = useState<Record<string, Record<number, number>>>({});
 
-  // Fetch press status for Nassau/Match Play games
-  const fetchPressStatus = useCallback(async () => {
+  // Fetch press status and game live status
+  const fetchGameStatus = useCallback(async () => {
     try {
       const token = await getToken();
       if (!token) return;
-      const status = await api.getPressStatus(token, roundId);
-      setPressStatus(status);
+
+      // Fetch both in parallel
+      const [pressData, liveData] = await Promise.all([
+        api.getPressStatus(token, roundId).catch(() => []),
+        api.getGameLiveStatus(token, roundId).catch(() => []),
+      ]);
+
+      setPressStatus(pressData);
+      setGameLiveStatus(liveData);
     } catch (error) {
-      console.error("Failed to fetch press status:", error);
+      console.error("Failed to fetch game status:", error);
     }
   }, [getToken, roundId]);
 
   // Handle real-time score updates from other players
   const handleRealtimeScoreUpdate = useCallback((update: RealtimeScoreUpdate) => {
-    // Find the player by userId
     const player = round?.players.find(p => p.userId === update.userId);
     if (!player) return;
 
-    // Only update if this is from another device/player
-    // (our own updates are already applied optimistically)
     setLocalScores((prev) => {
       const currentScore = prev[player.id]?.[update.holeNumber];
-      // Skip if score matches (we likely submitted this)
       if (currentScore === update.strokes) return prev;
 
       return {
@@ -65,15 +85,12 @@ export default function ScorecardPage() {
       };
     });
 
-    // Refresh press status when scores change
-    if (round?.games.some(g => g.type === "NASSAU" || g.type === "MATCH_PLAY")) {
-      fetchPressStatus();
-    }
-  }, [round, fetchPressStatus]);
+    // Refresh game status when scores change
+    fetchGameStatus();
+  }, [round, fetchGameStatus]);
 
   // Handle player joined events
   const handlePlayerJoined = useCallback((player: RealtimePlayerJoined) => {
-    // Refresh round data to get the new player
     async function refresh() {
       try {
         const token = await getToken();
@@ -81,7 +98,6 @@ export default function ScorecardPage() {
         const data = await api.getRound(token, roundId);
         setRound(data);
 
-        // Update local scores for new player
         setLocalScores((prev) => {
           const newScores = { ...prev };
           const newPlayer = data.players.find(p => p.userId === player.userId);
@@ -136,10 +152,8 @@ export default function ScorecardPage() {
         });
         setLocalScores(scores);
 
-        // Also fetch press status if there's a Nassau or Match Play game
-        if (data.games.some(g => g.type === "NASSAU" || g.type === "MATCH_PLAY")) {
-          fetchPressStatus();
-        }
+        // Fetch game status
+        fetchGameStatus();
       } catch (error) {
         console.error("Failed to fetch round:", error);
       } finally {
@@ -148,12 +162,21 @@ export default function ScorecardPage() {
     }
 
     fetchRound();
-  }, [getToken, roundId, fetchPressStatus]);
+  }, [getToken, roundId, fetchGameStatus]);
 
-  const handleScoreChange = useCallback(
-    async (playerId: string, holeNumber: number, delta: number) => {
-      const currentScore = localScores[playerId]?.[holeNumber] || 0;
-      const newScore = Math.max(1, currentScore + delta);
+  const handleScoreClick = useCallback(
+    (playerId: string, holeNumber: number, currentScore: number) => {
+      setSelectedScore({ playerId, holeNumber, currentScore });
+      setScoreModalOpen(true);
+    },
+    []
+  );
+
+  const handleScoreSave = useCallback(
+    async (newScore: number) => {
+      if (!selectedScore) return;
+
+      const { playerId, holeNumber, currentScore } = selectedScore;
 
       // Optimistic update
       setLocalScores((prev) => ({
@@ -164,8 +187,9 @@ export default function ScorecardPage() {
         },
       }));
 
-      // Save to server
+      setScoreModalOpen(false);
       setSavingScore(`${playerId}-${holeNumber}`);
+
       try {
         const token = await getToken();
         if (!token) return;
@@ -176,10 +200,8 @@ export default function ScorecardPage() {
           playerId,
         });
 
-        // Refresh press status after score update
-        if (round?.games.some(g => g.type === "NASSAU" || g.type === "MATCH_PLAY")) {
-          fetchPressStatus();
-        }
+        // Refresh game status after score update
+        fetchGameStatus();
       } catch (error) {
         console.error("Failed to save score:", error);
         toast.error("Failed to save score");
@@ -193,9 +215,10 @@ export default function ScorecardPage() {
         }));
       } finally {
         setSavingScore(null);
+        setSelectedScore(null);
       }
     },
-    [getToken, roundId, localScores, round?.games, fetchPressStatus]
+    [getToken, roundId, selectedScore, fetchGameStatus]
   );
 
   const handlePress = useCallback(
@@ -212,8 +235,7 @@ export default function ScorecardPage() {
         });
 
         toast.success("Press created");
-        // Refresh press status
-        fetchPressStatus();
+        fetchGameStatus();
       } catch (error) {
         console.error("Failed to create press:", error);
         toast.error("Failed to create press");
@@ -221,7 +243,7 @@ export default function ScorecardPage() {
         setIsPressing(false);
       }
     },
-    [getToken, fetchPressStatus]
+    [getToken, fetchGameStatus]
   );
 
   const handleFinishRound = useCallback(async () => {
@@ -230,7 +252,6 @@ export default function ScorecardPage() {
       const token = await getToken();
       if (!token) return;
 
-      // Finalize the round - this calculates results, creates settlements, and marks round as COMPLETED
       await api.finalizeRound(token, roundId);
       toast.success("Round completed!");
       router.push(`/rounds/${roundId}/settlement`);
@@ -243,11 +264,9 @@ export default function ScorecardPage() {
 
   // Handle scores saved from photo review
   const handlePhotoScoresSaved = useCallback((scores: { holeNumber: number; strokes: number }[]) => {
-    // Find current user's player ID
-    const currentPlayer = round?.players[0]; // First player is typically the current user
+    const currentPlayer = round?.players.find(p => p.userId === userId);
     if (!currentPlayer) return;
 
-    // Update local scores
     setLocalScores((prev) => {
       const newScores = { ...prev };
       if (!newScores[currentPlayer.id]) {
@@ -259,13 +278,9 @@ export default function ScorecardPage() {
       return newScores;
     });
 
-    // Close the modal
     setShowPhotoReview(false);
-  }, [round]);
-
-  const getPlayerTotal = (playerId: string, holes: number[]) => {
-    return holes.reduce((sum, hole) => sum + (localScores[playerId]?.[hole] || 0), 0);
-  };
+    fetchGameStatus();
+  }, [round, userId, fetchGameStatus]);
 
   // Check if all players have scores for all 18 holes
   const allScoresComplete = round?.players.every(player => {
@@ -277,7 +292,7 @@ export default function ScorecardPage() {
     return true;
   }) ?? false;
 
-  // Count missing scores for display
+  // Count missing scores
   const getMissingScoresCount = () => {
     if (!round) return 0;
     let missing = 0;
@@ -291,13 +306,69 @@ export default function ScorecardPage() {
     return missing;
   };
 
+  // Get hole data from round
+  const getHoles = (): HoleData[] => {
+    if (!round?.course?.holes) {
+      return Array.from({ length: 18 }, (_, i) => ({
+        holeNumber: i + 1,
+        par: 4,
+        handicapRank: i + 1,
+      }));
+    }
+
+    return round.course.holes.map((hole) => ({
+      holeNumber: hole.holeNumber,
+      par: hole.par,
+      handicapRank: hole.handicapRank,
+      yardage: (hole as { yardages?: Array<{ tee?: { id: string }; yardage: number }> }).yardages?.find((y) => y.tee?.id === round.teeId)?.yardage,
+    }));
+  };
+
+  // Get player data for grid
+  const getPlayers = () => {
+    if (!round) return [];
+
+    return round.players.map((player) => ({
+      id: player.id,
+      name: player.user.displayName || player.user.firstName || "Player",
+      handicapIndex: player.user.handicapIndex,
+      courseHandicap: player.courseHandicap ?? undefined,
+    }));
+  };
+
+  // Find current player
+  const currentPlayer = round?.players.find(p => p.userId === userId);
+
+  // Get selected hole data for modal
+  const getSelectedHoleData = () => {
+    if (!selectedScore) return null;
+    const holes = getHoles();
+    const hole = holes.find(h => h.holeNumber === selectedScore.holeNumber);
+    const player = round?.players.find(p => p.id === selectedScore.playerId);
+
+    if (!hole || !player) return null;
+
+    // Calculate strokes given
+    const minHandicap = Math.min(
+      ...round!.players.map(p => p.courseHandicap ?? 0)
+    );
+    const handicapDiff = (player.courseHandicap ?? 0) - minHandicap;
+    const strokesGiven = hole.handicapRank <= handicapDiff ? 1 : 0;
+
+    return {
+      ...hole,
+      playerName: player.user.displayName || player.user.firstName || "Player",
+      strokesGiven,
+    };
+  };
+
   if (isLoading) {
     return (
-      <div>
-        <Header title="Scorecard" showBack />
-        <div className="p-lg space-y-lg">
-          <Skeleton className="h-16 w-full" />
+      <div className="min-h-screen bg-background">
+        <div className="p-4 space-y-4">
+          <Skeleton className="h-12 w-full" />
           <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-32 w-full" />
         </div>
       </div>
     );
@@ -305,348 +376,140 @@ export default function ScorecardPage() {
 
   if (!round) {
     return (
-      <div>
-        <Header title="Scorecard" showBack />
-        <div className="p-lg">
-          <Card>
-            <CardContent className="p-xl text-center">
-              <p className="text-muted">Round not found</p>
-            </CardContent>
-          </Card>
+      <div className="min-h-screen bg-background">
+        <div className="p-4">
+          <p className="text-muted text-center">Round not found</p>
         </div>
       </div>
     );
   }
 
-  const frontNine = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-  const backNine = [10, 11, 12, 13, 14, 15, 16, 17, 18];
+  const holes = getHoles();
+  const players = getPlayers();
+  const selectedHoleData = getSelectedHoleData();
+
+  // Connection status color
+  const connectionColor = {
+    connected: "bg-success",
+    connecting: "bg-amber-500 animate-pulse",
+    disconnected: "bg-error",
+    error: "bg-error",
+  }[connectionStatus];
 
   return (
-    <div className="pb-24">
-      <Header
-        title={`Hole ${currentHole}`}
-        showBack
-        rightAction={
-          round.status === "ACTIVE" && (
-            <div className="flex items-center gap-sm">
-              <button
-                onClick={() => setShowPhotoReview(true)}
-                className="p-2 rounded-lg hover:bg-surface transition-colors"
-                aria-label="Scan scorecard"
-              >
-                <Camera className="h-5 w-5 text-muted" />
-              </button>
-              <ConnectionStatusIndicator
-                status={connectionStatus}
-                onReconnect={reconnect}
-                showLabel
-              />
+    <div className="min-h-screen bg-background pb-24">
+      {/* Header */}
+      <header className="sticky top-0 z-50 glass border-b border-border">
+        <div className="flex items-center justify-between px-4 h-14">
+          <div className="flex items-center gap-3">
+            <Link href={`/rounds/${roundId}`}>
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-sm font-semibold truncate max-w-[200px]">
+                {round.course.name}
+              </h1>
+              <p className="text-xs text-muted">
+                {round.tee?.name || "Tees"} • {round.players.length} players
+              </p>
             </div>
-          )
-        }
-      />
-
-      {/* Hole Navigation */}
-      <div className="sticky top-14 z-30 glass border-b border-border">
-        <div className="flex overflow-x-auto no-scrollbar p-sm gap-xs">
-          {[...frontNine, ...backNine].map((hole) => (
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Connection status dot */}
             <button
-              key={hole}
-              onClick={() => setCurrentHole(hole)}
+              onClick={connectionStatus !== "connected" ? reconnect : undefined}
               className={cn(
-                "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-caption font-medium transition-colors",
-                currentHole === hole
-                  ? "bg-brand text-white"
-                  : "bg-surface text-muted hover:bg-elevated"
+                "w-3 h-3 rounded-full transition-colors",
+                connectionColor,
+                connectionStatus !== "connected" && "cursor-pointer"
               )}
-            >
-              {hole}
-            </button>
-          ))}
+              title={connectionStatus}
+            />
+          </div>
         </div>
-      </div>
+      </header>
 
-      <div className="p-lg space-y-lg">
-        {/* Current Hole Scoring */}
-        <div
-          key={currentHole}
-          
-          
-          className="space-y-md"
-        >
-          {round.players.map((player) => {
-            const score = localScores[player.id]?.[currentHole] || 0;
-            const isSaving = savingScore === `${player.id}-${currentHole}`;
+      <div className="p-4 space-y-6">
+        {/* Scorecard Grid */}
+        <ScorecardGrid
+          holes={holes}
+          players={players}
+          scores={localScores}
+          currentPlayerId={currentPlayer?.id}
+          onScoreClick={handleScoreClick}
+        />
 
-            return (
-              <Card key={player.id}>
-                <CardContent className="p-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-md">
-                      <Avatar
-                        src={player.user.avatarUrl}
-                        name={player.user.displayName || player.user.firstName || "Player"}
-                        size="md"
-                      />
-                      <div>
-                        <p className="text-body font-medium">
-                          {player.user.displayName ||
-                            player.user.firstName ||
-                            "Player"}
-                        </p>
-                        {player.courseHandicap !== null && (
-                          <p className="text-caption text-muted">
-                            HCP: {player.courseHandicap}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Score Controls */}
-                    <div className="flex items-center gap-md">
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        onClick={() => handleScoreChange(player.id, currentHole, -1)}
-                        disabled={score <= 1 || isSaving}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-
-                      <div className="w-14 text-center">
-                        <span className="text-score font-bold">
-                          {score || "-"}
-                        </span>
-                      </div>
-
-                      <Button
-                        size="icon"
-                        variant="secondary"
-                        onClick={() => handleScoreChange(player.id, currentHole, 1)}
-                        disabled={isSaving}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        {/* Match Status & Press */}
-        {pressStatus.length > 0 && (
-          <Card className="bg-gradient-to-br from-surface to-elevated border-brand/20">
-            <CardContent className="p-lg">
-              <h3 className="text-h3 font-semibold mb-md flex items-center gap-2">
-                <span className="text-brand">Match Status</span>
-                {round?.games.find(g => g.type === "NASSAU")?.isAutoPress && (
-                  <Badge variant="brand" className="text-xs">Auto-Press</Badge>
-                )}
-              </h3>
-
-              {pressStatus.map((game) => (
-                <div key={game.gameId} className="space-y-md">
-                  {game.segments.map((segment) => {
-                    const isDown = segment.currentScore < 0;
-                    const isUp = segment.currentScore > 0;
-                    const isTied = segment.currentScore === 0;
-                    const scoreText = isTied
-                      ? "AS"
-                      : `${Math.abs(segment.currentScore)} ${isUp ? "UP" : "DOWN"}`;
-
-                    return (
-                      <div key={segment.segment} className="border-b border-border/50 pb-md last:border-0 last:pb-0">
-                        <div className="flex items-center justify-between mb-sm">
-                          <div className="flex items-center gap-sm">
-                            <span className="text-caption text-muted uppercase tracking-wide">
-                              {segment.segment === "FRONT" ? "Front 9" :
-                               segment.segment === "BACK" ? "Back 9" :
-                               segment.segment === "OVERALL" ? "Overall" : "Match"}
-                            </span>
-                            <span className="text-caption text-muted">
-                              ({segment.holesPlayed} played, {segment.holesRemaining} to go)
-                            </span>
-                          </div>
-                          <div className={cn(
-                            "flex items-center gap-xs font-semibold",
-                            isUp && "text-success",
-                            isDown && "text-error",
-                            isTied && "text-muted"
-                          )}>
-                            {isUp && <TrendingUp className="h-4 w-4" />}
-                            {isDown && <TrendingDown className="h-4 w-4" />}
-                            {isTied && <TiedIcon className="h-4 w-4" />}
-                            {scoreText}
-                          </div>
-                        </div>
-
-                        {/* Active Presses */}
-                        {segment.activePresses.length > 0 && (
-                          <div className="space-y-xs mb-sm">
-                            {segment.activePresses.map((press) => {
-                              const pressIsDown = press.currentScore < 0;
-                              const pressIsUp = press.currentScore > 0;
-                              const pressIsTied = press.currentScore === 0;
-                              const pressScoreText = pressIsTied
-                                ? "AS"
-                                : `${Math.abs(press.currentScore)} ${pressIsUp ? "UP" : "DOWN"}`;
-
-                              return (
-                                <div
-                                  key={press.id}
-                                  className="flex items-center justify-between pl-4 py-xs border-l-2 border-brand/50"
-                                >
-                                  <span className="text-caption text-muted">
-                                    Press from #{press.startHole}
-                                  </span>
-                                  <div className="flex items-center gap-md">
-                                    <span className={cn(
-                                      "text-caption font-medium",
-                                      pressIsUp && "text-success",
-                                      pressIsDown && "text-error",
-                                      pressIsTied && "text-muted"
-                                    )}>
-                                      {pressScoreText}
-                                    </span>
-                                    {press.canPressThePress && (
-                                      <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        onClick={() => handlePress(
-                                          game.gameId,
-                                          segment.segment as PressSegment,
-                                          press.holesPlayed + press.startHole,
-                                          press.id
-                                        )}
-                                        disabled={isPressing}
-                                        className="text-xs h-7 px-2"
-                                      >
-                                        Press
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-
-                        {/* Press Button */}
-                        {segment.canPress && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => handlePress(
-                              game.gameId,
-                              segment.segment as PressSegment,
-                              segment.autoPressHole || currentHole
-                            )}
-                            disabled={isPressing}
-                            className="w-full mt-sm"
-                          >
-                            <AlertCircle className="h-4 w-4 mr-2" />
-                            Press {segment.segment === "FRONT" ? "Front" : segment.segment === "BACK" ? "Back" : "Match"} (2 Down)
-                          </Button>
-                        )}
-
-                        {/* Auto-Press Suggestion */}
-                        {segment.suggestAutoPress && game.isAutoPress && (
-                          <div className="flex items-center gap-sm text-caption text-warning mt-sm">
-                            <AlertCircle className="h-4 w-4" />
-                            <span>Auto-press triggered at hole #{segment.autoPressHole}</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+        {/* Games Summary - Always Visible */}
+        {gameLiveStatus.length > 0 && (
+          <GamesSummary
+            games={gameLiveStatus}
+            pressStatus={pressStatus}
+            onPress={handlePress}
+            isPressing={isPressing}
+            currentHole={1}
+          />
         )}
-
-        {/* Totals */}
-        <Card>
-          <CardContent className="p-lg">
-            <h3 className="text-h3 font-semibold mb-md">Totals</h3>
-            <div className="space-y-sm">
-              {round.players.map((player) => {
-                const front = getPlayerTotal(player.id, frontNine);
-                const back = getPlayerTotal(player.id, backNine);
-                const total = front + back;
-
-                return (
-                  <div
-                    key={player.id}
-                    className="flex items-center justify-between py-sm"
-                  >
-                    <p className="text-body">
-                      {player.user.displayName || player.user.firstName}
-                    </p>
-                    <div className="flex items-center gap-lg text-caption">
-                      <span className="text-muted">F9: {front || "-"}</span>
-                      <span className="text-muted">B9: {back || "-"}</span>
-                      <span className="font-semibold text-foreground">
-                        {total || "-"}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Incomplete Scores Warning */}
-        {!allScoresComplete && currentHole === 18 && (
-          <Card className="bg-warning/10 border-warning/30">
-            <CardContent className="p-md">
-              <div className="flex items-center gap-sm text-warning">
-                <AlertCircle className="h-5 w-5 flex-shrink-0" />
-                <p className="text-caption">
-                  Enter scores for all players on all holes before finishing the round.
-                  {getMissingScoresCount()} score{getMissingScoresCount() !== 1 ? 's' : ''} remaining.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        {!allScoresComplete && getMissingScoresCount() <= 36 && (
+          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3">
+            <div className="flex items-center gap-2 text-warning">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <p className="text-sm">
+                {getMissingScoresCount()} score{getMissingScoresCount() !== 1 ? "s" : ""} remaining
+              </p>
+            </div>
+          </div>
         )}
+      </div>
 
-        {/* Quick Actions */}
-        <div className="flex gap-md">
-          {currentHole > 1 && (
-            <Button
-              variant="secondary"
-              className="flex-1"
-              onClick={() => setCurrentHole(currentHole - 1)}
-            >
-              Previous Hole
-            </Button>
-          )}
-          {currentHole < 18 && (
-            <Button
-              className="flex-1"
-              onClick={() => setCurrentHole(currentHole + 1)}
-            >
-              Next Hole
-            </Button>
-          )}
-          {currentHole === 18 && (
-            <Button
-              className="flex-1"
-              onClick={handleFinishRound}
-              disabled={isFinishing || !allScoresComplete}
-            >
-              <Check className="h-4 w-4 mr-2" />
-              {isFinishing ? "Finishing..." :
-               !allScoresComplete ? `${getMissingScoresCount()} scores missing` :
-               "Finish Round"}
-            </Button>
-          )}
+      {/* Bottom Action Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 glass border-t border-border">
+        <div className="flex gap-3 p-4 max-w-lg mx-auto">
+          <Button
+            variant="secondary"
+            onClick={() => setShowPhotoReview(true)}
+            className="flex-1"
+          >
+            <Camera className="h-4 w-4 mr-2" />
+            Scan Scorecard
+          </Button>
+          <Button
+            onClick={handleFinishRound}
+            disabled={isFinishing || !allScoresComplete}
+            className="flex-1"
+          >
+            <Check className="h-4 w-4 mr-2" />
+            {isFinishing
+              ? "Finishing..."
+              : !allScoresComplete
+              ? `${getMissingScoresCount()} missing`
+              : "Finish Round"}
+          </Button>
         </div>
       </div>
+
+      {/* Score Entry Modal */}
+      {selectedHoleData && (
+        <ScoreEntryModal
+          open={scoreModalOpen}
+          onClose={() => {
+            setScoreModalOpen(false);
+            setSelectedScore(null);
+          }}
+          onSave={handleScoreSave}
+          playerName={selectedHoleData.playerName}
+          holeNumber={selectedHoleData.holeNumber}
+          par={selectedHoleData.par}
+          yardage={selectedHoleData.yardage}
+          handicapRank={selectedHoleData.handicapRank}
+          currentScore={selectedScore?.currentScore}
+          strokesGiven={selectedHoleData.strokesGiven}
+          isSaving={savingScore === `${selectedScore?.playerId}-${selectedScore?.holeNumber}`}
+        />
+      )}
 
       {/* Scorecard Photo Review Modal */}
       <ScorecardPhotoReview

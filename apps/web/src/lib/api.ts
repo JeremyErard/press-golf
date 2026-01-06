@@ -219,6 +219,8 @@ export const api = {
     }, token),
   getPressStatus: (token: string, roundId: string) =>
     apiRequest<PressStatus[]>(`/games/${roundId}/press-status`, {}, token),
+  getGameLiveStatus: (token: string, roundId: string) =>
+    apiRequest<GameLiveStatus[]>(`/games/${roundId}/live-status`, {}, token),
 
   // Buddies
   getBuddies: (token: string) =>
@@ -429,7 +431,7 @@ export interface Round {
 }
 
 export interface RoundDetail extends Round {
-  course: Course;
+  course: CourseDetail;
   tee: Tee;
   players: RoundPlayer[];
   games: Game[];
@@ -737,6 +739,33 @@ export interface ActivePressStatus {
   holesPlayed: number;
   holesRemaining: number;
   canPressThePress: boolean;
+}
+
+// Game live status types (for scorecard display)
+export interface GameLiveStatus {
+  gameId: string;
+  type: string;
+  betAmount: number;
+  isAutoPress?: boolean;
+  nassauStatus?: {
+    front: { score: number; label: string; holesPlayed: number; holesRemaining: number };
+    back: { score: number; label: string; holesPlayed: number; holesRemaining: number };
+    overall: { score: number; label: string; holesPlayed: number; holesRemaining: number };
+  };
+  skinsStatus?: {
+    skinsWon: number;
+    skinsLost: number;
+    carryover: number;
+    potentialWinnings: number;
+  };
+  wolfStatus?: {
+    points: number;
+    nextPickHole?: number;
+  };
+  stablefordStatus?: {
+    points: number;
+  };
+  description?: string;
 }
 
 // Buddy types

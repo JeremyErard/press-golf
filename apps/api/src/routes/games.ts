@@ -1417,6 +1417,298 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       data: pressStatus,
     };
   });
+
+  // =====================
+  // GET /api/games/:roundId/live-status
+  // Get live game status for all game types (for scorecard display)
+  // =====================
+  app.get<{ Params: { roundId: string } }>('/:roundId/live-status', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { roundId } = request.params;
+
+    const round = await prisma.round.findUnique({
+      where: { id: roundId },
+      include: {
+        course: {
+          include: { holes: { orderBy: { holeNumber: 'asc' } } },
+        },
+        players: {
+          include: {
+            user: { select: { id: true, displayName: true, firstName: true } },
+            scores: { orderBy: { holeNumber: 'asc' } },
+          },
+        },
+        games: {
+          include: {
+            presses: {
+              where: { status: 'ACTIVE' },
+            },
+            wolfDecisions: true,
+          },
+        },
+      },
+    });
+
+    if (!round) {
+      return notFound(reply, 'Round not found');
+    }
+
+    // Find current user's player
+    const currentPlayer = round.players.find(p => p.userId === (user.id as string));
+    if (!currentPlayer) {
+      return forbidden(reply, 'You must be a player in this round');
+    }
+
+    const holes = round.course?.holes || [];
+    const minHandicap = Math.min(...round.players.map(p => p.courseHandicap || 0));
+
+    // Helper to calculate match status for Nassau/Match Play
+    const calcMatchStatus = (gamePlayers: typeof round.players, startHole: number, endHole: number) => {
+      if (gamePlayers.length !== 2) return { score: 0, holesPlayed: 0, holesRemaining: endHole - startHole + 1 };
+
+      const [p1, p2] = gamePlayers;
+      let p1Up = 0;
+      let holesPlayed = 0;
+
+      for (let h = startHole; h <= endHole; h++) {
+        const p1Score = p1.scores.find(s => s.holeNumber === h);
+        const p2Score = p2.scores.find(s => s.holeNumber === h);
+
+        if (!p1Score?.strokes || !p2Score?.strokes) continue;
+
+        const hole = holes.find(ho => ho.holeNumber === h);
+
+        // Calculate net scores
+        const p1Strokes = p1Score.strokes - (hole && hole.handicapRank <= ((p1.courseHandicap || 0) - minHandicap) ? 1 : 0);
+        const p2Strokes = p2Score.strokes - (hole && hole.handicapRank <= ((p2.courseHandicap || 0) - minHandicap) ? 1 : 0);
+
+        holesPlayed++;
+        if (p1Strokes < p2Strokes) p1Up++;
+        else if (p2Strokes < p1Strokes) p1Up--;
+      }
+
+      // Return score from current player's perspective
+      const isPlayer1 = currentPlayer.userId === p1.userId;
+      return {
+        score: isPlayer1 ? p1Up : -p1Up,
+        holesPlayed,
+        holesRemaining: (endHole - startHole + 1) - holesPlayed,
+      };
+    };
+
+    // Helper to calculate skins status
+    const calcSkinsStatus = (gamePlayers: typeof round.players) => {
+      let skinsWon = 0;
+      let skinsLost = 0;
+      let carryover = 0;
+      let currentCarry = 0;
+
+      for (let h = 1; h <= 18; h++) {
+        const hole = holes.find(ho => ho.holeNumber === h);
+
+        // Get net scores for all players
+        const scores = gamePlayers.map(player => {
+          const score = player.scores.find(s => s.holeNumber === h);
+          if (!score?.strokes) return { userId: player.userId, netScore: null };
+
+          const handicapDiff = (player.courseHandicap || 0) - minHandicap;
+          const strokesOnThisHole = hole && hole.handicapRank <= handicapDiff ? 1 : 0;
+
+          return {
+            userId: player.userId,
+            netScore: score.strokes - strokesOnThisHole,
+          };
+        });
+
+        const allScored = scores.every(s => s.netScore !== null);
+        if (!allScored) {
+          currentCarry++;
+          continue;
+        }
+
+        const lowest = Math.min(...scores.map(s => s.netScore!));
+        const winners = scores.filter(s => s.netScore === lowest);
+
+        if (winners.length === 1) {
+          const skinValue = 1 + currentCarry;
+          if (winners[0].userId === currentPlayer.userId) {
+            skinsWon += skinValue;
+          } else {
+            skinsLost += skinValue;
+          }
+          currentCarry = 0;
+        } else {
+          currentCarry++;
+        }
+      }
+
+      carryover = currentCarry;
+
+      return { skinsWon, skinsLost, carryover, potentialWinnings: skinsWon };
+    };
+
+    // Helper to calculate stableford points
+    const calcStablefordStatus = () => {
+      let points = 0;
+
+      for (let h = 1; h <= 18; h++) {
+        const hole = holes.find(ho => ho.holeNumber === h);
+        const score = currentPlayer.scores.find(s => s.holeNumber === h);
+
+        if (!score?.strokes || !hole) continue;
+
+        // Calculate net score
+        const handicapDiff = (currentPlayer.courseHandicap || 0) - minHandicap;
+        const strokesGiven = hole.handicapRank <= handicapDiff ? 1 : 0;
+        const netStrokes = score.strokes - strokesGiven;
+
+        // Stableford points: 2=par, 1=bogey, 3=birdie, 4=eagle, 0=double+
+        const diff = netStrokes - hole.par;
+        if (diff <= -3) points += 5; // Albatross
+        else if (diff === -2) points += 4; // Eagle
+        else if (diff === -1) points += 3; // Birdie
+        else if (diff === 0) points += 2; // Par
+        else if (diff === 1) points += 1; // Bogey
+        // Double bogey or worse = 0 points
+      }
+
+      return { points };
+    };
+
+    // Build game status array
+    const liveStatus: Array<{
+      gameId: string;
+      type: string;
+      betAmount: number;
+      isAutoPress?: boolean;
+      nassauStatus?: {
+        front: { score: number; label: string; holesPlayed: number; holesRemaining: number };
+        back: { score: number; label: string; holesPlayed: number; holesRemaining: number };
+        overall: { score: number; label: string; holesPlayed: number; holesRemaining: number };
+      };
+      skinsStatus?: {
+        skinsWon: number;
+        skinsLost: number;
+        carryover: number;
+        potentialWinnings: number;
+      };
+      wolfStatus?: {
+        points: number;
+        nextPickHole?: number;
+      };
+      stablefordStatus?: {
+        points: number;
+      };
+      description?: string;
+    }> = [];
+
+    for (const game of round.games) {
+      // Filter players for this game (if participantIds is set)
+      const gamePlayers = game.participantIds.length > 0
+        ? round.players.filter(p => game.participantIds.includes(p.userId))
+        : round.players;
+
+      // Check if current user is in this game
+      const isInGame = gamePlayers.some(p => p.userId === currentPlayer.userId);
+      if (!isInGame) continue;
+
+      const betAmount = Number(game.betAmount);
+
+      const gameStatus: typeof liveStatus[0] = {
+        gameId: game.id,
+        type: game.type,
+        betAmount,
+        isAutoPress: game.isAutoPress,
+      };
+
+      switch (game.type) {
+        case 'NASSAU': {
+          const front = calcMatchStatus(gamePlayers, 1, 9);
+          const back = calcMatchStatus(gamePlayers, 10, 18);
+          const overall = calcMatchStatus(gamePlayers, 1, 18);
+
+          const formatLabel = (score: number) => {
+            if (score === 0) return 'AS';
+            return `${Math.abs(score)} ${score > 0 ? 'UP' : 'DN'}`;
+          };
+
+          gameStatus.nassauStatus = {
+            front: { ...front, label: formatLabel(front.score) },
+            back: { ...back, label: formatLabel(back.score) },
+            overall: { ...overall, label: formatLabel(overall.score) },
+          };
+          break;
+        }
+
+        case 'MATCH_PLAY': {
+          const match = calcMatchStatus(gamePlayers, 1, 18);
+          const formatLabel = (score: number) => {
+            if (score === 0) return 'AS';
+            return `${Math.abs(score)} ${score > 0 ? 'UP' : 'DN'}`;
+          };
+
+          gameStatus.nassauStatus = {
+            front: { score: 0, label: '', holesPlayed: 0, holesRemaining: 0 },
+            back: { score: 0, label: '', holesPlayed: 0, holesRemaining: 0 },
+            overall: { ...match, label: formatLabel(match.score) },
+          };
+          break;
+        }
+
+        case 'SKINS': {
+          gameStatus.skinsStatus = calcSkinsStatus(gamePlayers);
+          break;
+        }
+
+        case 'STABLEFORD': {
+          gameStatus.stablefordStatus = calcStablefordStatus();
+          break;
+        }
+
+        case 'WOLF': {
+          // Simplified wolf status - just show running points
+          // Full wolf calculation would require wolf decisions
+          const decisions = game.wolfDecisions || [];
+          let points = 0;
+
+          // Find next hole where current player is wolf
+          const playerOrder = gamePlayers.map(p => p.userId);
+          const currentIndex = playerOrder.indexOf(currentPlayer.userId);
+          let nextPickHole: number | undefined;
+
+          for (let h = 1; h <= 18; h++) {
+            const wolfIndex = (h - 1) % playerOrder.length;
+            if (playerOrder[wolfIndex] === currentPlayer.userId) {
+              const hasDecision = decisions.some(d => d.holeNumber === h);
+              const score = currentPlayer.scores.find(s => s.holeNumber === h);
+              if (!hasDecision && !score?.strokes) {
+                nextPickHole = h;
+                break;
+              }
+            }
+          }
+
+          gameStatus.wolfStatus = { points, nextPickHole };
+          break;
+        }
+
+        default: {
+          // Generic description for unsupported game types
+          gameStatus.description = `${game.type} game in progress`;
+          break;
+        }
+      }
+
+      liveStatus.push(gameStatus);
+    }
+
+    return {
+      success: true,
+      data: liveStatus,
+    };
+  });
 };
 
 // =====================
