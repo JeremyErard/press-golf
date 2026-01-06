@@ -148,17 +148,18 @@ enum PaymentMethodType {
 // ===================
 
 model Course {
-  id          String   @id @default(cuid())
-  name        String
-  city        String?
-  state       String?
-  country     String   @default("USA")
-  logoUrl     String?
-  website     String?
-  isVerified  Boolean  @default(false)
-  createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  city         String?
+  state        String?
+  country      String   @default("USA")
+  logoUrl      String?
+  heroImageUrl String?
+  website      String?
+  isVerified   Boolean  @default(false)
+  createdById  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   createdBy User?  @relation(fields: [createdById], references: [id])
   tees      Tee[]

@@ -86,6 +86,7 @@ export default function CoursesPage() {
                         {/* Course Thumbnail */}
                         <CourseThumbnail
                           courseName={course.name}
+                          heroImageUrl={course.heroImageUrl}
                           className="w-12 h-12 flex-shrink-0"
                         />
                         <div className="space-y-xs flex-1 min-w-0">

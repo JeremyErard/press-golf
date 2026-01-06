@@ -452,6 +452,7 @@ export interface Course {
   country: string;
   logoUrl?: string;
   website?: string;
+  heroImageUrl?: string;
   isVerified: boolean;
 }
 

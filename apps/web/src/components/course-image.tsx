@@ -77,11 +77,35 @@ export function CourseImage({ courseName, className = "", showOverlay = true }: 
   );
 }
 
-// Smaller thumbnail version for cards
-export function CourseThumbnail({ courseName, className = "" }: Omit<CourseImageProps, "showOverlay">) {
+interface CourseThumbnailProps {
+  courseName: string;
+  heroImageUrl?: string;
+  className?: string;
+}
+
+// Smaller thumbnail version for cards - shows hero image if available
+export function CourseThumbnail({ courseName, heroImageUrl, className = "" }: CourseThumbnailProps) {
   const gradient = getGradientFromName(courseName);
   const initials = getInitials(courseName);
+  const [imageError, setImageError] = useState(false);
 
+  // If we have a hero image and it hasn't errored, show it
+  if (heroImageUrl && !imageError) {
+    return (
+      <div className={`relative overflow-hidden rounded-lg ${className}`}>
+        <Image
+          src={heroImageUrl}
+          alt={courseName}
+          fill
+          className="object-cover"
+          onError={() => setImageError(true)}
+          sizes="48px"
+        />
+      </div>
+    );
+  }
+
+  // Fallback to gradient with initials
   return (
     <div className={`relative overflow-hidden rounded-lg ${className}`}>
       <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />

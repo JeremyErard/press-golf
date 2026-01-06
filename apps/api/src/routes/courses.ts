@@ -38,6 +38,7 @@ interface UpdateCourseBody {
   state?: string;
   country?: string;
   website?: string;
+  heroImageUrl?: string;
 }
 
 interface SearchQuery {
@@ -562,7 +563,7 @@ Extract as much data as you can see. If some fields are not visible, omit them b
   }, async (request, reply) => {
     const user = getUser(request);
     const { id } = request.params;
-    const { name, city, state, country, website } = request.body;
+    const { name, city, state, country, website, heroImageUrl } = request.body;
 
     // Find course and verify ownership
     const course = await prisma.course.findUnique({
@@ -584,6 +585,7 @@ Extract as much data as you can see. If some fields are not visible, omit them b
     if (state !== undefined) updateData.state = state?.trim() || null;
     if (country !== undefined) updateData.country = country;
     if (website !== undefined) updateData.website = website?.trim() || null;
+    if (heroImageUrl !== undefined) updateData.heroImageUrl = heroImageUrl?.trim() || null;
 
     const updatedCourse = await prisma.course.update({
       where: { id },
