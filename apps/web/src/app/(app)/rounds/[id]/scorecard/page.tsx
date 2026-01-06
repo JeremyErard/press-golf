@@ -398,35 +398,56 @@ export default function ScorecardPage() {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Header */}
-      <header className="sticky top-0 z-50 glass border-b border-border">
-        <div className="flex items-center justify-between px-4 h-14">
+      {/* Header with Hero Image */}
+      <header className="sticky top-0 z-50">
+        {/* Hero image background */}
+        <div
+          className="absolute inset-0 h-24 bg-cover bg-center"
+          style={{
+            backgroundImage: round.course.heroImageUrl
+              ? `url(${round.course.heroImageUrl})`
+              : 'linear-gradient(to right, #1a1a2e, #16213e)'
+          }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
+        </div>
+
+        {/* Header content */}
+        <div className="relative flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-3">
             <Link href={`/rounds/${roundId}`}>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
+              <Button variant="ghost" size="icon" className="h-9 w-9 text-white hover:bg-white/20">
                 <ChevronLeft className="h-5 w-5" />
               </Button>
             </Link>
             <div>
-              <h1 className="text-sm font-semibold truncate max-w-[200px]">
+              <h1 className="text-sm font-semibold truncate max-w-[200px] text-white drop-shadow">
                 {round.course.name}
               </h1>
-              <p className="text-xs text-muted">
-                {round.tee?.name || "Tees"} • {round.players.length} players
+              <p className="text-xs text-white/80">
+                {round.tee?.name || "Tees"} • {round.players.length} player{round.players.length !== 1 ? "s" : ""}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Connection status dot */}
+            {/* Connection status indicator */}
             <button
               onClick={connectionStatus !== "connected" ? reconnect : undefined}
               className={cn(
-                "w-3 h-3 rounded-full transition-colors",
-                connectionColor,
-                connectionStatus !== "connected" && "cursor-pointer"
+                "flex items-center gap-1.5 bg-black/30 rounded-full px-2 py-1",
+                connectionStatus !== "connected" && "cursor-pointer hover:bg-black/50"
               )}
-              title={connectionStatus}
-            />
+            >
+              <span
+                className={cn(
+                  "w-2 h-2 rounded-full",
+                  connectionColor
+                )}
+              />
+              <span className="text-xs text-white/90 capitalize">
+                {connectionStatus}
+              </span>
+            </button>
           </div>
         </div>
       </header>

@@ -285,57 +285,6 @@ export function ScorecardGrid({
           {renderGrid(backNine, false)}
         </TabsContent>
       </Tabs>
-
-      {/* Overall totals */}
-      <div className="bg-surface rounded-lg p-4">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-semibold text-muted">TOTALS</span>
-          <span className="text-xs text-muted">
-            Par {calculateParTotal(holes)}
-          </span>
-        </div>
-        <div className="space-y-2">
-          {players.map((player) => {
-            const front = calculateTotal(player.id, frontNine.map((h) => h.holeNumber));
-            const back = calculateTotal(player.id, backNine.map((h) => h.holeNumber));
-            const total = front + back;
-            // Only calculate par for holes that have been played
-            const holesPlayed = holes.filter((h) => scores[player.id]?.[h.holeNumber]);
-            const parPlayed = holesPlayed.reduce((sum, h) => sum + h.par, 0);
-            const diff = total > 0 && parPlayed > 0 ? total - parPlayed : 0;
-            const isCurrentPlayer = player.id === currentPlayerId;
-
-            return (
-              <div
-                key={player.id}
-                className={cn(
-                  "flex items-center justify-between py-1",
-                  isCurrentPlayer && "text-brand"
-                )}
-              >
-                <span className="text-sm font-medium">
-                  {player.name.split(" ")[0]}
-                </span>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-muted w-10 text-center">{front || "-"}</span>
-                  <span className="text-muted w-10 text-center">{back || "-"}</span>
-                  <span className="font-bold w-10 text-center">{total || "-"}</span>
-                  {total > 0 && (
-                    <span
-                      className={cn(
-                        "w-12 text-right text-xs",
-                        diff < 0 ? "text-brand" : diff > 0 ? "text-error" : "text-muted"
-                      )}
-                    >
-                      {diff === 0 ? "E" : diff > 0 ? `+${diff}` : diff}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }

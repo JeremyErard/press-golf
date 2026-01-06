@@ -183,6 +183,9 @@ export function GamesSummary({
     const status = game.skinsStatus;
     if (!status) return null;
 
+    // Calculate actual net winnings
+    const netWinnings = (status.skinsWon - status.skinsLost) * game.betAmount;
+
     return (
       <Card key={game.gameId}>
         <CardContent className="p-4">
@@ -193,6 +196,13 @@ export function GamesSummary({
                 {formatBet(game.betAmount)}/skin
               </Badge>
             </div>
+            {/* Show net winnings */}
+            <span className={cn(
+              "text-lg font-bold",
+              netWinnings > 0 ? "text-success" : netWinnings < 0 ? "text-error" : "text-muted"
+            )}>
+              {netWinnings >= 0 ? "+" : ""}{formatBet(netWinnings)}
+            </span>
           </div>
 
           <div className="grid grid-cols-3 gap-4 text-center">
@@ -210,11 +220,11 @@ export function GamesSummary({
             </div>
           </div>
 
-          {status.potentialWinnings > 0 && (
-            <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-center gap-1 text-sm">
-              <DollarSign className="h-4 w-4 text-success" />
-              <span className="text-success font-medium">
-                +{formatBet(status.potentialWinnings)} potential
+          {status.carryover > 0 && (
+            <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-center gap-1 text-sm text-muted">
+              <DollarSign className="h-4 w-4" />
+              <span>
+                {formatBet((status.carryover + 1) * game.betAmount)} up for grabs next skin
               </span>
             </div>
           )}
