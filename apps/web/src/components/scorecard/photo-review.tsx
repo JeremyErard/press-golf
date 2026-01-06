@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { Check, AlertTriangle, Loader2, X, Camera } from "lucide-react";
+import { Check, AlertTriangle, Loader2, Camera } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -10,7 +10,6 @@ import {
   SheetTitle,
   SheetDescription,
   Button,
-  Input,
 } from "@/components/ui";
 import { ImageCapture } from "@/components/image-capture";
 import { api, type ScorecardExtraction } from "@/lib/api";
