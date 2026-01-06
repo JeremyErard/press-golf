@@ -32,3 +32,5 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: BLOB_READ_WRITE_TOKEN
+        sync: false
