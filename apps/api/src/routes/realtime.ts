@@ -1,8 +1,54 @@
-import { FastifyPluginAsync } from 'fastify';
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { EventEmitter } from 'events';
-import { requireAuth, getUser } from '../lib/auth.js';
+import { verifyToken } from '@clerk/backend';
 import { prisma } from '../lib/prisma.js';
 import { forbidden } from '../lib/errors.js';
+
+// Custom auth handler for SSE that reads token from query params
+// (EventSource doesn't support custom headers)
+async function requireAuthFromQuery(
+  request: FastifyRequest<{ Querystring: { token?: string } }>,
+  reply: FastifyReply
+): Promise<{ userId: string } | null> {
+  const token = request.query.token;
+
+  if (!token) {
+    reply.code(401).send({ error: 'Authentication required' });
+    return null;
+  }
+
+  try {
+    // Verify the JWT token with Clerk
+    const payload = await verifyToken(token, {
+      secretKey: process.env.CLERK_SECRET_KEY!,
+    });
+
+    if (!payload.sub) {
+      reply.code(401).send({ error: 'Invalid token' });
+      return null;
+    }
+
+    // Find or create user in our database
+    let user = await prisma.user.findUnique({
+      where: { clerkId: payload.sub },
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          clerkId: payload.sub,
+          email: `${payload.sub}@placeholder.local`,
+        },
+      });
+    }
+
+    return { userId: user.id };
+  } catch (error) {
+    request.log.error(error, 'SSE auth error');
+    reply.code(401).send({ error: 'Authentication failed' });
+    return null;
+  }
+}
 
 // In-memory event emitter for SSE broadcasts
 // For production scaling, replace with Redis pub/sub
@@ -74,17 +120,19 @@ export const realtimeRoutes: FastifyPluginAsync = async (app) => {
   // GET /api/realtime/rounds/:id/live
   // SSE endpoint for real-time round updates
   // =====================
-  app.get<{ Params: { id: string } }>('/rounds/:id/live', {
-    preHandler: requireAuth,
-  }, async (request, reply) => {
-    const user = getUser(request);
+  app.get<{ Params: { id: string }; Querystring: { token?: string } }>('/rounds/:id/live', async (request, reply) => {
+    // Use custom auth that reads token from query params
+    const authResult = await requireAuthFromQuery(request, reply);
+    if (!authResult) return; // Auth failed, response already sent
+
+    const { userId } = authResult;
     const { id: roundId } = request.params;
 
     // Verify user is a participant in the round
     const roundPlayer = await prisma.roundPlayer.findFirst({
       where: {
         roundId,
-        userId: user.id as string,
+        userId,
       },
     });
 
@@ -141,11 +189,11 @@ export const realtimeRoutes: FastifyPluginAsync = async (app) => {
     request.raw.on('close', () => {
       clearInterval(pingInterval);
       roundEvents.off(`round:${roundId}`, eventHandler);
-      request.log.info({ roundId, userId: user.id }, 'SSE connection closed');
+      request.log.info({ roundId, userId }, 'SSE connection closed');
     });
 
     // Log connection
-    request.log.info({ roundId, userId: user.id }, 'SSE connection established');
+    request.log.info({ roundId, userId }, 'SSE connection established');
 
     // Don't call reply.send() - we're streaming
     return reply;
