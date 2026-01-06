@@ -7,7 +7,7 @@ import { ChevronRight, Play } from "lucide-react";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
 import { PendingApprovals } from "@/components/handicap/pending-approvals";
 import { GolferIllustration } from "@/components/illustrations";
-import { api, type Round, type RoundDetail, type CalculateResultsResponse } from "@/lib/api";
+import { api, type Round, type RoundDetail, type CalculateResultsResponse, type User as ApiUser } from "@/lib/api";
 import { formatDate, formatMoney } from "@/lib/utils";
 
 interface RoundWithEarnings extends Round {
@@ -18,7 +18,8 @@ interface RoundWithEarnings extends Round {
 
 export default function DashboardPage() {
   const { getToken } = useAuth();
-  const { user } = useUser();
+  const { user: clerkUser } = useUser();
+  const [apiUser, setApiUser] = useState<ApiUser | null>(null);
   const [rounds, setRounds] = useState<RoundWithEarnings[]>([]);
   const [activeRoundDetail, setActiveRoundDetail] = useState<RoundDetail | null>(null);
   const [activeRoundResults, setActiveRoundResults] = useState<CalculateResultsResponse | null>(null);
@@ -30,7 +31,12 @@ export default function DashboardPage() {
         const token = await getToken();
         if (!token) return;
 
-        const roundsData = await api.getRounds(token);
+        // Fetch user profile and rounds in parallel
+        const [userData, roundsData] = await Promise.all([
+          api.getMe(token),
+          api.getRounds(token),
+        ]);
+        setApiUser(userData);
 
         // For completed rounds, calculate earnings
         const roundsWithEarnings: RoundWithEarnings[] = [];
@@ -48,7 +54,7 @@ export default function DashboardPage() {
               const resultsResponse = await api.calculateResults(token, round.id);
 
               // Find current user's player in this round and sum their earnings from all games
-              const currentPlayer = detail.players.find(p => p.user.id === user?.id);
+              const currentPlayer = detail.players.find(p => p.user.id === userData.id);
               if (currentPlayer && resultsResponse.results) {
                 let earnings = 0;
 
@@ -139,7 +145,7 @@ export default function DashboardPage() {
     }
 
     fetchData();
-  }, [getToken, user?.id]);
+  }, [getToken]);
 
   const activeRound = rounds.find((r) => r.status === "ACTIVE");
   const setupRounds = rounds.filter((r) => r.status === "SETUP");
@@ -155,7 +161,7 @@ export default function DashboardPage() {
 
   // Get current hole and match status for active round
   const activeRoundStatus = useMemo(() => {
-    if (!activeRoundDetail || !user) return null;
+    if (!activeRoundDetail || !apiUser) return null;
 
     // Find the highest hole with a score to determine current hole
     let currentHole = 1;
@@ -168,7 +174,7 @@ export default function DashboardPage() {
     });
 
     // Calculate user's current match position from results
-    const currentPlayer = activeRoundDetail.players.find(p => p.user.id === user.id);
+    const currentPlayer = activeRoundDetail.players.find(p => p.user.id === apiUser.id);
     let userNet = 0;
     if (currentPlayer && activeRoundResults?.results) {
       const { results } = activeRoundResults;
@@ -197,7 +203,7 @@ export default function DashboardPage() {
       netPosition: userNet,
       gameLabel,
     };
-  }, [activeRoundDetail, activeRoundResults, user]);
+  }, [activeRoundDetail, activeRoundResults, apiUser]);
 
   // Get greeting and time period based on time of day
   const getTimeOfDay = () => {
@@ -248,8 +254,8 @@ export default function DashboardPage() {
           <Link href="/profile" className="group">
             <div className="relative">
               <Avatar
-                src={user?.imageUrl}
-                name={user?.firstName || "G"}
+                src={apiUser?.avatarUrl || clerkUser?.imageUrl}
+                name={apiUser?.firstName || clerkUser?.firstName || "G"}
                 size="lg"
                 className="ring-2 ring-brand/30 shadow-lg shadow-brand/20 group-hover:ring-brand/50 transition-all"
               />
@@ -278,7 +284,7 @@ export default function DashboardPage() {
               {timeOfDay.greeting}
             </p>
             <p className="text-[1.75rem] font-bold text-white mt-0.5 tracking-tight drop-shadow-lg">
-              {user?.firstName || "Golfer"}
+              {apiUser?.firstName || clerkUser?.firstName || "Golfer"}
             </p>
           </div>
         </div>
