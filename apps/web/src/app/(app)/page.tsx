@@ -212,27 +212,27 @@ export default function DashboardPage() {
       return {
         greeting: "Good Morning",
         period: "morning",
-        image: "/images/Golf Course Sunrise.jpeg",
+        image: "/images/Firefly_I need an image of a beautiful golf course at daybreak 358356.png",
       };
     }
     if (hour < 17) {
       return {
         greeting: "Good Afternoon",
         period: "afternoon",
-        image: "/images/Golf Course Afternoon.jpeg",
+        image: "/images/Firefly_I need an image of a beautiful golf course mid afternoon 358356.png",
       };
     }
     if (hour < 20) {
       return {
         greeting: "Good Evening",
         period: "evening",
-        image: "/images/Golf Course Evening.jpeg",
+        image: "/images/Firefly_I need an image of a beautiful golf course at dusk 358356.png",
       };
     }
     return {
       greeting: "Good Evening",
       period: "night",
-      image: "/images/Arcadia Night Post Round.jpeg",
+      image: "/images/Firefly_I need a high resolution image of a group of golfers toasting in the evening after a  358356.png",
     };
   };
 
@@ -300,7 +300,7 @@ export default function DashboardPage() {
           <div className="absolute inset-0">
             <img
               src={careerEarnings >= 0
-                ? "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTMTEa6FZvQEn0R8NB2J1nkf41x5VADiZ6bew&s"
+                ? "/images/Firefly_Need a high resolution image of a male golfer holding a crystal trophy while smoking  358356.png"
                 : "https://i0.wp.com/efe.com/wp-content/uploads/2024/04/rss-efe6d24dff7e3f5149dfef214769b347848fdc6af6fw.jpg?fit=1920%2C1346&ssl=1"
               }
               alt={careerEarnings >= 0 ? "Winning golfer" : "Disappointed golfer"}
