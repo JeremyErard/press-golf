@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import Image from "next/image";
+// Using img tag instead of Next.js Image to avoid optimization issues with external URLs
+// import Image from "next/image";
 import { Plus, Search, MapPin, ChevronRight, Check } from "lucide-react";
 import { Button, Card, CardContent, Skeleton } from "@/components/ui";
 import { Header } from "@/components/layout/header";
@@ -87,12 +88,10 @@ export default function CoursesPage() {
                     {/* Hero Image Background */}
                     <div className="absolute inset-0">
                       {course.heroImageUrl ? (
-                        <Image
+                        <img
                           src={course.heroImageUrl}
                           alt={course.name}
-                          fill
-                          className="object-cover transition-transform duration-300 group-hover:scale-105"
-                          sizes="(max-width: 768px) 100vw, 600px"
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
