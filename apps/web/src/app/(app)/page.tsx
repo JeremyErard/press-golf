@@ -206,27 +206,27 @@ export default function DashboardPage() {
       return {
         greeting: "Good Morning",
         period: "morning",
-        image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSffODDzDCrLinZ7-7P34yfW0vTe6w8pqq2g&s", // Sunrise golf course
+        image: "/images/Golf Course Sunrise.jpeg",
       };
     }
     if (hour < 17) {
       return {
         greeting: "Good Afternoon",
         period: "afternoon",
-        image: "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=800&q=80", // Sunny golf course
+        image: "/images/Golf Course Afternoon.jpeg",
       };
     }
     if (hour < 20) {
       return {
         greeting: "Good Evening",
         period: "evening",
-        image: "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800&q=80", // Sunset golf course
+        image: "/images/Golf Course Evening.jpeg",
       };
     }
     return {
       greeting: "Good Evening",
       period: "night",
-      image: "https://images.unsplash.com/photo-1575037614876-c38a4c44f5bd?w=800&q=80", // Friends at bar
+      image: "/images/Arcadia Night Post Round.jpeg",
     };
   };
 
