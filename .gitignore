@@ -51,3 +51,4 @@ tmp/
 temp/
 .vercel
 .env.check
+.env*.local

@@ -16,6 +16,8 @@ const nextConfig = {
       { protocol: 'https', hostname: 'dhgc.org' },
       { protocol: 'https', hostname: 'highpointegolf.com' },
       { protocol: 'https', hostname: 'www.kingsleyclub.com' },
+      { protocol: 'https', hostname: 'images.squarespace-cdn.com' },
+      { protocol: 'https', hostname: 'www.interlachencc.org' },
     ],
   },
 };

@@ -1,6 +1,5 @@
 import Image from "next/image";
 import { InstallButton } from "@/components/pwa/install-button";
-import { PressLogo } from "@/components/press-logo";
 
 export default function AuthLayout({
   children,
@@ -26,8 +25,8 @@ export default function AuthLayout({
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-3xl">
-          <h1 className="text-white drop-shadow-2xl">
-            <PressLogo size="lg" />
+          <h1 className="text-6xl md:text-7xl font-black tracking-tight text-white drop-shadow-2xl">
+            PRESS
           </h1>
           <div className="flex items-center justify-center gap-3 mt-4">
             <div className="h-px w-12 bg-gradient-to-r from-transparent to-white/50"></div>

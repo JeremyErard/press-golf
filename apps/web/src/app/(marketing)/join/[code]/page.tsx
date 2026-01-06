@@ -9,7 +9,6 @@ import { Button, Card, CardContent, Avatar, Badge, Skeleton } from "@/components
 import { api, type InviteDetails, type GameType } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { getInstallInstructions, showInstallPrompt } from "@/lib/pwa";
-import { PressLogo } from "@/components/press-logo";
 
 const gameTypeLabels: Record<GameType, string> = {
   NASSAU: "Nassau",
@@ -145,14 +144,8 @@ export default function InviteLandingPage() {
     <div className="min-h-screen p-lg">
       <div className="max-w-md mx-auto">
         {/* Header */}
-        <div
-          
-          
-          className="text-center py-xl"
-        >
-          <h1 className="text-white">
-            <PressLogo size="xl" />
-          </h1>
+        <div className="text-center py-xl">
+          <h1 className="text-hero gradient-text">Press</h1>
           <p className="text-muted mt-sm">Golf Betting Made Simple</p>
         </div>
 

@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import Image from "next/image";
 import { ChevronRight, Play } from "lucide-react";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
 import { PendingApprovals } from "@/components/handicap/pending-approvals";
@@ -200,26 +199,52 @@ export default function DashboardPage() {
     };
   }, [activeRoundDetail, activeRoundResults, user]);
 
-  // Get greeting based on time of day
-  const getGreeting = () => {
+  // Get greeting and time period based on time of day
+  const getTimeOfDay = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    return "Good Evening";
+    if (hour < 12) {
+      return {
+        greeting: "Good Morning",
+        period: "morning",
+        image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSffODDzDCrLinZ7-7P34yfW0vTe6w8pqq2g&s", // Sunrise golf course
+      };
+    }
+    if (hour < 17) {
+      return {
+        greeting: "Good Afternoon",
+        period: "afternoon",
+        image: "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=800&q=80", // Sunny golf course
+      };
+    }
+    if (hour < 20) {
+      return {
+        greeting: "Good Evening",
+        period: "evening",
+        image: "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?w=800&q=80", // Sunset golf course
+      };
+    }
+    return {
+      greeting: "Good Evening",
+      period: "night",
+      image: "https://images.unsplash.com/photo-1575037614876-c38a4c44f5bd?w=800&q=80", // Friends at bar
+    };
   };
+
+  const timeOfDay = getTimeOfDay();
 
   return (
     <div className="min-h-screen pb-28">
       {/* Logo Header */}
       <div className="px-5 pt-6 pb-2">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-black tracking-tight text-white">
-            <span className="inline-block transform -skew-x-2">P</span>
-            <span className="inline-block transform skew-x-1">R</span>
-            <span className="inline-block">E</span>
-            <span className="inline-block transform skew-x-1">S</span>
-            <span className="inline-block transform -skew-x-2">S</span>
-          </h1>
+          <div>
+            <h1 className="text-3xl font-black tracking-tight text-white drop-shadow-lg">
+              PRESS
+            </h1>
+            <p className="text-white/60 text-[10px] uppercase tracking-[0.2em] font-medium mt-0.5">
+              Golf Betting Made Simple
+            </p>
+          </div>
           <Link href="/profile" className="group">
             <div className="relative">
               <Avatar
@@ -234,14 +259,29 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Greeting Section */}
+      {/* Greeting Section with Time-Based Image */}
       <div className="px-5 pb-4">
-        <p className="text-gray-400 text-sm font-medium tracking-wide">
-          {getGreeting()}
-        </p>
-        <p className="text-[1.75rem] font-bold text-white mt-0.5 tracking-tight">
-          {user?.firstName || "Golfer"}
-        </p>
+        <div className="relative overflow-hidden rounded-2xl">
+          {/* Time-based background image */}
+          <div className="absolute inset-0">
+            <img
+              src={timeOfDay.image}
+              alt={`Golf course ${timeOfDay.period}`}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
+          </div>
+
+          {/* Content */}
+          <div className="relative z-10 p-5 py-6">
+            <p className="text-white/70 text-sm font-medium tracking-wide">
+              {timeOfDay.greeting}
+            </p>
+            <p className="text-[1.75rem] font-bold text-white mt-0.5 tracking-tight drop-shadow-lg">
+              {user?.firstName || "Golfer"}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="px-5 space-y-5">
@@ -249,38 +289,36 @@ export default function DashboardPage() {
         <PendingApprovals />
 
         {/* Career Earnings Card */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0d2818] via-[#14532d] to-[#052e16] shadow-xl shadow-green-900/20">
-          {/* Golf Course Illustration */}
-          <div className="absolute right-0 top-0 bottom-0 w-2/3 pointer-events-none">
-            <svg
-              viewBox="0 0 300 200"
-              className="w-full h-full"
-              preserveAspectRatio="xMaxYMid slice"
-            >
-              {/* Rolling hills */}
-              <ellipse cx="280" cy="160" rx="180" ry="60" fill="#166534" opacity="0.6" />
-              <ellipse cx="200" cy="180" rx="150" ry="50" fill="#14532d" opacity="0.8" />
-              <ellipse cx="320" cy="170" rx="120" ry="45" fill="#15803d" opacity="0.5" />
-
-              {/* Flag pole */}
-              <line x1="220" y1="50" x2="220" y2="130" stroke="#a3a3a3" strokeWidth="3" />
-
-              {/* Flag */}
-              <path d="M220 50 L260 65 L220 80 Z" fill="#ef4444" />
-
-              {/* Hole shadow */}
-              <ellipse cx="220" cy="135" rx="12" ry="5" fill="#052e16" opacity="0.8" />
-            </svg>
+        <div className={`relative overflow-hidden rounded-2xl shadow-xl ${careerEarnings >= 0 ? "shadow-green-900/20" : "shadow-red-900/20"}`}>
+          {/* Conditional Background Image */}
+          <div className="absolute inset-0">
+            <img
+              src={careerEarnings >= 0
+                ? "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTMTEa6FZvQEn0R8NB2J1nkf41x5VADiZ6bew&s"
+                : "https://i0.wp.com/efe.com/wp-content/uploads/2024/04/rss-efe6d24dff7e3f5149dfef214769b347848fdc6af6fw.jpg?fit=1920%2C1346&ssl=1"
+              }
+              alt={careerEarnings >= 0 ? "Winning golfer" : "Disappointed golfer"}
+              className="w-full h-full object-cover"
+            />
+            {/* Gradient overlay for text readability */}
+            <div className={`absolute inset-0 ${careerEarnings >= 0
+              ? "bg-gradient-to-r from-black/80 via-black/60 to-black/40"
+              : "bg-gradient-to-r from-black/80 via-black/60 to-black/40"}`}
+            />
           </div>
 
           {/* Content */}
           <div className="relative z-10 p-5">
-            <p className="text-gray-400 text-sm font-medium mb-1">Career Earnings</p>
+            <p className="text-gray-300 text-sm font-medium mb-1">Career Earnings</p>
             <p className={`text-[3.5rem] font-bold leading-none tracking-tight ${careerEarnings >= 0 ? "text-green-400" : "text-red-400"}`}>
               {formatMoney(careerEarnings)}
             </p>
             <div className="mt-4">
-              <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-green-500/20 text-green-400 border border-green-500/30">
+              <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ${
+                careerEarnings >= 0
+                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                  : "bg-red-500/20 text-red-400 border border-red-500/30"
+              }`}>
                 Career Net
               </span>
             </div>
@@ -291,18 +329,17 @@ export default function DashboardPage() {
         {activeRound && activeRoundStatus && (
           <Link href={`/rounds/${activeRound.id}/scorecard`}>
             <div className="relative overflow-hidden rounded-2xl glass-card-hover animate-fade-in-up">
-              {/* Course Image Background */}
-              <div className="absolute inset-0 opacity-40">
-                <Image
-                  src="/images/course-placeholder.jpg"
-                  alt="Course"
-                  fill
-                  className="object-cover"
-                  onError={(e) => {
-                    // Fallback gradient if image fails
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
+              {/* Course Hero Image Background */}
+              <div className="absolute inset-0">
+                {activeRoundDetail?.course?.heroImageUrl ? (
+                  <img
+                    src={activeRoundDetail.course.heroImageUrl}
+                    alt={activeRoundDetail.course.name}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
+                )}
                 <div className="absolute inset-0 bg-gradient-to-r from-[#111d32] via-[#111d32]/80 to-transparent" />
               </div>
 
