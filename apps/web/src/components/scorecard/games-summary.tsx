@@ -22,6 +22,13 @@ interface GameLiveStatus {
     skinsLost: number;
     carryover: number;
     potentialWinnings: number;
+    playerResults?: Array<{
+      userId: string;
+      name: string;
+      skinsWon: number;
+      holesWon: number[];
+      netAmount: number;
+    }>;
   };
   // Wolf specific
   wolfStatus?: {
@@ -183,43 +190,76 @@ export function GamesSummary({
     const status = game.skinsStatus;
     if (!status) return null;
 
-    // Calculate actual net winnings
-    const netWinnings = (status.skinsWon - status.skinsLost) * game.betAmount;
+    // Sort players by net amount (winners first)
+    const sortedPlayers = status.playerResults
+      ? [...status.playerResults].sort((a, b) => b.netAmount - a.netAmount)
+      : [];
 
     return (
       <Card key={game.gameId}>
         <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Skins</span>
+              <span className="font-semibold text-lg">Skins</span>
               <Badge variant="default" className="text-xs">
                 {formatBet(game.betAmount)}/skin
               </Badge>
             </div>
-            {/* Show net winnings */}
-            <span className={cn(
-              "text-lg font-bold",
-              netWinnings > 0 ? "text-success" : netWinnings < 0 ? "text-error" : "text-muted"
-            )}>
-              {netWinnings >= 0 ? "+" : ""}{formatBet(netWinnings)}
-            </span>
+            {status.carryover > 0 && (
+              <Badge variant="brand" className="text-xs">
+                {status.carryover} carry
+              </Badge>
+            )}
           </div>
 
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-success">{status.skinsWon}</p>
-              <p className="text-xs text-muted">Won</p>
+          {/* Player standings */}
+          {sortedPlayers.length > 0 ? (
+            <div className="space-y-2">
+              {sortedPlayers.map((player, index) => (
+                <div
+                  key={player.userId}
+                  className={cn(
+                    "flex items-center justify-between py-2 px-3 rounded-lg",
+                    index === 0 && player.netAmount > 0 ? "bg-success/10" : "bg-surface"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium">{player.name}</span>
+                    {player.skinsWon > 0 && (
+                      <span className="text-xs text-muted">
+                        {player.skinsWon} skin{player.skinsWon !== 1 ? "s" : ""} (#{player.holesWon.join(", #")})
+                      </span>
+                    )}
+                  </div>
+                  <span className={cn(
+                    "font-bold",
+                    player.netAmount > 0 ? "text-success" : player.netAmount < 0 ? "text-error" : "text-muted"
+                  )}>
+                    {player.netAmount >= 0 ? "+" : ""}{formatBet(player.netAmount)}
+                  </span>
+                </div>
+              ))}
             </div>
-            <div>
-              <p className="text-2xl font-bold text-error">{status.skinsLost}</p>
-              <p className="text-xs text-muted">Lost</p>
+          ) : (
+            /* Fallback to simple view if no playerResults */
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-2xl font-bold text-success">{status.skinsWon}</p>
+                <p className="text-xs text-muted">Won</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-error">{status.skinsLost}</p>
+                <p className="text-xs text-muted">Lost</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-amber-500">{status.carryover}</p>
+                <p className="text-xs text-muted">Carry</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-amber-500">{status.carryover}</p>
-              <p className="text-xs text-muted">Carry</p>
-            </div>
-          </div>
+          )}
 
+          {/* Carryover info */}
           {status.carryover > 0 && (
             <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-center gap-1 text-sm text-muted">
               <DollarSign className="h-4 w-4" />

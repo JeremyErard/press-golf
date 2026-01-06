@@ -757,6 +757,13 @@ export interface GameLiveStatus {
     skinsLost: number;
     carryover: number;
     potentialWinnings: number;
+    playerResults?: Array<{
+      userId: string;
+      name: string;
+      skinsWon: number;
+      holesWon: number[];
+      netAmount: number;
+    }>;
   };
   wolfStatus?: {
     points: number;

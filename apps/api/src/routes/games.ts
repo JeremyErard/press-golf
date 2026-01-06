@@ -1498,12 +1498,30 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       };
     };
 
-    // Helper to calculate skins status
-    const calcSkinsStatus = (gamePlayers: typeof round.players) => {
+    // Helper to calculate skins status with per-player breakdown
+    const calcSkinsStatus = (gamePlayers: typeof round.players, betAmount: number) => {
       let skinsWon = 0;
       let skinsLost = 0;
       let carryover = 0;
       let currentCarry = 0;
+
+      // Track per-player results
+      const playerResults: Record<string, {
+        userId: string;
+        name: string;
+        skinsWon: number;
+        holesWon: number[];
+      }> = {};
+
+      // Initialize player results
+      gamePlayers.forEach(player => {
+        playerResults[player.userId] = {
+          userId: player.userId,
+          name: player.user.displayName || player.user.firstName || 'Player',
+          skinsWon: 0,
+          holesWon: [],
+        };
+      });
 
       for (let h = 1; h <= 18; h++) {
         const hole = holes.find(ho => ho.holeNumber === h);
@@ -1533,7 +1551,15 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
 
         if (winners.length === 1) {
           const skinValue = 1 + currentCarry;
-          if (winners[0].userId === currentPlayer.userId) {
+          const winnerId = winners[0].userId;
+
+          // Track who won this skin
+          if (playerResults[winnerId]) {
+            playerResults[winnerId].skinsWon += skinValue;
+            playerResults[winnerId].holesWon.push(h);
+          }
+
+          if (winnerId === currentPlayer.userId) {
             skinsWon += skinValue;
           } else {
             skinsLost += skinValue;
@@ -1546,7 +1572,28 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
 
       carryover = currentCarry;
 
-      return { skinsWon, skinsLost, carryover, potentialWinnings: skinsWon };
+      // Convert to array and calculate net amounts
+      const playersArray = Object.values(playerResults).map(p => {
+        // Calculate net amount: skins won - (total skins by others / number of others)
+        const othersSkinsWon = Object.values(playerResults)
+          .filter(o => o.userId !== p.userId)
+          .reduce((sum, o) => sum + o.skinsWon, 0);
+        const numOthers = gamePlayers.length - 1;
+        const netAmount = (p.skinsWon * numOthers - othersSkinsWon) * betAmount / numOthers;
+
+        return {
+          ...p,
+          netAmount: Math.round(netAmount * 100) / 100,
+        };
+      });
+
+      return {
+        skinsWon,
+        skinsLost,
+        carryover,
+        potentialWinnings: skinsWon,
+        playerResults: playersArray,
+      };
     };
 
     // Helper to calculate stableford points
@@ -1593,6 +1640,13 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         skinsLost: number;
         carryover: number;
         potentialWinnings: number;
+        playerResults: Array<{
+          userId: string;
+          name: string;
+          skinsWon: number;
+          holesWon: number[];
+          netAmount: number;
+        }>;
       };
       wolfStatus?: {
         points: number;
@@ -1658,7 +1712,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         }
 
         case 'SKINS': {
-          gameStatus.skinsStatus = calcSkinsStatus(gamePlayers);
+          gameStatus.skinsStatus = calcSkinsStatus(gamePlayers, betAmount);
           break;
         }
 
