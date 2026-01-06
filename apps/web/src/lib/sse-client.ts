@@ -118,16 +118,39 @@ export class SSEClient {
         this.onStatusChange("connected");
       };
 
-      this.eventSource.onmessage = (event) => {
+      // Handler for parsing events
+      const parseEvent = (event: MessageEvent, type?: SSEEventType) => {
         try {
-          const parsed = JSON.parse(event.data) as SSEEvent;
-          this.onEvent(parsed);
+          const parsed = JSON.parse(event.data);
+          // If type is provided (named event), use it; otherwise get from data
+          const eventType = type || parsed.type;
+          this.onEvent({ ...parsed, type: eventType } as SSEEvent);
         } catch (error) {
           console.error("Failed to parse SSE event:", error, event.data);
         }
       };
 
-      this.eventSource.onerror = () => {
+      // Listen for unnamed events (fallback)
+      this.eventSource.onmessage = (event) => parseEvent(event);
+
+      // Listen for named events (SSE sends these with "event: type")
+      const eventTypes: SSEEventType[] = [
+        "score_updated",
+        "game_updated",
+        "player_joined",
+        "round_completed",
+        "connected",
+        "ping",
+      ];
+
+      eventTypes.forEach((eventType) => {
+        this.eventSource!.addEventListener(eventType, (event) => {
+          parseEvent(event as MessageEvent, eventType);
+        });
+      });
+
+      this.eventSource.onerror = (error) => {
+        console.error("SSE connection error:", error);
         this.onStatusChange("error");
         this.scheduleReconnect();
       };

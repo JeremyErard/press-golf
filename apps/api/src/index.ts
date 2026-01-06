@@ -39,7 +39,12 @@ const app = Fastify({
 // Register plugins
 await app.register(cors, {
   origin: process.env.NODE_ENV === 'production'
-    ? (process.env.FRONTEND_URL || 'https://press-golf.vercel.app')
+    ? [
+        'https://pressbet.golf',
+        'https://www.pressbet.golf',
+        'https://press-golf.vercel.app',
+        ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+      ]
     : true,
   credentials: true,
 });
