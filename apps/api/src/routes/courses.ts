@@ -146,6 +146,7 @@ Extract all available data including:
 Look for:
 - Course name (usually at top of scorecard)
 - Location (city, state if visible)
+- Website URL (often printed on scorecard - look for www. or .com or .co.uk etc.)
 - For each of the 18 holes: hole number, par, AND handicap/stroke index (HDCP, S.I., or Handicap row)
 - Tee information: tee names (e.g., Blue, White, Red), yardages per hole, total yardage, slope rating, course rating
 
@@ -157,6 +158,7 @@ Return ONLY a JSON object with this exact format:
   "courseName": "Example Golf Club",
   "city": "City Name",
   "state": "ST",
+  "website": "https://www.examplegolf.com",
   "holes": [
     { "holeNumber": 1, "par": 4, "handicapRank": 7 },
     { "holeNumber": 2, "par": 5, "handicapRank": 1 },
@@ -256,6 +258,7 @@ Extract as much data as you can see. If some fields are not visible, omit them b
         name?: string;
         city?: string;
         state?: string;
+        website?: string;
         holes?: { holeNumber: number; par: number; handicapRank: number; yardages?: { teeName: string; yardage: number }[] }[];
         tees?: { name: string; color?: string; slopeRating?: number; courseRating?: number; totalYardage?: number }[];
         confidence?: string;
@@ -263,6 +266,7 @@ Extract as much data as you can see. If some fields are not visible, omit them b
         name: extracted.courseName,
         city: extracted.city,
         state: extracted.state,
+        website: extracted.website,
         confidence: extracted.confidence,
       };
 
@@ -642,7 +646,8 @@ Extract as much data as you can see. If some fields are not visible, omit them b
       city?.trim() || null,
       state?.trim() || null,
       course.id,
-      prisma
+      prisma,
+      website?.trim() || null  // Pass extracted website URL for hero image lookup
     ).catch((err) => {
       console.error('Failed to find/extract hero image:', err);
     });

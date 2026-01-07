@@ -1,11 +1,9 @@
 /**
  * Utility for finding and extracting course hero images
+ * Uses actual web fetching to find og:image from course websites
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { uploadCourseHeroImage } from './blob.js';
-
-const anthropic = new Anthropic();
 
 interface HeroImageResult {
   heroImageUrl: string | null;
@@ -13,99 +11,191 @@ interface HeroImageResult {
 }
 
 /**
+ * Generate possible website URLs for a golf course
+ */
+function generatePossibleUrls(courseName: string): string[] {
+  // Normalize the name for URL generation
+  const normalized = courseName
+    .toLowerCase()
+    .replace(/golf\s*(club|course|links)?/gi, '')
+    .replace(/country\s*club/gi, '')
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '');
+
+  const withHyphens = courseName
+    .toLowerCase()
+    .replace(/golf\s*(club|course|links)?/gi, '')
+    .replace(/country\s*club/gi, '')
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '-');
+
+  // Common patterns for golf course websites
+  return [
+    `https://www.${normalized}golf.com`,
+    `https://www.${normalized}golfclub.com`,
+    `https://www.${normalized}cc.com`,
+    `https://www.${withHyphens}-golf.com`,
+    `https://${normalized}golf.com`,
+    `https://${normalized}.com`,
+  ];
+}
+
+/**
+ * Extract og:image or other hero image from HTML
+ */
+function extractHeroImage(html: string, baseUrl: string): string | null {
+  // Try og:image first (most reliable)
+  const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+
+  if (ogImageMatch) {
+    let imageUrl = ogImageMatch[1];
+    // Make relative URLs absolute
+    if (imageUrl.startsWith('/')) {
+      const url = new URL(baseUrl);
+      imageUrl = `${url.protocol}//${url.host}${imageUrl}`;
+    }
+    return imageUrl;
+  }
+
+  // Try twitter:image
+  const twitterImageMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
+  if (twitterImageMatch) {
+    let imageUrl = twitterImageMatch[1];
+    if (imageUrl.startsWith('/')) {
+      const url = new URL(baseUrl);
+      imageUrl = `${url.protocol}//${url.host}${imageUrl}`;
+    }
+    return imageUrl;
+  }
+
+  return null;
+}
+
+/**
  * Searches for a golf course website and extracts a hero image
  * Runs asynchronously and updates the course record when complete
+ * @param extractedWebsite - Optional website URL extracted from scorecard (highest priority)
  */
 export async function findAndExtractHeroImage(
   courseName: string,
   city: string | null,
   state: string | null,
   courseId: string,
-  prisma: any
+  prisma: any,
+  extractedWebsite?: string | null
 ): Promise<HeroImageResult> {
   try {
-    // Build search query
-    const searchQuery = [courseName, city, state, 'golf course'].filter(Boolean).join(' ');
-
-    // Use Claude to search for the course website and find a hero image
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      messages: [
-        {
-          role: 'user',
-          content: `Find the official website for this golf course and identify a hero image URL.
-
-Golf Course: ${courseName}
-Location: ${[city, state].filter(Boolean).join(', ') || 'Unknown'}
-
-Search for the golf course's official website. Once found, look for:
-1. The main hero/banner image on their homepage
-2. An Open Graph (og:image) meta tag
-3. A prominent course photo
-
-Return ONLY a JSON object:
-{
-  "found": true,
-  "website": "https://example-golf.com",
-  "heroImageUrl": "https://example-golf.com/images/hero.jpg",
-  "confidence": "high"
-}
-
-Or if not found:
-{
-  "found": false,
-  "reason": "Could not find official website"
-}
-
-Important:
-- Only return direct image URLs (ending in .jpg, .png, .webp, etc.)
-- Prefer high-resolution landscape images
-- The image should show the golf course (fairways, greens, scenery)
-- Do NOT return placeholder or logo images`,
-        },
-      ],
-    });
-
-    // Extract response
-    const responseText = message.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map((block) => block.text)
-      .join('');
-
-    // Parse JSON
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.log('No JSON found in hero image search response');
-      return { heroImageUrl: null, website: null };
+    console.log(`[HeroImage] Starting search for: ${courseName}`);
+    if (extractedWebsite) {
+      console.log(`[HeroImage] Using extracted website: ${extractedWebsite}`);
     }
 
-    const result = JSON.parse(jsonMatch[0]);
+    // Build list of URLs to try - prioritize extracted website
+    const possibleUrls: string[] = [];
 
-    if (!result.found || !result.heroImageUrl) {
-      console.log('Hero image not found:', result.reason);
-      return { heroImageUrl: null, website: result.website || null };
+    // Add extracted website first (highest priority)
+    if (extractedWebsite) {
+      // Ensure it has protocol
+      let url = extractedWebsite.trim();
+      if (!url.startsWith('http')) {
+        url = 'https://' + url;
+      }
+      possibleUrls.push(url);
+      // Also try www variant if not present
+      if (!url.includes('www.')) {
+        const urlObj = new URL(url);
+        possibleUrls.push(`${urlObj.protocol}//www.${urlObj.host}${urlObj.pathname}`);
+      }
+    }
+
+    // Add generated URLs as fallback
+    possibleUrls.push(...generatePossibleUrls(courseName));
+    console.log(`[HeroImage] Trying URLs:`, possibleUrls);
+
+    let foundWebsite: string | null = null;
+    let heroImageUrl: string | null = null;
+
+    // Try each possible URL
+    for (const url of possibleUrls) {
+      try {
+        console.log(`[HeroImage] Trying: ${url}`);
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          },
+          redirect: 'follow',
+        });
+
+        if (!response.ok) {
+          console.log(`[HeroImage] ${url} returned ${response.status}`);
+          continue;
+        }
+
+        const html = await response.text();
+
+        // Check if this looks like a golf course website
+        const lowerHtml = html.toLowerCase();
+        if (!lowerHtml.includes('golf') && !lowerHtml.includes('course') && !lowerHtml.includes('tee')) {
+          console.log(`[HeroImage] ${url} doesn't appear to be a golf site`);
+          continue;
+        }
+
+        // Extract hero image
+        const imageUrl = extractHeroImage(html, url);
+        if (imageUrl) {
+          foundWebsite = url;
+          heroImageUrl = imageUrl;
+          console.log(`[HeroImage] Found image at ${url}: ${imageUrl}`);
+          break;
+        }
+      } catch (err) {
+        console.log(`[HeroImage] Error fetching ${url}:`, err);
+        continue;
+      }
+    }
+
+    if (!heroImageUrl) {
+      console.log(`[HeroImage] No hero image found for: ${courseName}`);
+      return { heroImageUrl: null, website: foundWebsite };
     }
 
     // Download the image
-    const imageResponse = await fetch(result.heroImageUrl, {
+    console.log(`[HeroImage] Downloading: ${heroImageUrl}`);
+    const imageResponse = await fetch(heroImageUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; PressGolfBot/1.0)',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
       },
     });
 
     if (!imageResponse.ok) {
-      console.log('Failed to download hero image:', imageResponse.status);
-      return { heroImageUrl: null, website: result.website };
+      console.log(`[HeroImage] Failed to download image: ${imageResponse.status}`);
+      return { heroImageUrl: null, website: foundWebsite };
     }
 
     const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+    // Make sure it's actually an image
+    if (!contentType.includes('image')) {
+      console.log(`[HeroImage] Not an image: ${contentType}`);
+      return { heroImageUrl: null, website: foundWebsite };
+    }
+
     const buffer = Buffer.from(await imageResponse.arrayBuffer());
 
-    // Validate it's actually an image and not too large
+    // Validate size
     if (buffer.length > 10 * 1024 * 1024) {
-      console.log('Hero image too large, skipping');
-      return { heroImageUrl: null, website: result.website };
+      console.log(`[HeroImage] Image too large: ${buffer.length} bytes`);
+      return { heroImageUrl: null, website: foundWebsite };
+    }
+
+    if (buffer.length < 1000) {
+      console.log(`[HeroImage] Image too small (probably a placeholder): ${buffer.length} bytes`);
+      return { heroImageUrl: null, website: foundWebsite };
     }
 
     // Determine extension from content type
@@ -122,14 +212,14 @@ Important:
       where: { id: courseId },
       data: {
         heroImageUrl: uploaded.url,
-        website: result.website,
+        website: foundWebsite,
       },
     });
 
-    console.log(`Hero image saved for course ${courseId}: ${uploaded.url}`);
-    return { heroImageUrl: uploaded.url, website: result.website };
+    console.log(`[HeroImage] Saved for course ${courseId}: ${uploaded.url}`);
+    return { heroImageUrl: uploaded.url, website: foundWebsite };
   } catch (error) {
-    console.error('Failed to find/extract hero image:', error);
+    console.error('[HeroImage] Failed:', error);
     return { heroImageUrl: null, website: null };
   }
 }

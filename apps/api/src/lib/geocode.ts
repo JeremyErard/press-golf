@@ -14,6 +14,35 @@ interface NominatimResponse {
   display_name: string;
 }
 
+// US state codes for detection
+const US_STATES = new Set([
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+  'DC', 'PR', 'VI', 'GU', 'AS', 'MP',
+  // Full state names
+  'ALABAMA', 'ALASKA', 'ARIZONA', 'ARKANSAS', 'CALIFORNIA', 'COLORADO',
+  'CONNECTICUT', 'DELAWARE', 'FLORIDA', 'GEORGIA', 'HAWAII', 'IDAHO',
+  'ILLINOIS', 'INDIANA', 'IOWA', 'KANSAS', 'KENTUCKY', 'LOUISIANA',
+  'MAINE', 'MARYLAND', 'MASSACHUSETTS', 'MICHIGAN', 'MINNESOTA',
+  'MISSISSIPPI', 'MISSOURI', 'MONTANA', 'NEBRASKA', 'NEVADA',
+  'NEW HAMPSHIRE', 'NEW JERSEY', 'NEW MEXICO', 'NEW YORK', 'NORTH CAROLINA',
+  'NORTH DAKOTA', 'OHIO', 'OKLAHOMA', 'OREGON', 'PENNSYLVANIA',
+  'RHODE ISLAND', 'SOUTH CAROLINA', 'SOUTH DAKOTA', 'TENNESSEE', 'TEXAS',
+  'UTAH', 'VERMONT', 'VIRGINIA', 'WASHINGTON', 'WEST VIRGINIA',
+  'WISCONSIN', 'WYOMING'
+]);
+
+/**
+ * Check if a state value is a US state
+ */
+function isUSState(state: string | null | undefined): boolean {
+  if (!state) return false;
+  return US_STATES.has(state.toUpperCase().trim());
+}
+
 /**
  * Geocode an address (city, state, country) to lat/lng coordinates
  * Uses OpenStreetMap Nominatim API
@@ -23,8 +52,17 @@ export async function geocodeAddress(
   state?: string | null,
   country: string = 'USA'
 ): Promise<GeocodeResult | null> {
+  // Smart country detection: only use USA if state is a valid US state
+  // Otherwise, let Nominatim figure out the country
+  let effectiveCountry: string | null = country;
+  if (state && !isUSState(state)) {
+    // State doesn't match US - this is likely an international course
+    // Let Nominatim handle country detection
+    effectiveCountry = null;
+  }
+
   // Build search query
-  const parts = [city, state, country].filter(Boolean);
+  const parts = [city, state, effectiveCountry].filter(Boolean);
   if (parts.length === 0) {
     return null;
   }
