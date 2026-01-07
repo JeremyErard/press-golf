@@ -692,7 +692,7 @@ export default function RoundDetailPage() {
                   <BettingIllustration className="w-full h-full" />
                 </div>
                 <p className="text-white font-semibold">No games added yet</p>
-                <p className="text-gray-400 text-sm mt-2">
+                <p className="text-muted text-sm mt-2">
                   Add games to start betting
                 </p>
               </CardContent>

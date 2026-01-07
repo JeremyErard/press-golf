@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { Plus, ChevronRight } from "lucide-react";
-import { Button, Card, CardContent, Badge, Tabs, TabsList, TabsTrigger, Skeleton } from "@/components/ui";
+import { Card, CardContent, Badge, Tabs, TabsList, TabsTrigger, Skeleton, EmptyState, FAB } from "@/components/ui";
 import { Header } from "@/components/layout/header";
 import { GolferIllustration } from "@/components/illustrations";
 import { api, type Round } from "@/lib/api";
@@ -127,39 +127,24 @@ export default function RoundsPage() {
             ))}
           </div>
         ) : (
-          <Card className="glass-card">
-            <CardContent className="py-12 px-6 text-center">
-              <div className="w-32 h-32 mx-auto mb-6 animate-float">
-                <GolferIllustration className="w-full h-full" />
-              </div>
-              <p className="text-white font-semibold text-lg">No rounds found</p>
-              <p className="text-gray-400 text-sm mt-2">
-                {filter === "all"
-                  ? "Start a new round to get going!"
-                  : `No ${filter.toLowerCase()} rounds yet`}
-              </p>
-              {filter === "all" && (
-                <Link href="/rounds/new" className="inline-block mt-6">
-                  <Button className="btn-ripple">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Start a Round
-                  </Button>
-                </Link>
-              )}
-            </CardContent>
-          </Card>
+          <EmptyState
+            illustration={<GolferIllustration className="w-full h-full" />}
+            title="No rounds found"
+            description={
+              filter === "all"
+                ? "Start a new round to get going!"
+                : `No ${filter.toLowerCase()} rounds yet`
+            }
+            action={filter === "all" ? {
+              label: "Start a Round",
+              href: "/rounds/new",
+              icon: <Plus className="h-4 w-4 mr-2" />,
+            } : undefined}
+          />
         )}
       </div>
 
-      {/* FAB */}
-      <Link
-        href="/rounds/new"
-        className="fixed bottom-24 right-lg z-40"
-      >
-        <Button size="icon" className="h-14 w-14 rounded-full shadow-lg">
-          <Plus className="h-6 w-6" />
-        </Button>
-      </Link>
+      <FAB href="/rounds/new" label="Start a new round" />
     </div>
   );
 }

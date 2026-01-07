@@ -5,7 +5,7 @@ import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Plus, Search, MapPin, ChevronRight, Check } from "lucide-react";
-import { Button, Card, CardContent, Skeleton } from "@/components/ui";
+import { Card, CardContent, Skeleton, EmptyState, FAB } from "@/components/ui";
 import { Header } from "@/components/layout/header";
 import { CourseMapIllustration } from "@/components/illustrations";
 import { api, type Course } from "@/lib/api";
@@ -68,7 +68,7 @@ export default function CoursesPage() {
             placeholder="Search courses..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-12 pl-12 pr-md rounded-xl glass-card border-white/10 text-body text-foreground placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand/50 transition-all"
+            className="w-full h-12 pl-12 pr-md rounded-xl glass-card border-white/10 text-body text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand/50 transition-all"
           />
         </div>
 
@@ -146,49 +146,26 @@ export default function CoursesPage() {
             ))}
           </div>
         ) : searchQuery ? (
-          <Card className="glass-card">
-            <CardContent className="py-12 px-6 text-center">
-              <div className="w-24 h-24 mx-auto mb-6 opacity-60">
-                <CourseMapIllustration className="w-full h-full" />
-              </div>
-              <p className="text-white font-semibold text-lg">No courses found</p>
-              <p className="text-gray-400 text-sm mt-2">
-                Try a different search or add a new course
-              </p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            illustration={<CourseMapIllustration className="w-full h-full opacity-60" />}
+            title="No courses found"
+            description="Try a different search or add a new course"
+          />
         ) : (
-          <Card className="glass-card">
-            <CardContent className="py-12 px-6 text-center">
-              <div className="w-32 h-32 mx-auto mb-6 animate-float">
-                <CourseMapIllustration className="w-full h-full" />
-              </div>
-              <p className="text-white font-semibold text-lg">No courses yet</p>
-              <p className="text-gray-400 text-sm mt-2">
-                Add your first course to get started
-              </p>
-              <Link href="/courses/add" className="inline-block mt-6">
-                <Button className="btn-ripple">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Course
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+          <EmptyState
+            illustration={<CourseMapIllustration className="w-full h-full" />}
+            title="No courses yet"
+            description="Add your first course to get started"
+            action={{
+              label: "Add Course",
+              href: "/courses/add",
+              icon: <Plus className="h-4 w-4 mr-2" />,
+            }}
+          />
         )}
       </div>
 
-      {/* FAB - hide in select mode */}
-      {!selectMode && (
-        <Link
-          href="/courses/add"
-          className="fixed bottom-24 right-lg z-40"
-        >
-          <Button size="icon" className="h-14 w-14 rounded-full shadow-lg">
-            <Plus className="h-6 w-6" />
-          </Button>
-        </Link>
-      )}
+      <FAB href="/courses/add" label="Add a new course" show={!selectMode} />
     </div>
   );
 }

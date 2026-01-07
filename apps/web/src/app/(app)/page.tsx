@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { ChevronRight, Play, UserPlus } from "lucide-react";
-import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
+import { Button, Card, CardContent, Badge, Avatar, Skeleton, SectionHeader } from "@/components/ui";
 import { PendingApprovals } from "@/components/handicap/pending-approvals";
 import { GolferIllustration } from "@/components/illustrations";
 import { api, type Round, type RoundDetail, type CalculateResultsResponse, type User as ApiUser } from "@/lib/api";
@@ -315,7 +315,7 @@ export default function DashboardPage() {
 
           {/* Content */}
           <div className="relative z-10 p-5">
-            <p className="text-gray-300 text-sm font-medium mb-1">Career Earnings</p>
+            <p className="text-muted text-sm font-medium mb-1">Career Earnings</p>
             <p className={`text-[3.5rem] font-bold leading-none tracking-tight ${careerEarnings >= 0 ? "text-green-400" : "text-red-400"}`}>
               {formatMoney(careerEarnings)}
             </p>
@@ -404,9 +404,7 @@ export default function DashboardPage() {
         {/* Setup Rounds Section - Rounds waiting to start */}
         {setupRounds.length > 0 && (
           <div className="pt-2">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">Rounds in Setup</h2>
-            </div>
+            <SectionHeader title="Rounds in Setup" />
             <div className="space-y-3">
               {setupRounds.map((round, index) => (
                 <Link key={round.id} href={`/rounds/${round.id}`}>
@@ -420,7 +418,7 @@ export default function DashboardPage() {
                           <p className="text-white font-semibold">
                             {round.courseName || "Round Setup"}
                           </p>
-                          <p className="text-sm text-gray-400 mt-0.5">
+                          <p className="text-sm text-muted mt-0.5">
                             {formatDate(round.date)} • {round._count?.players || 0} player{(round._count?.players || 0) !== 1 ? "s" : ""}
                           </p>
                         </div>
@@ -428,7 +426,7 @@ export default function DashboardPage() {
                           <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
                             Setup
                           </Badge>
-                          <ChevronRight className="h-5 w-5 text-gray-500" />
+                          <ChevronRight className="h-5 w-5 text-subtle" />
                         </div>
                       </div>
                     </CardContent>
@@ -441,15 +439,7 @@ export default function DashboardPage() {
 
         {/* Recent Rounds Section */}
         <div className="pt-2">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Recent Rounds</h2>
-            <Link
-              href="/rounds"
-              className="text-sm text-brand font-medium hover:text-brand-dark transition-colors"
-            >
-              See All
-            </Link>
-          </div>
+          <SectionHeader title="Recent Rounds" seeAllHref="/rounds" />
 
           {isLoading ? (
             <div className="space-y-3">
@@ -471,7 +461,7 @@ export default function DashboardPage() {
                           <p className="text-white font-semibold">
                             {round.courseName || formatDate(round.date)}
                           </p>
-                          <p className="text-sm text-gray-400 mt-0.5">
+                          <p className="text-sm text-muted mt-0.5">
                             {formatDate(round.date)} • {round._count?.players || 0} player{(round._count?.players || 0) !== 1 ? "s" : ""}
                           </p>
                         </div>
@@ -481,7 +471,7 @@ export default function DashboardPage() {
                               {round.earnings >= 0 ? "+" : ""}{formatMoney(round.earnings)}
                             </span>
                           )}
-                          <ChevronRight className="h-5 w-5 text-gray-500" />
+                          <ChevronRight className="h-5 w-5 text-subtle" />
                         </div>
                       </div>
                     </CardContent>
@@ -498,7 +488,7 @@ export default function DashboardPage() {
                     <GolferIllustration className="w-full h-full" />
                   </div>
                   <h3 className="text-white font-semibold text-lg">Welcome to Press!</h3>
-                  <p className="text-gray-400 text-sm mt-1">Get started with these quick steps</p>
+                  <p className="text-muted text-sm mt-1">Get started with these quick steps</p>
                 </div>
 
                 {/* Onboarding checklist */}
@@ -507,33 +497,33 @@ export default function DashboardPage() {
                     <div className="w-8 h-8 rounded-full bg-brand/20 flex items-center justify-center text-brand font-bold text-sm">1</div>
                     <div className="flex-1">
                       <p className="text-white font-medium text-sm">Complete your profile</p>
-                      <p className="text-gray-500 text-xs">Add your name and handicap</p>
+                      <p className="text-subtle text-xs">Add your name and handicap</p>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-brand transition-colors" />
+                    <ChevronRight className="w-4 h-4 text-subtle group-hover:text-brand transition-colors" />
                   </Link>
 
                   <Link href="/courses" className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors group">
                     <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-sm">2</div>
                     <div className="flex-1">
                       <p className="text-white font-medium text-sm">Browse courses</p>
-                      <p className="text-gray-500 text-xs">Find your home course</p>
+                      <p className="text-subtle text-xs">Find your home course</p>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-amber-400 transition-colors" />
+                    <ChevronRight className="w-4 h-4 text-subtle group-hover:text-amber-400 transition-colors" />
                   </Link>
 
                   <Link href="/rounds/new" className="flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors group">
                     <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold text-sm">3</div>
                     <div className="flex-1">
                       <p className="text-white font-medium text-sm">Start your first round</p>
-                      <p className="text-gray-500 text-xs">Set up games and invite friends</p>
+                      <p className="text-subtle text-xs">Set up games and invite friends</p>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-green-400 transition-colors" />
+                    <ChevronRight className="w-4 h-4 text-subtle group-hover:text-green-400 transition-colors" />
                   </Link>
                 </div>
               </CardContent>
             </Card>
           ) : (
-            <p className="text-gray-500 text-sm text-center py-4">No completed rounds yet</p>
+            <p className="text-subtle text-sm text-center py-4">No completed rounds yet</p>
           )}
         </div>
 

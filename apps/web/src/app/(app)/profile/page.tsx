@@ -8,11 +8,10 @@ import {
   Users,
   CreditCard,
   LogOut,
-  ChevronRight,
   Crown,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
-import { Card, CardContent, Button, Badge } from "@/components/ui";
+import { Card, CardContent, Button, Badge, ListItem, ListItemGroup, SectionHeader } from "@/components/ui";
 import { HandicapCard } from "@/components/handicap/handicap-card";
 import { AvatarEditor } from "@/components/profile/avatar-editor";
 import { api, type BillingStatus, type User as ApiUser } from "@/lib/api";
@@ -101,90 +100,48 @@ export default function ProfilePage() {
         </div>
 
         {/* Handicap */}
-        <div className="space-y-md">
-          <h3 className="text-h3 font-semibold text-muted px-xs">Handicap</h3>
+        <div>
+          <SectionHeader title="Handicap" />
           <HandicapCard />
         </div>
 
         {/* Settings */}
-        <div className="space-y-md">
-          <h3 className="text-h3 font-semibold text-muted px-xs">Settings</h3>
-
-          <Card>
-            <CardContent className="p-0 divide-y divide-border">
-              <button
-                onClick={() => router.push("/profile/edit")}
-                className="w-full flex items-center justify-between p-lg min-h-[72px] hover:bg-surface active:bg-elevated transition-colors"
-              >
-                <div className="flex items-center gap-md">
-                  <div className="w-11 h-11 rounded-full bg-elevated flex items-center justify-center">
-                    <User className="h-5 w-5 text-muted" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-body font-medium">Personal Info</p>
-                    <p className="text-caption text-muted">Name, phone, GHIN</p>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted" />
-              </button>
-
-              <button
-                onClick={() => router.push("/buddies")}
-                className="w-full flex items-center justify-between p-lg min-h-[72px] hover:bg-surface active:bg-elevated transition-colors"
-              >
-                <div className="flex items-center gap-md">
-                  <div className="w-11 h-11 rounded-full bg-elevated flex items-center justify-center">
-                    <Users className="h-5 w-5 text-muted" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-body font-medium">My Buddies</p>
-                    <p className="text-caption text-muted">Manage your golf buddies</p>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted" />
-              </button>
-
-              <button
-                onClick={() => router.push("/profile/payment-methods")}
-                className="w-full flex items-center justify-between p-lg min-h-[72px] hover:bg-surface active:bg-elevated transition-colors"
-              >
-                <div className="flex items-center gap-md">
-                  <div className="w-11 h-11 rounded-full bg-elevated flex items-center justify-center">
-                    <CreditCard className="h-5 w-5 text-muted" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-body font-medium">Payment Methods</p>
-                    <p className="text-caption text-muted">Venmo, CashApp, Zelle</p>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted" />
-              </button>
-
-              <button
-                onClick={() => router.push("/profile/subscription")}
-                className="w-full flex items-center justify-between p-lg min-h-[72px] hover:bg-surface active:bg-elevated transition-colors"
-              >
-                <div className="flex items-center gap-md">
-                  <div className="w-11 h-11 rounded-full bg-elevated flex items-center justify-center">
-                    <Crown className="h-5 w-5 text-muted" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-body font-medium">Subscription</p>
-                    <p className="text-caption text-muted">
-                      {isFoundingMember
-                        ? "Founding Member - Free forever"
-                        : subscriptionStatus === "ACTIVE"
-                        ? "Pro member"
-                        : subscriptionStatus === "PAST_DUE"
-                        ? "Payment issue"
-                        : "Subscription required"}
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted" />
-              </button>
-            </CardContent>
-          </Card>
+        <div>
+          <SectionHeader title="Settings" />
+          <ListItemGroup>
+            <ListItem
+              href="/profile/edit"
+              icon={<User className="h-5 w-5 text-muted" />}
+              title="Personal Info"
+              subtitle="Name, phone, GHIN"
+            />
+            <ListItem
+              href="/buddies"
+              icon={<Users className="h-5 w-5 text-muted" />}
+              title="My Buddies"
+              subtitle="Manage your golf buddies"
+            />
+            <ListItem
+              href="/profile/payment-methods"
+              icon={<CreditCard className="h-5 w-5 text-muted" />}
+              title="Payment Methods"
+              subtitle="Venmo, CashApp, Zelle"
+            />
+            <ListItem
+              href="/profile/subscription"
+              icon={<Crown className="h-5 w-5 text-muted" />}
+              title="Subscription"
+              subtitle={
+                isFoundingMember
+                  ? "Founding Member - Free forever"
+                  : subscriptionStatus === "ACTIVE"
+                  ? "Pro member"
+                  : subscriptionStatus === "PAST_DUE"
+                  ? "Payment issue"
+                  : "Subscription required"
+              }
+            />
+          </ListItemGroup>
         </div>
 
         {/* Sign Out */}

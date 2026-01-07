@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { Plus, Search, ChevronRight, UserPlus } from "lucide-react";
-import { Button, Card, CardContent, Skeleton, Avatar, Badge } from "@/components/ui";
+import { Card, CardContent, Skeleton, Avatar, Badge, EmptyState, FAB } from "@/components/ui";
 import { Header } from "@/components/layout/header";
 import { api, type Buddy } from "@/lib/api";
 import { BuddyDetailSheet } from "@/components/buddies/buddy-detail-sheet";
@@ -79,7 +79,7 @@ export default function BuddiesPage() {
             placeholder="Search buddies..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-12 pl-12 pr-md rounded-xl glass-card border-white/10 text-body text-foreground placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand/50 transition-all"
+            className="w-full h-12 pl-12 pr-md rounded-xl glass-card border-white/10 text-body text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand/50 transition-all"
           />
         </div>
 
@@ -126,49 +126,30 @@ export default function BuddiesPage() {
             ))}
           </div>
         ) : searchQuery ? (
-          <Card className="glass-card">
-            <CardContent className="py-12 px-6 text-center">
-              <div className="w-24 h-24 mx-auto mb-6 opacity-60 flex items-center justify-center">
-                <Search className="w-16 h-16 text-muted" />
-              </div>
-              <p className="text-white font-semibold text-lg">No buddies found</p>
-              <p className="text-gray-400 text-sm mt-2">
-                Try a different search or add a new buddy
-              </p>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={<Search className="w-16 h-16 text-muted" />}
+            title="No buddies found"
+            description="Try a different search or add a new buddy"
+          />
         ) : (
-          <Card className="glass-card">
-            <CardContent className="py-12 px-6 text-center">
-              <div className="w-32 h-32 mx-auto mb-6 flex items-center justify-center">
-                <UserPlus className="w-20 h-20 text-brand/50" />
-              </div>
-              <p className="text-white font-semibold text-lg">No buddies yet</p>
-              <p className="text-gray-400 text-sm mt-2">
-                Add buddies to quickly invite them to rounds
-              </p>
-              <Button
-                className="mt-6"
-                onClick={() => setShowAddSheet(true)}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Buddy
-              </Button>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={<UserPlus className="w-20 h-20 text-brand/50" />}
+            title="No buddies yet"
+            description="Add buddies to quickly invite them to rounds"
+            action={{
+              label: "Add Buddy",
+              onClick: () => setShowAddSheet(true),
+              icon: <Plus className="h-4 w-4 mr-2" />,
+            }}
+          />
         )}
       </div>
 
-      {/* FAB */}
-      {buddies.length > 0 && (
-        <Button
-          size="icon"
-          className="fixed bottom-24 right-lg z-40 h-14 w-14 rounded-full shadow-lg"
-          onClick={() => setShowAddSheet(true)}
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
-      )}
+      <FAB
+        onClick={() => setShowAddSheet(true)}
+        label="Add a buddy"
+        show={buddies.length > 0}
+      />
 
       {/* Buddy Detail Sheet */}
       <BuddyDetailSheet
