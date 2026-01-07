@@ -883,7 +883,7 @@ export default function RoundDetailPage() {
             </SheetDescription>
           </SheetHeader>
 
-          <div className="px-5 pb-8 space-y-6">
+          <div className="px-5 pb-28 space-y-6">
             {/* Invite New Player Button */}
             <Button
               className="w-full h-14"
@@ -992,7 +992,7 @@ export default function RoundDetailPage() {
           </SheetHeader>
 
           {editingGame && (
-            <div className="px-5 pb-8 space-y-6">
+            <div className="px-5 pb-28 space-y-6">
               {/* Game Info Card */}
               <div
                 className={cn(
@@ -1093,7 +1093,7 @@ export default function RoundDetailPage() {
             </SheetDescription>
           </SheetHeader>
 
-          <div className="px-5 pb-8 space-y-4 pt-6">
+          <div className="px-5 pb-28 space-y-4 pt-6">
             {/* Warning Card */}
             <div className="p-4 rounded-xl border border-error/30 bg-error/10">
               <div className="flex items-start gap-3">
