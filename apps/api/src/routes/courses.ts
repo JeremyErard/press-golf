@@ -145,10 +145,12 @@ Extract all available data including:
 
 Look for:
 - Course name (usually at top of scorecard)
-- Location (city, state if visible)
+- Location: city, state/region, AND country (important for international courses like Scotland, Ireland, etc.)
 - Website URL (often printed on scorecard - look for www. or .com or .co.uk etc.)
 - For each of the 18 holes: hole number, par, AND handicap/stroke index (HDCP, S.I., or Handicap row)
 - Tee information: tee names (e.g., Blue, White, Red), yardages per hole, total yardage, slope rating, course rating
+
+NOTE: For international courses (Scotland, Ireland, England, etc.), set "state" to the region/county and "country" to the actual country (e.g., "Scotland", "Ireland"). Do NOT default to USA for non-US courses.
 
 IMPORTANT: The handicap/stroke index is CRITICAL - it's usually labeled "HDCP", "HCP", "Handicap", "S.I.", or "Stroke Index" on the scorecard. It's a number 1-18 that indicates hole difficulty (1 = hardest, 18 = easiest). This is different from par. Look carefully for this row.
 
@@ -158,6 +160,7 @@ Return ONLY a JSON object with this exact format:
   "courseName": "Example Golf Club",
   "city": "City Name",
   "state": "ST",
+  "country": "USA",
   "website": "https://www.examplegolf.com",
   "holes": [
     { "holeNumber": 1, "par": 4, "handicapRank": 7 },

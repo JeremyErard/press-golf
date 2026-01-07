@@ -45,35 +45,123 @@ function generatePossibleUrls(courseName: string): string[] {
 }
 
 /**
- * Extract og:image or other hero image from HTML
+ * Check if an image URL looks like a logo (to avoid)
+ */
+function looksLikeLogo(url: string): boolean {
+  const lowerUrl = url.toLowerCase();
+  return lowerUrl.includes('logo') ||
+    lowerUrl.includes('crest') ||
+    lowerUrl.includes('badge') ||
+    lowerUrl.includes('emblem') ||
+    lowerUrl.includes('icon') ||
+    lowerUrl.includes('seal') ||
+    lowerUrl.includes('shield');
+}
+
+/**
+ * Check if an image URL looks like a course photo (preferred)
+ */
+function looksLikeCoursePhoto(url: string): boolean {
+  const lowerUrl = url.toLowerCase();
+  return lowerUrl.includes('course') ||
+    lowerUrl.includes('hole') ||
+    lowerUrl.includes('fairway') ||
+    lowerUrl.includes('green') ||
+    lowerUrl.includes('aerial') ||
+    lowerUrl.includes('landscape') ||
+    lowerUrl.includes('hero') ||
+    lowerUrl.includes('banner') ||
+    lowerUrl.includes('slider') ||
+    lowerUrl.includes('bg') ||
+    lowerUrl.includes('background');
+}
+
+/**
+ * Extract hero image from HTML, preferring course photos over logos
  */
 function extractHeroImage(html: string, baseUrl: string): string | null {
-  // Try og:image first (most reliable)
-  const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
-    || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+  const candidates: { url: string; score: number }[] = [];
 
-  if (ogImageMatch) {
-    let imageUrl = ogImageMatch[1];
-    // Make relative URLs absolute
+  // Helper to make URLs absolute
+  const makeAbsolute = (imageUrl: string): string => {
+    if (imageUrl.startsWith('//')) {
+      return 'https:' + imageUrl;
+    }
     if (imageUrl.startsWith('/')) {
       const url = new URL(baseUrl);
-      imageUrl = `${url.protocol}//${url.host}${imageUrl}`;
+      return `${url.protocol}//${url.host}${imageUrl}`;
+    }
+    if (!imageUrl.startsWith('http')) {
+      const url = new URL(baseUrl);
+      return `${url.protocol}//${url.host}/${imageUrl}`;
     }
     return imageUrl;
+  };
+
+  // Helper to score an image URL
+  const scoreImage = (url: string): number => {
+    let score = 0;
+    if (looksLikeLogo(url)) score -= 100; // Heavily penalize logos
+    if (looksLikeCoursePhoto(url)) score += 50; // Prefer course photos
+    // Prefer larger image paths (often have dimensions in name)
+    if (url.match(/\d{3,4}x\d{3,4}/) || url.match(/large|big|full|hd|high/i)) score += 20;
+    // Prefer jpg/jpeg (usually photos vs png logos)
+    if (url.match(/\.jpe?g/i)) score += 10;
+    return score;
+  };
+
+  // Try og:image
+  const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+  if (ogImageMatch) {
+    const url = makeAbsolute(ogImageMatch[1]);
+    candidates.push({ url, score: scoreImage(url) + 30 }); // Bonus for og:image
   }
 
   // Try twitter:image
-  const twitterImageMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
-  if (twitterImageMatch) {
-    let imageUrl = twitterImageMatch[1];
-    if (imageUrl.startsWith('/')) {
-      const url = new URL(baseUrl);
-      imageUrl = `${url.protocol}//${url.host}${imageUrl}`;
-    }
-    return imageUrl;
+  const twitterMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
+  if (twitterMatch) {
+    const url = makeAbsolute(twitterMatch[1]);
+    candidates.push({ url, score: scoreImage(url) + 25 });
   }
 
-  return null;
+  // Look for hero/banner images in HTML
+  const heroPatterns = [
+    /<img[^>]*class=["'][^"']*hero[^"']*["'][^>]*src=["']([^"']+)["']/gi,
+    /<img[^>]*src=["']([^"']+)["'][^>]*class=["'][^"']*hero[^"']*["']/gi,
+    /<div[^>]*class=["'][^"']*hero[^"']*["'][^>]*style=["'][^"']*url\(['"]?([^"')]+)['"]?\)/gi,
+    /<img[^>]*class=["'][^"']*banner[^"']*["'][^>]*src=["']([^"']+)["']/gi,
+    /<img[^>]*class=["'][^"']*slider[^"']*["'][^>]*src=["']([^"']+)["']/gi,
+  ];
+
+  for (const pattern of heroPatterns) {
+    let match;
+    while ((match = pattern.exec(html)) !== null) {
+      const url = makeAbsolute(match[1]);
+      if (!looksLikeLogo(url)) {
+        candidates.push({ url, score: scoreImage(url) + 40 }); // Bonus for hero class
+      }
+    }
+  }
+
+  // Look for large background images
+  const bgPattern = /background(?:-image)?:\s*url\(['"]?([^"')]+)['"]?\)/gi;
+  let bgMatch;
+  while ((bgMatch = bgPattern.exec(html)) !== null) {
+    const url = makeAbsolute(bgMatch[1]);
+    if (!looksLikeLogo(url)) {
+      candidates.push({ url, score: scoreImage(url) + 15 });
+    }
+  }
+
+  // Sort by score and return best candidate
+  candidates.sort((a, b) => b.score - a.score);
+
+  console.log('[HeroImage] Candidates:', candidates.slice(0, 5).map(c => ({ url: c.url.substring(0, 80), score: c.score })));
+
+  // Return best non-logo candidate, or og:image as fallback
+  const best = candidates.find(c => !looksLikeLogo(c.url)) || candidates[0];
+  return best?.url || null;
 }
 
 /**

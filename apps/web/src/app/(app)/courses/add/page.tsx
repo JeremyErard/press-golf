@@ -413,9 +413,12 @@ export default function AddCoursePage() {
           <div className="space-y-lg">
             <div className="text-center">
               <p className="text-caption text-muted mb-xs">Step 1 of 2</p>
-              <p className="text-h3 font-semibold">Front of Scorecard</p>
+              <p className="text-h3 font-semibold">📊 Scoring Grid Side</p>
+              <p className="text-body text-brand mt-sm font-medium">
+                The side with the numbered holes (1-18)
+              </p>
               <p className="text-caption text-muted mt-xs">
-                Capture the side with hole numbers, pars, and yardages
+                Look for: hole numbers, pars, yardages, handicap rankings
               </p>
             </div>
 
@@ -500,9 +503,12 @@ export default function AddCoursePage() {
           <div className="space-y-lg">
             <div className="text-center">
               <p className="text-caption text-muted mb-xs">Step 2 of 2</p>
-              <p className="text-h3 font-semibold">Back of Scorecard</p>
+              <p className="text-h3 font-semibold">📍 Course Info Side</p>
+              <p className="text-body text-brand mt-sm font-medium">
+                The side with the course name and logo
+              </p>
               <p className="text-caption text-muted mt-xs">
-                Capture the side with course name, address, and website
+                Look for: course name, city, website URL, phone number
               </p>
             </div>
 
