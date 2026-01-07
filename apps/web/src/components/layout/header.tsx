@@ -17,17 +17,20 @@ export function Header({ title, showBack = false, rightAction, className }: Head
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 glass border-b border-border safe-area-top",
+        "sticky top-0 z-40 glass border-b border-border",
         className
       )}
     >
+      {/* Safe area spacer for notched devices */}
+      <div className="safe-area-top" />
       <div className="flex items-center justify-between h-14 px-lg max-w-lg mx-auto">
         {/* Left section */}
-        <div className="w-10">
+        <div className="w-11">
           {showBack && (
             <button
               onClick={() => router.back()}
-              className="flex items-center justify-center w-10 h-10 -ml-2 rounded-full hover:bg-surface transition-colors"
+              className="flex items-center justify-center w-11 h-11 -ml-2 rounded-full hover:bg-surface active:bg-elevated active:scale-95 transition-all"
+              aria-label="Go back"
             >
               <ChevronLeft className="h-6 w-6" />
             </button>
@@ -38,7 +41,7 @@ export function Header({ title, showBack = false, rightAction, className }: Head
         <h1 className="text-h3 font-semibold truncate">{title}</h1>
 
         {/* Right section */}
-        <div className="w-10 flex justify-end">
+        <div className="w-11 flex justify-end">
           {rightAction}
         </div>
       </div>

@@ -54,7 +54,7 @@ function TabsList({ className, children, ...props }: React.HTMLAttributes<HTMLDi
   return (
     <div
       className={cn(
-        "inline-flex h-11 items-center justify-center rounded-lg bg-surface p-1 text-muted",
+        "inline-flex h-12 items-center justify-center rounded-xl bg-surface p-1 text-muted gap-1",
         className
       )}
       {...props}
@@ -75,10 +75,10 @@ function TabsTrigger({ value, className, children, ...props }: TabsTriggerProps)
   return (
     <button
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-md px-md py-1.5 text-caption font-medium transition-all focus-ring",
+        "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-lg h-10 text-caption font-medium transition-all focus-ring active:scale-95",
         isActive
           ? "bg-elevated text-foreground shadow-sm"
-          : "text-muted hover:text-foreground",
+          : "text-muted hover:text-foreground active:text-foreground",
         className
       )}
       onClick={() => setActiveTab(value)}

@@ -67,7 +67,7 @@ export default function BuddiesPage() {
   };
 
   return (
-    <div>
+    <div className="pb-24">
       <Header title="Buddies" />
 
       <div className="p-lg space-y-lg">

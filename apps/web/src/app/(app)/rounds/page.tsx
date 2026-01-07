@@ -67,7 +67,7 @@ export default function RoundsPage() {
     : rounds.filter((r) => r.status === filter);
 
   return (
-    <div>
+    <div className="pb-24">
       <Header title="Rounds" />
 
       <div className="p-lg space-y-lg">

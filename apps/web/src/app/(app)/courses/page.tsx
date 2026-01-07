@@ -53,7 +53,7 @@ export default function CoursesPage() {
   };
 
   return (
-    <div>
+    <div className="pb-24">
       <Header
         title={selectMode === "round" ? "Select Course" : "Courses"}
         showBack={selectMode === "round"}

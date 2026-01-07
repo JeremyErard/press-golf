@@ -67,7 +67,7 @@ export default function ProfilePage() {
   const subscriptionStatus = billingStatus?.status || "FREE";
 
   return (
-    <div>
+    <div className="pb-24">
       <Header title="Profile" />
 
       <div className="p-lg space-y-xl">
@@ -114,10 +114,10 @@ export default function ProfilePage() {
             <CardContent className="p-0 divide-y divide-border">
               <button
                 onClick={() => router.push("/profile/edit")}
-                className="w-full flex items-center justify-between p-lg hover:bg-surface transition-colors"
+                className="w-full flex items-center justify-between p-lg min-h-[72px] hover:bg-surface active:bg-elevated transition-colors"
               >
                 <div className="flex items-center gap-md">
-                  <div className="w-10 h-10 rounded-full bg-elevated flex items-center justify-center">
+                  <div className="w-11 h-11 rounded-full bg-elevated flex items-center justify-center">
                     <User className="h-5 w-5 text-muted" />
                   </div>
                   <div className="text-left">
@@ -130,10 +130,10 @@ export default function ProfilePage() {
 
               <button
                 onClick={() => router.push("/buddies")}
-                className="w-full flex items-center justify-between p-lg hover:bg-surface transition-colors"
+                className="w-full flex items-center justify-between p-lg min-h-[72px] hover:bg-surface active:bg-elevated transition-colors"
               >
                 <div className="flex items-center gap-md">
-                  <div className="w-10 h-10 rounded-full bg-elevated flex items-center justify-center">
+                  <div className="w-11 h-11 rounded-full bg-elevated flex items-center justify-center">
                     <Users className="h-5 w-5 text-muted" />
                   </div>
                   <div className="text-left">
@@ -146,10 +146,10 @@ export default function ProfilePage() {
 
               <button
                 onClick={() => router.push("/profile/payment-methods")}
-                className="w-full flex items-center justify-between p-lg hover:bg-surface transition-colors"
+                className="w-full flex items-center justify-between p-lg min-h-[72px] hover:bg-surface active:bg-elevated transition-colors"
               >
                 <div className="flex items-center gap-md">
-                  <div className="w-10 h-10 rounded-full bg-elevated flex items-center justify-center">
+                  <div className="w-11 h-11 rounded-full bg-elevated flex items-center justify-center">
                     <CreditCard className="h-5 w-5 text-muted" />
                   </div>
                   <div className="text-left">
@@ -162,10 +162,10 @@ export default function ProfilePage() {
 
               <button
                 onClick={() => router.push("/profile/subscription")}
-                className="w-full flex items-center justify-between p-lg hover:bg-surface transition-colors"
+                className="w-full flex items-center justify-between p-lg min-h-[72px] hover:bg-surface active:bg-elevated transition-colors"
               >
                 <div className="flex items-center gap-md">
-                  <div className="w-10 h-10 rounded-full bg-elevated flex items-center justify-center">
+                  <div className="w-11 h-11 rounded-full bg-elevated flex items-center justify-center">
                     <Crown className="h-5 w-5 text-muted" />
                   </div>
                   <div className="text-left">

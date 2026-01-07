@@ -471,7 +471,7 @@ export default function RoundDetailPage() {
   }
 
   return (
-    <div>
+    <div className="pb-24">
       <Header title="Round" showBack />
 
       <div className="p-lg space-y-lg">
