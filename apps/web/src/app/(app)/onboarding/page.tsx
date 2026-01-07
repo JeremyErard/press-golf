@@ -585,20 +585,32 @@ export default function OnboardingPage() {
           )}
 
           {currentStep === 1 ? (
-            <button
-              onClick={handleSubscribe}
-              disabled={loading}
-              className="flex-1 py-4 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <>
-                  <Crown className="w-5 h-5" />
-                  Subscribe - $1.99/mo
-                </>
-              )}
-            </button>
+            <div className="flex-1 flex flex-col gap-2">
+              <button
+                onClick={handleSubscribe}
+                disabled={loading}
+                className="w-full py-4 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <Crown className="w-5 h-5" />
+                    Subscribe - $1.99/mo
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setFirstName(clerkUser?.firstName || "");
+                  setLastName(clerkUser?.lastName || "");
+                  setCurrentStep(2);
+                }}
+                className="text-sm text-muted hover:text-foreground py-2"
+              >
+                Skip for now
+              </button>
+            </div>
           ) : (
             <button
               onClick={handleNext}
