@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireAuth, getUser } from '../lib/auth.js';
 import { badRequest, notFound, forbidden, sendError, ErrorCodes } from '../lib/errors.js';
 import { fetchWebpage, extractCourseData, findScorecardLinks, fetchPdf, extractCourseDataFromPdf } from '../lib/claude.js';
+import { geocodeAddress } from '../lib/geocode.js';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -530,6 +531,21 @@ Extract as much data as you can see. If some fields are not visible, omit them b
       }
 
       return newCourse;
+    });
+
+    // Geocode the course location asynchronously (non-blocking)
+    geocodeAddress(city, state, country).then(async (coords) => {
+      if (coords) {
+        await prisma.course.update({
+          where: { id: course.id },
+          data: {
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+          },
+        });
+      }
+    }).catch((err) => {
+      console.error('Failed to geocode course:', err);
     });
 
     // Fetch full course with relations

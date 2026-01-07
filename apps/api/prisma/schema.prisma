@@ -154,6 +154,8 @@ model Course {
   city         String?
   state        String?
   country      String   @default("USA")
+  latitude     Decimal? @db.Decimal(10, 7)
+  longitude    Decimal? @db.Decimal(10, 7)
   logoUrl      String?
   heroImageUrl String?
   website      String?
