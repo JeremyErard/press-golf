@@ -6,6 +6,7 @@ import { requireAuth, getUser } from '../lib/auth.js';
 import { badRequest, notFound, forbidden, sendError, ErrorCodes } from '../lib/errors.js';
 import { fetchWebpage, extractCourseData, findScorecardLinks, fetchPdf, extractCourseDataFromPdf } from '../lib/claude.js';
 import { geocodeAddress } from '../lib/geocode.js';
+import { findAndExtractHeroImage } from '../lib/course-hero.js';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -145,8 +146,10 @@ Extract all available data including:
 Look for:
 - Course name (usually at top of scorecard)
 - Location (city, state if visible)
-- For each of the 18 holes: hole number, par, handicap/stroke index
+- For each of the 18 holes: hole number, par, AND handicap/stroke index (HDCP, S.I., or Handicap row)
 - Tee information: tee names (e.g., Blue, White, Red), yardages per hole, total yardage, slope rating, course rating
+
+IMPORTANT: The handicap/stroke index is CRITICAL - it's usually labeled "HDCP", "HCP", "Handicap", "S.I.", or "Stroke Index" on the scorecard. It's a number 1-18 that indicates hole difficulty (1 = hardest, 18 = easiest). This is different from par. Look carefully for this row.
 
 Return ONLY a JSON object with this exact format:
 {
@@ -157,7 +160,7 @@ Return ONLY a JSON object with this exact format:
   "holes": [
     { "holeNumber": 1, "par": 4, "handicapRank": 7 },
     { "holeNumber": 2, "par": 5, "handicapRank": 1 },
-    ...for all 18 holes
+    ...for all 18 holes (handicapRank is the HDCP/stroke index value, NOT the par)
   ],
   "tees": [
     {
@@ -601,6 +604,17 @@ Extract as much data as you can see. If some fields are not visible, omit them b
       }
     }).catch((err) => {
       console.error('Failed to geocode course:', err);
+    });
+
+    // Find and extract hero image asynchronously (non-blocking)
+    findAndExtractHeroImage(
+      name.trim(),
+      city?.trim() || null,
+      state?.trim() || null,
+      course.id,
+      prisma
+    ).catch((err) => {
+      console.error('Failed to find/extract hero image:', err);
     });
 
     // Fetch full course with relations

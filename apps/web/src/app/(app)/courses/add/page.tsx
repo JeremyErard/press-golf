@@ -210,6 +210,12 @@ export default function AddCoursePage() {
     );
   };
 
+  const updateHoleHandicap = (holeNumber: number, handicapRank: number) => {
+    setHoles((prev) =>
+      prev.map((h) => (h.holeNumber === holeNumber ? { ...h, handicapRank } : h))
+    );
+  };
+
   const addTee = () => {
     setTees([
       ...tees,
@@ -231,9 +237,13 @@ export default function AddCoursePage() {
     if (!name.trim()) return;
 
     setIsSubmitting(true);
+    setExtractError(null);
     try {
       const token = await getToken();
-      if (!token) return;
+      if (!token) {
+        setExtractError("Not authenticated. Please sign in again.");
+        return;
+      }
 
       await api.createCourse(token, {
         name: name.trim(),
@@ -259,6 +269,7 @@ export default function AddCoursePage() {
       router.push("/courses");
     } catch (error) {
       console.error("Failed to create course:", error);
+      setExtractError(error instanceof Error ? error.message : "Failed to create course. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -572,6 +583,15 @@ export default function AddCoursePage() {
         {/* Step: Review */}
         {step === "review" && (
           <div className="space-y-lg">
+            {extractError && (
+              <div className="flex items-start gap-sm p-md rounded-lg bg-error/10 border border-error/20">
+                <AlertCircle className="h-5 w-5 text-error flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-caption text-error font-medium">Failed to Create Course</p>
+                  <p className="text-caption text-error/80">{extractError}</p>
+                </div>
+              </div>
+            )}
             {confidence && (
               <div className="flex items-center gap-sm">
                 <Check className="h-5 w-5 text-success" />
@@ -634,21 +654,41 @@ export default function AddCoursePage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-9 gap-1 mb-md">
-                  {holes.slice(0, 9).map((hole) => (
-                    <div key={hole.holeNumber} className="text-center">
-                      <p className="text-[10px] text-muted">{hole.holeNumber}</p>
-                      <p className="text-caption font-medium">{hole.par}</p>
-                    </div>
-                  ))}
+                {/* Front 9 */}
+                <div className="mb-md">
+                  <div className="grid grid-cols-9 gap-1 mb-1">
+                    {holes.slice(0, 9).map((hole) => (
+                      <div key={hole.holeNumber} className="text-center">
+                        <p className="text-[10px] text-muted">{hole.holeNumber}</p>
+                        <p className="text-caption font-medium">{hole.par}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-9 gap-1">
+                    {holes.slice(0, 9).map((hole) => (
+                      <div key={`hdcp-${hole.holeNumber}`} className="text-center">
+                        <p className="text-[9px] text-muted/60">hdcp {hole.handicapRank}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="grid grid-cols-9 gap-1">
-                  {holes.slice(9, 18).map((hole) => (
-                    <div key={hole.holeNumber} className="text-center">
-                      <p className="text-[10px] text-muted">{hole.holeNumber}</p>
-                      <p className="text-caption font-medium">{hole.par}</p>
-                    </div>
-                  ))}
+                {/* Back 9 */}
+                <div>
+                  <div className="grid grid-cols-9 gap-1 mb-1">
+                    {holes.slice(9, 18).map((hole) => (
+                      <div key={hole.holeNumber} className="text-center">
+                        <p className="text-[10px] text-muted">{hole.holeNumber}</p>
+                        <p className="text-caption font-medium">{hole.par}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-9 gap-1">
+                    {holes.slice(9, 18).map((hole) => (
+                      <div key={`hdcp-${hole.holeNumber}`} className="text-center">
+                        <p className="text-[9px] text-muted/60">hdcp {hole.handicapRank}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -721,8 +761,8 @@ export default function AddCoursePage() {
                 <h3 className="text-h3 font-semibold mb-md">Front Nine</h3>
                 <div className="grid grid-cols-3 gap-md">
                   {holes.slice(0, 9).map((hole) => (
-                    <div key={hole.holeNumber} className="text-center">
-                      <p className="text-caption text-muted mb-xs">
+                    <div key={hole.holeNumber} className="text-center space-y-sm">
+                      <p className="text-caption text-muted">
                         Hole {hole.holeNumber}
                       </p>
                       <div className="flex items-center justify-center gap-xs">
@@ -740,6 +780,17 @@ export default function AddCoursePage() {
                           </button>
                         ))}
                       </div>
+                      <div className="flex items-center justify-center gap-xs">
+                        <span className="text-[10px] text-muted">HDCP:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="18"
+                          value={hole.handicapRank}
+                          onChange={(e) => updateHoleHandicap(hole.holeNumber, parseInt(e.target.value) || 1)}
+                          className="w-10 h-6 text-center text-[11px] rounded bg-surface border border-border text-foreground"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -751,8 +802,8 @@ export default function AddCoursePage() {
                 <h3 className="text-h3 font-semibold mb-md">Back Nine</h3>
                 <div className="grid grid-cols-3 gap-md">
                   {holes.slice(9, 18).map((hole) => (
-                    <div key={hole.holeNumber} className="text-center">
-                      <p className="text-caption text-muted mb-xs">
+                    <div key={hole.holeNumber} className="text-center space-y-sm">
+                      <p className="text-caption text-muted">
                         Hole {hole.holeNumber}
                       </p>
                       <div className="flex items-center justify-center gap-xs">
@@ -769,6 +820,17 @@ export default function AddCoursePage() {
                             {par}
                           </button>
                         ))}
+                      </div>
+                      <div className="flex items-center justify-center gap-xs">
+                        <span className="text-[10px] text-muted">HDCP:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="18"
+                          value={hole.handicapRank}
+                          onChange={(e) => updateHoleHandicap(hole.holeNumber, parseInt(e.target.value) || 1)}
+                          className="w-10 h-6 text-center text-[11px] rounded bg-surface border border-border text-foreground"
+                        />
                       </div>
                     </div>
                   ))}

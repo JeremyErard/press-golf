@@ -121,6 +121,27 @@ export async function uploadScorecardPhoto(
 }
 
 /**
+ * Uploads a course hero image to Vercel Blob
+ */
+export async function uploadCourseHeroImage(
+  buffer: Buffer,
+  courseId: string,
+  extension: string = 'jpg'
+): Promise<UploadResult> {
+  const pathname = `courses/${courseId}/hero-${Date.now()}.${extension}`;
+
+  const blob = await put(pathname, buffer, {
+    access: 'public',
+    addRandomSuffix: false,
+  });
+
+  return {
+    url: blob.url,
+    pathname: blob.pathname,
+  };
+}
+
+/**
  * Deletes an image from Vercel Blob
  */
 export async function deleteImage(url: string): Promise<void> {
