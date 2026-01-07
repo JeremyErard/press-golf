@@ -633,9 +633,11 @@ Extract as much data as you can see. If some fields are not visible, omit them b
       success: true,
       data: fullCourse,
     };
-    } catch (error) {
+    } catch (error: any) {
       request.log.error(error, 'Failed to create course');
-      return sendError(reply, 500, ErrorCodes.COURSE_CREATION_FAILED, 'Failed to create course. Please try again.');
+      const errorMessage = error?.message || 'Unknown error';
+      console.error('Course creation error details:', errorMessage);
+      return sendError(reply, 500, ErrorCodes.COURSE_CREATION_FAILED, `Failed to create course: ${errorMessage}`);
     }
   });
 
