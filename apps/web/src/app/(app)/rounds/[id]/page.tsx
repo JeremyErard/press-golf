@@ -17,6 +17,16 @@ import {
   UserPlus,
   Users,
   MessageSquare,
+  Trophy,
+  Target,
+  Swords,
+  Dog,
+  Grid3X3,
+  Star,
+  Zap,
+  Dices,
+  CircleDot,
+  Banknote,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import {
@@ -75,6 +85,45 @@ const gameTypeDescriptions: Record<GameType, string> = {
   VEGAS: "Team score as 2-digit number",
   SNAKE: "Last 3-putt holds the snake",
   BANKER: "Banker vs field on each hole",
+};
+
+const gameTypeIcons: Record<GameType, React.ReactNode> = {
+  NASSAU: <Trophy className="h-5 w-5" />,
+  SKINS: <Target className="h-5 w-5" />,
+  MATCH_PLAY: <Swords className="h-5 w-5" />,
+  WOLF: <Dog className="h-5 w-5" />,
+  NINES: <Grid3X3 className="h-5 w-5" />,
+  STABLEFORD: <Star className="h-5 w-5" />,
+  BINGO_BANGO_BONGO: <Zap className="h-5 w-5" />,
+  VEGAS: <Dices className="h-5 w-5" />,
+  SNAKE: <CircleDot className="h-5 w-5" />,
+  BANKER: <Banknote className="h-5 w-5" />,
+};
+
+const gameTypeColors: Record<GameType, string> = {
+  NASSAU: "from-amber-500/20 to-amber-600/10 border-amber-500/30",
+  SKINS: "from-red-500/20 to-red-600/10 border-red-500/30",
+  MATCH_PLAY: "from-blue-500/20 to-blue-600/10 border-blue-500/30",
+  WOLF: "from-purple-500/20 to-purple-600/10 border-purple-500/30",
+  NINES: "from-green-500/20 to-green-600/10 border-green-500/30",
+  STABLEFORD: "from-yellow-500/20 to-yellow-600/10 border-yellow-500/30",
+  BINGO_BANGO_BONGO: "from-pink-500/20 to-pink-600/10 border-pink-500/30",
+  VEGAS: "from-orange-500/20 to-orange-600/10 border-orange-500/30",
+  SNAKE: "from-emerald-500/20 to-emerald-600/10 border-emerald-500/30",
+  BANKER: "from-cyan-500/20 to-cyan-600/10 border-cyan-500/30",
+};
+
+const gameTypeIconColors: Record<GameType, string> = {
+  NASSAU: "text-amber-400",
+  SKINS: "text-red-400",
+  MATCH_PLAY: "text-blue-400",
+  WOLF: "text-purple-400",
+  NINES: "text-green-400",
+  STABLEFORD: "text-yellow-400",
+  BINGO_BANGO_BONGO: "text-pink-400",
+  VEGAS: "text-orange-400",
+  SNAKE: "text-emerald-400",
+  BANKER: "text-cyan-400",
 };
 
 const ALL_GAME_TYPES: GameType[] = [
@@ -566,68 +615,113 @@ export default function RoundDetailPage() {
 
       {/* Add Game Sheet */}
       <Sheet open={showAddGame} onOpenChange={setShowAddGame}>
-        <SheetContent>
+        <SheetContent className="overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Add a Game</SheetTitle>
             <SheetDescription>
-              Select a game type and set your bet amount
+              {selectedGameType
+                ? `Configure ${gameTypeLabels[selectedGameType]}`
+                : "Choose from popular golf betting games"}
             </SheetDescription>
           </SheetHeader>
 
-          <div className="px-5 pb-8 space-y-6">
-            {/* Game Type Selection */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-muted">Game Type</label>
-              <div className="grid gap-2">
+          <div className="px-5 pb-8">
+            {!selectedGameType ? (
+              /* Game Type Selection - 2 column grid */
+              <div className="grid grid-cols-2 gap-3">
                 {availableGameTypes.map((type) => (
                   <button
                     key={type}
                     onClick={() => setSelectedGameType(type)}
                     className={cn(
-                      "w-full p-4 rounded-xl border text-left transition-all",
-                      selectedGameType === type
-                        ? "border-brand bg-brand/10"
-                        : "border-border bg-surface hover:bg-elevated"
+                      "relative p-4 rounded-xl border text-left transition-all",
+                      "bg-gradient-to-br",
+                      gameTypeColors[type],
+                      "hover:scale-[1.02] active:scale-[0.98]"
                     )}
                   >
-                    <p className="font-medium text-white">{gameTypeLabels[type]}</p>
-                    <p className="text-sm text-muted mt-1">
+                    <div className={cn("mb-2", gameTypeIconColors[type])}>
+                      {gameTypeIcons[type]}
+                    </div>
+                    <p className="font-semibold text-white text-sm">
+                      {gameTypeLabels[type]}
+                    </p>
+                    <p className="text-xs text-white/60 mt-1 line-clamp-2">
                       {gameTypeDescriptions[type]}
                     </p>
                   </button>
                 ))}
               </div>
-            </div>
+            ) : (
+              /* Bet Configuration */
+              <div className="space-y-6">
+                {/* Selected Game Card */}
+                <div
+                  className={cn(
+                    "p-4 rounded-xl border bg-gradient-to-br",
+                    gameTypeColors[selectedGameType]
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={cn("p-2 rounded-lg bg-black/20", gameTypeIconColors[selectedGameType])}>
+                      {gameTypeIcons[selectedGameType]}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold text-white">
+                        {gameTypeLabels[selectedGameType]}
+                      </p>
+                      <p className="text-sm text-white/70 mt-1">
+                        {gameTypeDescriptions[selectedGameType]}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-            {/* Bet Amount */}
-            {selectedGameType && (
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-muted">
-                  Bet Amount (per bet)
-                </label>
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl text-white">$</span>
-                  <Input
-                    type="number"
-                    value={betAmount}
-                    onChange={(e) => setBetAmount(e.target.value)}
-                    className="text-2xl font-semibold h-14"
-                    placeholder="5"
-                    min="1"
-                    step="1"
-                  />
+                {/* Bet Amount */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium text-white">
+                    Bet Amount
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[5, 10, 20, 50].map((amount) => (
+                      <button
+                        key={amount}
+                        onClick={() => setBetAmount(amount.toString())}
+                        className={cn(
+                          "py-3 rounded-xl font-semibold transition-all",
+                          betAmount === amount.toString()
+                            ? "bg-brand text-white"
+                            : "bg-surface border border-border text-white hover:bg-elevated"
+                        )}
+                      >
+                        ${amount}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg text-muted">$</span>
+                    <Input
+                      type="number"
+                      value={betAmount}
+                      onChange={(e) => setBetAmount(e.target.value)}
+                      className="text-lg font-semibold"
+                      placeholder="Custom amount"
+                      min="1"
+                      step="1"
+                    />
+                  </div>
                 </div>
 
                 {/* Auto Press option for Nassau */}
                 {selectedGameType === "NASSAU" && (
-                  <label className="flex items-center gap-3 p-4 rounded-xl bg-surface border border-border cursor-pointer">
+                  <label className="flex items-center gap-3 p-4 rounded-xl bg-surface border border-border cursor-pointer hover:bg-elevated transition-colors">
                     <input
                       type="checkbox"
                       checked={isAutoPress}
                       onChange={(e) => setIsAutoPress(e.target.checked)}
                       className="w-5 h-5 rounded border-border text-brand focus:ring-brand"
                     />
-                    <div>
+                    <div className="flex-1">
                       <p className="font-medium text-white">Auto Press</p>
                       <p className="text-sm text-muted">
                         Automatically press when down 2 holes
@@ -635,23 +729,35 @@ export default function RoundDetailPage() {
                     </div>
                   </label>
                 )}
+
+                {/* Actions */}
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
+                    onClick={() => {
+                      setSelectedGameType(null);
+                      setBetAmount("5");
+                      setIsAutoPress(false);
+                    }}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={handleAddGame}
+                    disabled={isAddingGame}
+                  >
+                    {isAddingGame ? (
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    ) : (
+                      <Plus className="h-5 w-5 mr-2" />
+                    )}
+                    Add Game
+                  </Button>
+                </div>
               </div>
             )}
-
-            {/* Add Button */}
-            <Button
-              className="w-full h-14"
-              size="lg"
-              onClick={handleAddGame}
-              disabled={!selectedGameType || isAddingGame}
-            >
-              {isAddingGame ? (
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              ) : (
-                <Plus className="h-5 w-5 mr-2" />
-              )}
-              Add {selectedGameType ? gameTypeLabels[selectedGameType] : "Game"}
-            </Button>
           </div>
         </SheetContent>
       </Sheet>
