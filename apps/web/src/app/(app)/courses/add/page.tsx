@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { Camera, Link as LinkIcon, Loader2, AlertCircle, Check, Edit3, Trash2, Plus } from "lucide-react";
+import { Camera, Link as LinkIcon, Loader2, AlertCircle, Check, Edit3, Trash2, Plus, ImagePlus, ArrowRight, RotateCcw } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Input, Badge } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -34,16 +34,26 @@ const defaultTees: TeeData[] = [
   { name: "White", color: "#FFFFFF", slopeRating: 125, courseRating: 70.5 },
 ];
 
-type Step = "choose" | "extracting" | "review" | "edit-holes" | "edit-tees";
+type Step = "choose" | "capture-front" | "capture-back" | "extracting" | "review" | "edit-holes" | "edit-tees";
 
 export default function AddCoursePage() {
   const router = useRouter();
   const { getToken } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Separate refs for camera and gallery file inputs
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>("choose");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
+
+  // Two-sided scorecard capture state
+  const [frontImage, setFrontImage] = useState<File | null>(null);
+  const [backImage, setBackImage] = useState<File | null>(null);
+  const [frontPreview, setFrontPreview] = useState<string | null>(null);
+  const [backPreview, setBackPreview] = useState<string | null>(null);
+  const [captureSide, setCaptureSide] = useState<"front" | "back">("front");
 
   // Course data
   const [name, setName] = useState("");
@@ -62,6 +72,27 @@ export default function AddCoursePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Reset the input so the same file can be selected again
+    e.target.value = "";
+
+    if (captureSide === "front") {
+      // Capture front image
+      if (frontPreview) URL.revokeObjectURL(frontPreview);
+      setFrontImage(file);
+      setFrontPreview(URL.createObjectURL(file));
+      setStep("capture-front");
+    } else {
+      // Capture back image
+      if (backPreview) URL.revokeObjectURL(backPreview);
+      setBackImage(file);
+      setBackPreview(URL.createObjectURL(file));
+      setStep("capture-back");
+    }
+  };
+
+  const handleExtractScorecard = async () => {
+    if (!frontImage) return;
+
     setStep("extracting");
     setExtractError(null);
 
@@ -73,7 +104,7 @@ export default function AddCoursePage() {
         return;
       }
 
-      const data = await api.extractCourseFromImage(token, file);
+      const data = await api.extractCourseFromImage(token, frontImage, backImage || undefined);
 
       // Populate form with extracted data
       if (data.name) setName(data.name);
@@ -103,8 +134,17 @@ export default function AddCoursePage() {
       setStep("review");
     } catch (error) {
       setExtractError(String(error) || "Failed to extract scorecard data");
-      setStep("choose");
+      setStep("capture-front");
     }
+  };
+
+  const startCapture = () => {
+    setCaptureSide("front");
+    setFrontImage(null);
+    setBackImage(null);
+    setFrontPreview(null);
+    setBackPreview(null);
+    setStep("capture-front");
   };
 
   const handleFetchFromUrl = async () => {
@@ -231,12 +271,19 @@ export default function AddCoursePage() {
       <Header title="Add Course" showBack />
 
       <div className="p-lg space-y-lg">
-        {/* Hidden file input */}
+        {/* Hidden file inputs for camera and gallery */}
         <input
-          ref={fileInputRef}
+          ref={cameraInputRef}
           type="file"
           accept="image/*"
           capture="environment"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        <input
+          ref={galleryInputRef}
+          type="file"
+          accept="image/*"
           onChange={handleFileSelect}
           className="hidden"
         />
@@ -257,7 +304,7 @@ export default function AddCoursePage() {
             {/* Primary: Photo */}
             <Card
               className="cursor-pointer hover:border-brand transition-colors border-2 border-brand/50"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={startCapture}
             >
               <CardContent className="p-xl text-center">
                 <div className="w-16 h-16 rounded-full bg-brand/20 flex items-center justify-center mx-auto mb-md">
@@ -265,7 +312,7 @@ export default function AddCoursePage() {
                 </div>
                 <p className="text-h3 font-semibold mb-xs">Take Photo of Scorecard</p>
                 <p className="text-caption text-muted">
-                  Snap a picture of the scorecard and we will extract all the data automatically
+                  Capture front and back like a mobile check deposit
                 </p>
                 <Badge variant="brand" className="mt-md">Recommended</Badge>
               </CardContent>
@@ -333,6 +380,181 @@ export default function AddCoursePage() {
             >
               Enter details manually
             </button>
+          </div>
+        )}
+
+        {/* Step: Capture Front */}
+        {step === "capture-front" && (
+          <div className="space-y-lg">
+            <div className="text-center">
+              <p className="text-caption text-muted mb-xs">Step 1 of 2</p>
+              <p className="text-h3 font-semibold">Front of Scorecard</p>
+              <p className="text-caption text-muted mt-xs">
+                Capture the side with hole numbers, pars, and yardages
+              </p>
+            </div>
+
+            {frontPreview ? (
+              <div className="space-y-md">
+                <div className="rounded-2xl overflow-hidden border border-border">
+                  <img
+                    src={frontPreview}
+                    alt="Front of scorecard"
+                    className="w-full object-contain max-h-64"
+                  />
+                </div>
+                <div className="flex gap-sm">
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
+                    onClick={() => {
+                      setCaptureSide("front");
+                      galleryInputRef.current?.click();
+                    }}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Retake
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={() => {
+                      setCaptureSide("back");
+                      setStep("capture-back");
+                    }}
+                  >
+                    Continue
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-md">
+                <Card
+                  className="cursor-pointer hover:border-brand transition-colors"
+                  onClick={() => {
+                    setCaptureSide("front");
+                    cameraInputRef.current?.click();
+                  }}
+                >
+                  <CardContent className="p-lg text-center">
+                    <div className="w-14 h-14 rounded-full bg-brand/20 flex items-center justify-center mx-auto mb-md">
+                      <Camera className="h-7 w-7 text-brand" />
+                    </div>
+                    <p className="text-body font-semibold">Take Photo</p>
+                  </CardContent>
+                </Card>
+
+                <button
+                  onClick={() => {
+                    setCaptureSide("front");
+                    galleryInputRef.current?.click();
+                  }}
+                  className="w-full flex items-center justify-center gap-sm text-caption text-muted hover:text-foreground transition-colors py-sm"
+                >
+                  <ImagePlus className="h-4 w-4" />
+                  Choose from Library
+                </button>
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                setStep("choose");
+                setFrontImage(null);
+                setFrontPreview(null);
+              }}
+              className="w-full text-center text-caption text-muted hover:text-foreground transition-colors py-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* Step: Capture Back */}
+        {step === "capture-back" && (
+          <div className="space-y-lg">
+            <div className="text-center">
+              <p className="text-caption text-muted mb-xs">Step 2 of 2</p>
+              <p className="text-h3 font-semibold">Back of Scorecard</p>
+              <p className="text-caption text-muted mt-xs">
+                Capture the side with course name, address, and website
+              </p>
+            </div>
+
+            {backPreview ? (
+              <div className="space-y-md">
+                <div className="rounded-2xl overflow-hidden border border-border">
+                  <img
+                    src={backPreview}
+                    alt="Back of scorecard"
+                    className="w-full object-contain max-h-64"
+                  />
+                </div>
+                <div className="flex gap-sm">
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
+                    onClick={() => {
+                      setCaptureSide("back");
+                      galleryInputRef.current?.click();
+                    }}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Retake
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={handleExtractScorecard}
+                  >
+                    Extract Data
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-md">
+                <Card
+                  className="cursor-pointer hover:border-brand transition-colors"
+                  onClick={() => {
+                    setCaptureSide("back");
+                    cameraInputRef.current?.click();
+                  }}
+                >
+                  <CardContent className="p-lg text-center">
+                    <div className="w-14 h-14 rounded-full bg-brand/20 flex items-center justify-center mx-auto mb-md">
+                      <Camera className="h-7 w-7 text-brand" />
+                    </div>
+                    <p className="text-body font-semibold">Take Photo</p>
+                  </CardContent>
+                </Card>
+
+                <button
+                  onClick={() => {
+                    setCaptureSide("back");
+                    galleryInputRef.current?.click();
+                  }}
+                  className="w-full flex items-center justify-center gap-sm text-caption text-muted hover:text-foreground transition-colors py-sm"
+                >
+                  <ImagePlus className="h-4 w-4" />
+                  Choose from Library
+                </button>
+              </div>
+            )}
+
+            <div className="flex gap-md">
+              <button
+                onClick={() => setStep("capture-front")}
+                className="flex-1 text-center text-caption text-muted hover:text-foreground transition-colors py-sm"
+              >
+                ← Back to Front
+              </button>
+              <button
+                onClick={handleExtractScorecard}
+                className="flex-1 text-center text-caption text-brand hover:text-brand-dark transition-colors py-sm"
+              >
+                Skip Back Photo →
+              </button>
+            </div>
           </div>
         )}
 

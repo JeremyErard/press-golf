@@ -127,9 +127,12 @@ export const api = {
       body: JSON.stringify({ url }),
     }, token),
 
-  extractCourseFromImage: async (token: string, file: File): Promise<ScrapedCourseData & { confidence?: string }> => {
+  extractCourseFromImage: async (token: string, frontImage: File, backImage?: File): Promise<ScrapedCourseData & { confidence?: string }> => {
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("frontImage", frontImage);
+    if (backImage) {
+      formData.append("backImage", backImage);
+    }
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
     const response = await fetch(`${API_URL}/courses/extract-from-image`, {

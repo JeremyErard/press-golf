@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { Camera, Upload, PenLine, Check, AlertCircle, Loader2, ArrowLeft } from "lucide-react";
+import { Camera, PenLine, Check, AlertCircle, Loader2, ArrowLeft, ImagePlus } from "lucide-react";
 import { api, HandicapSource } from "@/lib/api";
 
 type Step = "choice" | "upload" | "manual" | "confirm" | "success";
@@ -18,7 +18,10 @@ interface ExtractedData {
 export default function HandicapOnboardingPage() {
   const router = useRouter();
   const { getToken } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Separate refs for camera and gallery file inputs
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>("choice");
   const [loading, setLoading] = useState(false);
@@ -157,23 +160,43 @@ export default function HandicapOnboardingPage() {
         {/* Choice Step */}
         {step === "choice" && (
           <div className="space-y-4">
+            {/* Primary option: Choose from photos (gallery) - most users have screenshots */}
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full p-6 rounded-2xl bg-card border border-border hover:border-brand/50 transition-all group"
+              onClick={() => galleryInputRef.current?.click()}
+              className="w-full p-6 rounded-2xl bg-card border-2 border-brand/50 hover:border-brand transition-all group"
             >
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-xl bg-brand/10 flex items-center justify-center group-hover:bg-brand/20 transition-colors">
-                  <Camera className="w-7 h-7 text-brand" />
+                  <ImagePlus className="w-7 h-7 text-brand" />
                 </div>
                 <div className="text-left">
-                  <h3 className="font-semibold text-foreground">Upload Screenshot</h3>
+                  <h3 className="font-semibold text-foreground">Choose from Photos</h3>
                   <p className="text-sm text-muted mt-1">
-                    Take a photo of your GHIN app or handicap card
+                    Select a screenshot of your GHIN app or handicap card
                   </p>
                 </div>
               </div>
             </button>
 
+            {/* Secondary option: Take photo with camera */}
+            <button
+              onClick={() => cameraInputRef.current?.click()}
+              className="w-full p-6 rounded-2xl bg-card border border-border hover:border-brand/50 transition-all group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                  <Camera className="w-7 h-7 text-muted" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold text-foreground">Take Photo</h3>
+                  <p className="text-sm text-muted mt-1">
+                    Photograph your handicap card directly
+                  </p>
+                </div>
+              </div>
+            </button>
+
+            {/* Manual entry option */}
             <button
               onClick={() => setStep("manual")}
               className="w-full p-6 rounded-2xl bg-card border border-border hover:border-brand/50 transition-all group"
@@ -191,8 +214,16 @@ export default function HandicapOnboardingPage() {
               </div>
             </button>
 
+            {/* Hidden file inputs */}
             <input
-              ref={fileInputRef}
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            <input
+              ref={cameraInputRef}
               type="file"
               accept="image/*"
               capture="environment"
@@ -222,10 +253,10 @@ export default function HandicapOnboardingPage() {
 
             <div className="flex gap-3">
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => galleryInputRef.current?.click()}
                 className="flex-1 py-3 px-4 rounded-xl bg-card border border-border text-foreground font-medium hover:bg-card-hover transition-colors"
               >
-                <Upload className="w-4 h-4 inline mr-2" />
+                <ImagePlus className="w-4 h-4 inline mr-2" />
                 Change
               </button>
               <button
@@ -243,15 +274,6 @@ export default function HandicapOnboardingPage() {
                 )}
               </button>
             </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
           </div>
         )}
 

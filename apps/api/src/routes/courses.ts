@@ -59,47 +59,88 @@ export const courseRoutes: FastifyPluginAsync = async (app) => {
 
   // =====================
   // POST /api/courses/extract-from-image
-  // Extract course data from a scorecard photo using Claude Vision
+  // Extract course data from scorecard photos using Claude Vision
+  // Supports two images: front (hole data) and back (course info)
   // =====================
   app.post('/extract-from-image', {
     preHandler: requireAuth,
   }, async (request, reply) => {
-    const data = await request.file();
-    if (!data) {
-      return badRequest(reply, 'No image file provided');
-    }
-
-    // Validate file type
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!allowedTypes.includes(data.mimetype)) {
-      return badRequest(reply, 'Invalid file type. Please upload a JPEG, PNG, WebP, or GIF image.');
+
+    // Collect files from multipart upload
+    let frontImage: { buffer: Buffer; mimetype: string } | null = null;
+    let backImage: { buffer: Buffer; mimetype: string } | null = null;
+
+    const parts = request.parts();
+    for await (const part of parts) {
+      if (part.type === 'file') {
+        if (!allowedTypes.includes(part.mimetype)) {
+          return badRequest(reply, 'Invalid file type. Please upload a JPEG, PNG, WebP, or GIF image.');
+        }
+
+        const buffer = await part.toBuffer();
+
+        if (part.fieldname === 'frontImage') {
+          frontImage = { buffer, mimetype: part.mimetype };
+        } else if (part.fieldname === 'backImage') {
+          backImage = { buffer, mimetype: part.mimetype };
+        }
+      }
     }
 
-    // Read file into buffer
-    const buffer = await data.toBuffer();
-    const base64Image = buffer.toString('base64');
-    const mediaType = data.mimetype as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+    if (!frontImage) {
+      return badRequest(reply, 'No front image provided');
+    }
 
-    try {
-      // Use Claude Vision to extract scorecard data
-      const message = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: {
-                  type: 'base64',
-                  media_type: mediaType,
-                  data: base64Image,
-                },
-              },
-              {
-                type: 'text',
-                text: `Extract all golf course scorecard data from this image.
+    const frontBase64 = frontImage.buffer.toString('base64');
+    const frontMediaType = frontImage.mimetype as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+
+    // Build content array with images
+    const imageContent: Anthropic.ImageBlockParam[] = [
+      {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: frontMediaType,
+          data: frontBase64,
+        },
+      },
+    ];
+
+    // Add back image if provided
+    if (backImage) {
+      const backBase64 = backImage.buffer.toString('base64');
+      const backMediaType = backImage.mimetype as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+      imageContent.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: backMediaType,
+          data: backBase64,
+        },
+      });
+    }
+
+    // Build prompt based on number of images
+    const promptText = backImage
+      ? `You are analyzing TWO images of a golf scorecard (front and back).
+
+IMAGE 1 (FRONT): Contains the scoring grid with hole numbers, pars, yardages, and handicap rankings.
+IMAGE 2 (BACK): Contains course information like name, address, website, phone number.
+
+Extract ALL available data from BOTH images. Prioritize:
+- Course name, city, state from the BACK image
+- Hole data (pars, yardages, handicaps) from the FRONT image
+- Tee information (colors, ratings) from the FRONT image`
+      : `You are analyzing a golf scorecard image.
+
+Extract all available data including:
+- Course name (usually at top of scorecard)
+- Location (city, state if visible)
+- Hole data (pars, yardages, handicaps)
+- Tee information (colors, ratings)`;
+
+    const fullPrompt = `${promptText}
 
 Look for:
 - Course name (usually at top of scorecard)
@@ -153,7 +194,21 @@ If you cannot extract the scorecard data, return:
   "reason": "explanation of what went wrong"
 }
 
-Extract as much data as you can see. If some fields are not visible, omit them but still return what you can find.`,
+Extract as much data as you can see. If some fields are not visible, omit them but still return what you can find.`;
+
+    try {
+      // Use Claude Vision to extract scorecard data
+      const message = await anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              ...imageContent,
+              {
+                type: 'text',
+                text: fullPrompt,
               },
             ],
           },
