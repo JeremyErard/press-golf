@@ -20,16 +20,35 @@ async function request<T>(
     ...options.headers,
   };
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-    credentials: "include",
-  });
+  console.log(`[API] ${options.method || 'GET'} ${endpoint}`);
 
-  const json: ApiResponse<T> = await response.json();
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+      credentials: "include",
+    });
+  } catch (fetchError) {
+    console.error(`[API] Fetch error for ${endpoint}:`, fetchError);
+    throw new ApiError("NETWORK_ERROR", "Network error. Please check your connection.", 0);
+  }
+
+  console.log(`[API] Response status: ${response.status}`);
+
+  let json: ApiResponse<T>;
+  try {
+    json = await response.json();
+  } catch (parseError) {
+    console.error(`[API] JSON parse error for ${endpoint}:`, parseError);
+    throw new ApiError("PARSE_ERROR", "Invalid response from server.", response.status);
+  }
+
+  console.log(`[API] Response success: ${json.success}`);
 
   if (!response.ok || !json.success) {
     const error = json.error || { code: "UNKNOWN", message: "An error occurred" };
+    console.error(`[API] Error response:`, error);
     throw new ApiError(error.code, error.message, response.status);
   }
 

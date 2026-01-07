@@ -68,6 +68,9 @@ export default function AddCoursePage() {
   const [url, setUrl] = useState("");
   const [isFetchingUrl, setIsFetchingUrl] = useState(false);
 
+  // Debug state (temporary for troubleshooting)
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -238,15 +241,23 @@ export default function AddCoursePage() {
 
     setIsSubmitting(true);
     setExtractError(null);
+    setDebugInfo("Starting...");
+
+    console.log("[AddCourse] Starting course creation...");
+
     try {
       const token = await getToken();
+      console.log("[AddCourse] Token obtained:", token ? "yes" : "no");
+      setDebugInfo("Got token: " + (token ? "yes" : "no"));
+
       if (!token) {
         setExtractError("Not authenticated. Please sign in again.");
+        setDebugInfo("No token - auth failed");
         setIsSubmitting(false);
         return;
       }
 
-      const result = await api.createCourse(token, {
+      const courseData = {
         name: name.trim(),
         city: city.trim() || undefined,
         state: state.trim() || undefined,
@@ -265,24 +276,48 @@ export default function AddCoursePage() {
             courseRating: t.courseRating,
             totalYardage: t.totalYardage,
           })),
-      });
+      };
+
+      console.log("[AddCourse] Sending course data:", JSON.stringify(courseData).substring(0, 200) + "...");
+      setDebugInfo("Sending API request...");
+
+      const result = await api.createCourse(token, courseData);
+
+      console.log("[AddCourse] API response:", result);
+      console.log("[AddCourse] Result ID:", result?.id);
+      setDebugInfo("Got result: " + JSON.stringify(result ? { id: result.id, name: result.name } : null));
 
       if (result && result.id) {
+        console.log("[AddCourse] Success! Navigating to /courses");
+        setDebugInfo("Success! Navigating...");
         router.push("/courses");
       } else {
+        console.log("[AddCourse] No result.id, setting error");
+        setDebugInfo("No result.id in response");
         setExtractError("Course was not created. Please try again.");
         setIsSubmitting(false);
       }
     } catch (error: unknown) {
-      console.error("Failed to create course:", error);
+      console.error("[AddCourse] Caught error:", error);
+      console.error("[AddCourse] Error type:", typeof error);
+      console.error("[AddCourse] Error constructor:", error?.constructor?.name);
+
       let errorMessage = "Failed to create course. Please try again.";
       if (error instanceof Error) {
         errorMessage = error.message;
+        console.error("[AddCourse] Error.message:", error.message);
       } else if (typeof error === 'object' && error !== null && 'message' in error) {
         errorMessage = String((error as { message: unknown }).message);
       } else if (typeof error === 'string') {
         errorMessage = error;
       }
+
+      // Also check for network errors
+      if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('Network')) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      }
+
+      setDebugInfo("Error caught: " + errorMessage);
       setExtractError(errorMessage);
       setIsSubmitting(false);
     }
@@ -596,6 +631,12 @@ export default function AddCoursePage() {
         {/* Step: Review */}
         {step === "review" && (
           <div className="space-y-lg">
+            {/* Debug info - temporary */}
+            {debugInfo && (
+              <div className="p-sm rounded bg-blue-500/10 border border-blue-500/20">
+                <p className="text-xs text-blue-400 font-mono">{debugInfo}</p>
+              </div>
+            )}
             {extractError && (
               <div className="flex items-start gap-sm p-md rounded-lg bg-error/10 border border-error/20">
                 <AlertCircle className="h-5 w-5 text-error flex-shrink-0 mt-0.5" />
