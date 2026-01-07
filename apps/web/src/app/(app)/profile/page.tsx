@@ -5,6 +5,7 @@ import { useUser, useClerk, useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import {
   User,
+  Users,
   CreditCard,
   LogOut,
   ChevronRight,
@@ -122,6 +123,22 @@ export default function ProfilePage() {
                   <div className="text-left">
                     <p className="text-body font-medium">Personal Info</p>
                     <p className="text-caption text-muted">Name, phone, GHIN</p>
+                  </div>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted" />
+              </button>
+
+              <button
+                onClick={() => router.push("/buddies")}
+                className="w-full flex items-center justify-between p-lg hover:bg-surface transition-colors"
+              >
+                <div className="flex items-center gap-md">
+                  <div className="w-10 h-10 rounded-full bg-elevated flex items-center justify-center">
+                    <Users className="h-5 w-5 text-muted" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-body font-medium">My Buddies</p>
+                    <p className="text-caption text-muted">Manage your golf buddies</p>
                   </div>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted" />

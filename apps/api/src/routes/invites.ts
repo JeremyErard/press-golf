@@ -7,9 +7,10 @@ const createInviteSchema = z.object({
   roundId: z.string().optional(),
   email: z.string().email().optional(),
   phone: z.string().regex(/^\+?[1-9]\d{6,14}$/, 'Invalid phone number format').optional(),
+  type: z.enum(['ROUND', 'BUDDY']).optional(),
 }).refine(
-  (data) => data.email || data.phone || data.roundId,
-  { message: 'Either email, phone, or roundId must be provided' }
+  (data) => data.email || data.phone || data.roundId || data.type === 'BUDDY',
+  { message: 'Either email, phone, roundId, or type=BUDDY must be provided' }
 );
 
 export default async function inviteRoutes(fastify: FastifyInstance) {

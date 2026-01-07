@@ -79,6 +79,61 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // =====================
+  // GET /api/users/search
+  // Search for users by name or email (for adding buddies)
+  // =====================
+  app.get<{ Querystring: { q?: string } }>('/search', async (request, reply) => {
+    const user = getUser(request);
+    const { q } = request.query;
+
+    if (!q || q.length < 2) {
+      return badRequest(reply, 'Search query must be at least 2 characters');
+    }
+
+    // Get current user's existing buddies to exclude them
+    const existingBuddies = await prisma.buddy.findMany({
+      where: { userId: user.id as string },
+      select: { buddyUserId: true },
+    });
+    const buddyUserIds = existingBuddies.map(b => b.buddyUserId);
+
+    // Search users by name or email (case-insensitive)
+    const users = await prisma.user.findMany({
+      where: {
+        AND: [
+          // Exclude current user
+          { id: { not: user.id as string } },
+          // Exclude existing buddies
+          { id: { notIn: buddyUserIds } },
+          // Search by name or email
+          {
+            OR: [
+              { displayName: { contains: q, mode: 'insensitive' } },
+              { firstName: { contains: q, mode: 'insensitive' } },
+              { lastName: { contains: q, mode: 'insensitive' } },
+              { email: { contains: q, mode: 'insensitive' } },
+            ],
+          },
+        ],
+      },
+      select: {
+        id: true,
+        displayName: true,
+        firstName: true,
+        lastName: true,
+        avatarUrl: true,
+        handicapIndex: true,
+      },
+      take: 10, // Limit results
+    });
+
+    return {
+      success: true,
+      data: users,
+    };
+  });
+
+  // =====================
   // GET /api/users/me/payment-methods
   // Get user's payment methods
   // =====================

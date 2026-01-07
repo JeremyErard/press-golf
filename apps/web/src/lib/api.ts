@@ -78,6 +78,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({}),
     }, token),
+  searchUsers: (token: string, query: string) =>
+    apiRequest<Array<{
+      id: string;
+      displayName?: string;
+      firstName?: string;
+      lastName?: string;
+      avatarUrl?: string;
+      handicapIndex?: number;
+    }>>(`/users/search?q=${encodeURIComponent(query)}`, {}, token),
 
   // Rounds
   getRounds: (token: string) => apiRequest<Round[]>("/rounds", {}, token),
@@ -233,6 +242,11 @@ export const api = {
   removeBuddy: (token: string, buddyId: string) =>
     apiRequest<{ deleted: boolean }>(`/buddies/${buddyId}`, {
       method: "DELETE",
+    }, token),
+  updateBuddyNickname: (token: string, buddyId: string, nickname?: string) =>
+    apiRequest<Buddy>(`/buddies/${buddyId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ nickname }),
     }, token),
   addBuddyToRound: (token: string, roundId: string, buddyUserId: string) =>
     apiRequest<RoundPlayer>(`/rounds/${roundId}/add-buddy/${buddyUserId}`, {
@@ -680,6 +694,7 @@ export interface CreateInviteInput {
   roundId?: string;
   email?: string;
   phone?: string;
+  type?: "ROUND" | "BUDDY"; // BUDDY = buddy-only invite without a round
 }
 
 // Press types
