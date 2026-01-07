@@ -475,39 +475,60 @@ export default function RoundDetailPage() {
       <Header title={round.course.name} showBack />
 
       <div className="p-lg space-y-lg">
-        {/* Status & Info Card */}
-        <div>
-          <Card>
-            <CardContent className="p-lg space-y-lg">
-              <div className="flex items-center justify-between">
-                <Badge variant={statusBadgeVariant[round.status]}>
-                  {statusLabel[round.status]}
-                </Badge>
-                <div className="flex items-center gap-sm text-caption text-muted">
-                  <Calendar className="h-4 w-4" />
-                  <span>{formatDate(round.date)}</span>
-                </div>
-              </div>
+        {/* Course Hero Card */}
+        <Card className="relative overflow-hidden rounded-xl">
+          {/* Hero Image Background */}
+          <div className="absolute inset-0">
+            {round.course.heroImageUrl ? (
+              <img
+                src={round.course.heroImageUrl}
+                alt={round.course.name}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
+            )}
+            {/* Gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/30" />
+          </div>
 
-              <div className="grid grid-cols-2 gap-md">
-                <div>
-                  <p className="text-caption text-muted">Course</p>
-                  <p className="text-body font-medium">{round.course.name}</p>
-                </div>
-                <div>
-                  <p className="text-caption text-muted">Tees</p>
-                  <div className="flex items-center gap-sm">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: getTeeColor(round.tee.name, round.tee.color) }}
-                    />
-                    <p className="text-body font-medium">{round.tee.name}</p>
-                  </div>
-                </div>
+          {/* Content */}
+          <CardContent className="relative z-10 p-lg py-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <Badge variant={statusBadgeVariant[round.status]}>
+                {statusLabel[round.status]}
+              </Badge>
+              <div className="flex items-center gap-sm text-caption text-white/80">
+                <Calendar className="h-4 w-4" />
+                <span>{formatDate(round.date)}</span>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+
+            <div>
+              <p className="text-h3 font-semibold text-white drop-shadow-md">
+                {round.course.name}
+              </p>
+              {(round.course.city || round.course.state) && (
+                <p className="text-caption text-white/70">
+                  {[round.course.city, round.course.state].filter(Boolean).join(", ")}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-sm pt-1">
+              <div
+                className="w-4 h-4 rounded-full border border-white/30"
+                style={{ backgroundColor: getTeeColor(round.tee.name, round.tee.color) }}
+              />
+              <p className="text-body text-white/90">{round.tee.name} Tees</p>
+              {round.tee.totalYardage && (
+                <span className="text-caption text-white/60">
+                  • {round.tee.totalYardage.toLocaleString()} yds
+                </span>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Invite Card */}
         {round.status === "SETUP" && (
