@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { ChevronRight, Play } from "lucide-react";
+import { ChevronRight, Play, UserPlus } from "lucide-react";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
 import { PendingApprovals } from "@/components/handicap/pending-approvals";
 import { GolferIllustration } from "@/components/illustrations";
@@ -537,34 +537,25 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Quick Stats Row */}
+        {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4 pt-2">
-          <Link href="/courses">
-            <Card className="glass-card-hover h-full">
-              <CardContent className="p-4">
-                <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center mb-3">
-                  <svg className="w-5 h-5 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <p className="text-white font-semibold">Courses</p>
-                <p className="text-xs text-gray-500 mt-0.5">Browse & add</p>
-              </CardContent>
-            </Card>
+          <Link href="/rounds/new">
+            <Button
+              variant="secondary"
+              className="w-full h-14 bg-brand/10 hover:bg-brand/20 border border-brand/20 text-brand font-semibold"
+            >
+              <Play className="w-4 h-4 mr-2" />
+              New Round
+            </Button>
           </Link>
-          <Link href="/rounds">
-            <Card className="glass-card-hover h-full">
-              <CardContent className="p-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center mb-3">
-                  <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
-                  </svg>
-                </div>
-                <p className="text-white font-semibold">Rounds</p>
-                <p className="text-xs text-gray-500 mt-0.5">Track games</p>
-              </CardContent>
-            </Card>
+          <Link href="/buddies">
+            <Button
+              variant="secondary"
+              className="w-full h-14 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Invite Buddy
+            </Button>
           </Link>
         </div>
       </div>
