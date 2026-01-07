@@ -27,14 +27,14 @@ async function request<T>(
       headers,
       credentials: "include",
     });
-  } catch (fetchError) {
+  } catch {
     throw new ApiError("NETWORK_ERROR", "Network error. Please check your connection.", 0);
   }
 
   let json: ApiResponse<T>;
   try {
     json = await response.json();
-  } catch (parseError) {
+  } catch {
     throw new ApiError("PARSE_ERROR", "Invalid response from server.", response.status);
   }
 
