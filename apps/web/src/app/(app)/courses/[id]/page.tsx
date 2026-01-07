@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { MapPin, Check, Flag, ChevronDown, Play } from "lucide-react";
+import { MapPin, Check, Flag, ChevronDown, Play, Home } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, Skeleton, Button } from "@/components/ui";
 import { api, type CourseDetail, type Tee } from "@/lib/api";
@@ -45,6 +45,8 @@ export default function CourseDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAlternateTees, setShowAlternateTees] = useState(false);
+  const [isHomeCourse, setIsHomeCourse] = useState(false);
+  const [isTogglingHome, setIsTogglingHome] = useState(false);
 
   // Categorize tees into primary and alternate
   const { primary: primaryTees, alternate: alternateTees } = useMemo(() => {
@@ -57,8 +59,15 @@ export default function CourseDetailPage() {
       try {
         const token = await getToken();
         if (!token) return;
-        const data = await api.getCourse(token, params.id as string);
-        setCourse(data);
+
+        // Fetch course details and home courses in parallel
+        const [courseData, homeCourses] = await Promise.all([
+          api.getCourse(token, params.id as string),
+          api.getHomeCourses(token),
+        ]);
+
+        setCourse(courseData);
+        setIsHomeCourse(homeCourses.some(c => c.id === params.id));
       } catch (err) {
         console.error("Failed to fetch course:", err);
         setError("Failed to load course");
@@ -71,6 +80,28 @@ export default function CourseDetailPage() {
       fetchCourse();
     }
   }, [getToken, params.id]);
+
+  const toggleHomeCourse = useCallback(async () => {
+    if (!course) return;
+
+    setIsTogglingHome(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      if (isHomeCourse) {
+        await api.removeHomeCourse(token, course.id);
+        setIsHomeCourse(false);
+      } else {
+        await api.addHomeCourse(token, course.id);
+        setIsHomeCourse(true);
+      }
+    } catch (err) {
+      console.error("Failed to toggle home course:", err);
+    } finally {
+      setIsTogglingHome(false);
+    }
+  }, [course, getToken, isHomeCourse]);
 
   if (isLoading) {
     return (
@@ -139,6 +170,19 @@ export default function CourseDetailPage() {
                   </div>
                 )}
               </div>
+              {/* Home Course Toggle */}
+              <button
+                onClick={toggleHomeCourse}
+                disabled={isTogglingHome}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  isHomeCourse
+                    ? "bg-amber-500 text-white"
+                    : "bg-white/10 text-muted hover:bg-white/20"
+                } ${isTogglingHome ? "opacity-50" : ""}`}
+              >
+                <Home className="h-4 w-4" />
+                <span>{isHomeCourse ? "Home" : "Set Home"}</span>
+              </button>
             </div>
           </CardContent>
         </Card>

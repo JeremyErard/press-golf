@@ -379,6 +379,87 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
       data: updated,
     };
   });
+
+  // =====================
+  // GET /api/users/me/home-courses
+  // Get user's home courses
+  // =====================
+  app.get('/me/home-courses', async (request, reply) => {
+    const user = getUser(request);
+
+    const homeCourses = await prisma.homeCourse.findMany({
+      where: { userId: user.id as string },
+      include: {
+        course: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return {
+      success: true,
+      data: homeCourses.map(hc => hc.course),
+    };
+  });
+
+  // =====================
+  // POST /api/users/me/home-courses/:courseId
+  // Add a course as home course
+  // =====================
+  app.post<{ Params: { courseId: string } }>('/me/home-courses/:courseId', async (request, reply) => {
+    const user = getUser(request);
+    const { courseId } = request.params;
+
+    // Verify the course exists
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+    });
+
+    if (!course) {
+      return notFound(reply, 'Course not found');
+    }
+
+    // Create home course entry (upsert to handle duplicates gracefully)
+    await prisma.homeCourse.upsert({
+      where: {
+        userId_courseId: {
+          userId: user.id as string,
+          courseId,
+        },
+      },
+      create: {
+        userId: user.id as string,
+        courseId,
+      },
+      update: {}, // No update needed, just ensure it exists
+    });
+
+    return {
+      success: true,
+      data: { courseId, isHomeCourse: true },
+    };
+  });
+
+  // =====================
+  // DELETE /api/users/me/home-courses/:courseId
+  // Remove a course from home courses
+  // =====================
+  app.delete<{ Params: { courseId: string } }>('/me/home-courses/:courseId', async (request, reply) => {
+    const user = getUser(request);
+    const { courseId } = request.params;
+
+    // Delete the home course entry (silently succeed if doesn't exist)
+    await prisma.homeCourse.deleteMany({
+      where: {
+        userId: user.id as string,
+        courseId,
+      },
+    });
+
+    return {
+      success: true,
+      data: { courseId, isHomeCourse: false },
+    };
+  });
 };
 
 // =====================

@@ -55,6 +55,7 @@ model User {
   // Relations
   paymentMethods       PaymentMethod[]
   coursesCreated       Course[]
+  homeCourses          HomeCourse[]
   roundsCreated        Round[]        @relation("RoundsCreated")
   roundPlayers         RoundPlayer[]
   gamesCreated         Game[]         @relation("GamesCreated")
@@ -161,13 +162,29 @@ model Course {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  createdBy User?  @relation(fields: [createdById], references: [id])
-  tees      Tee[]
-  holes     Hole[]
-  rounds    Round[]
+  createdBy   User?        @relation(fields: [createdById], references: [id])
+  tees        Tee[]
+  holes       Hole[]
+  rounds      Round[]
+  homeCourses HomeCourse[]
 
   @@index([name])
   @@index([state])
+}
+
+// User's designated home courses (can have multiple)
+model HomeCourse {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
 }
 
 model Tee {

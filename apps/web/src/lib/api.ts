@@ -152,6 +152,19 @@ export const api = {
     return json.data;
   },
 
+  // Home Courses
+  getHomeCourses: (token: string) =>
+    apiRequest<Course[]>("/users/me/home-courses", {}, token),
+  addHomeCourse: (token: string, courseId: string) =>
+    apiRequest<{ courseId: string; isHomeCourse: boolean }>(`/users/me/home-courses/${courseId}`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }, token),
+  removeHomeCourse: (token: string, courseId: string) =>
+    apiRequest<{ courseId: string; isHomeCourse: boolean }>(`/users/me/home-courses/${courseId}`, {
+      method: "DELETE",
+    }, token),
+
   // Games
   addGame: (token: string, roundId: string, data: AddGameInput) =>
     apiRequest<Game>("/games", {

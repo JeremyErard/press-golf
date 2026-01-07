@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Plus, Search, MapPin, ChevronRight, Check } from "lucide-react";
+import { Plus, Search, MapPin, ChevronRight, Check, Home } from "lucide-react";
 import { Card, CardContent, Skeleton, EmptyState, FAB } from "@/components/ui";
 import { Header } from "@/components/layout/header";
 import { CourseMapIllustration } from "@/components/illustrations";
@@ -15,6 +15,7 @@ export default function CoursesPage() {
   const searchParams = useSearchParams();
   const selectMode = searchParams.get("select"); // "round" when selecting for new round
   const [courses, setCourses] = useState<Course[]>([]);
+  const [homeCourseIds, setHomeCourseIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -23,8 +24,15 @@ export default function CoursesPage() {
       try {
         const token = await getToken();
         if (!token) return;
-        const data = await api.getCourses(token);
-        setCourses(data);
+
+        // Fetch courses and home courses in parallel
+        const [coursesData, homeCoursesData] = await Promise.all([
+          api.getCourses(token),
+          api.getHomeCourses(token),
+        ]);
+
+        setCourses(coursesData);
+        setHomeCourseIds(new Set(homeCoursesData.map(c => c.id)));
       } catch (error) {
         console.error("Failed to fetch courses:", error);
       } finally {
@@ -35,14 +43,28 @@ export default function CoursesPage() {
     fetchCourses();
   }, [getToken]);
 
-  const filteredCourses = searchQuery
-    ? courses.filter(
+  // Filter and sort courses (home courses first)
+  const filteredCourses = useMemo(() => {
+    let filtered = courses;
+
+    if (searchQuery) {
+      filtered = courses.filter(
         (c) =>
           c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           c.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           c.state?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : courses;
+      );
+    }
+
+    // Sort: home courses first, then alphabetically
+    return filtered.sort((a, b) => {
+      const aIsHome = homeCourseIds.has(a.id);
+      const bIsHome = homeCourseIds.has(b.id);
+      if (aIsHome && !bIsHome) return -1;
+      if (!aIsHome && bIsHome) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [courses, homeCourseIds, searchQuery]);
 
   // Determine link destination based on mode
   const getCourseHref = (courseId: string) => {
@@ -117,6 +139,11 @@ export default function CoursesPage() {
                       <div className="flex items-center justify-between">
                         <div className="space-y-xs flex-1 min-w-0">
                           <div className="flex items-center gap-sm">
+                            {homeCourseIds.has(course.id) && (
+                              <div className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                                <Home className="h-3 w-3 text-white" />
+                              </div>
+                            )}
                             <p className="text-body font-semibold text-white truncate drop-shadow-md">
                               {course.name}
                             </p>
