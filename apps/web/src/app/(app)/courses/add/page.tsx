@@ -242,10 +242,11 @@ export default function AddCoursePage() {
       const token = await getToken();
       if (!token) {
         setExtractError("Not authenticated. Please sign in again.");
+        setIsSubmitting(false);
         return;
       }
 
-      await api.createCourse(token, {
+      const result = await api.createCourse(token, {
         name: name.trim(),
         city: city.trim() || undefined,
         state: state.trim() || undefined,
@@ -266,11 +267,23 @@ export default function AddCoursePage() {
           })),
       });
 
-      router.push("/courses");
-    } catch (error) {
+      if (result && result.id) {
+        router.push("/courses");
+      } else {
+        setExtractError("Course was not created. Please try again.");
+        setIsSubmitting(false);
+      }
+    } catch (error: unknown) {
       console.error("Failed to create course:", error);
-      setExtractError(error instanceof Error ? error.message : "Failed to create course. Please try again.");
-    } finally {
+      let errorMessage = "Failed to create course. Please try again.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = String((error as { message: unknown }).message);
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      setExtractError(errorMessage);
       setIsSubmitting(false);
     }
   };
