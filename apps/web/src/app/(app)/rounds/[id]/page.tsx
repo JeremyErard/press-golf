@@ -627,27 +627,24 @@ export default function RoundDetailPage() {
 
           <div className="px-5 pb-28">
             {!selectedGameType ? (
-              /* Game Type Selection - 2 column grid */
-              <div className="grid grid-cols-2 gap-3">
+              /* Game Type Selection - 3 column grid */
+              <div className="grid grid-cols-3 gap-2">
                 {availableGameTypes.map((type) => (
                   <button
                     key={type}
                     onClick={() => setSelectedGameType(type)}
                     className={cn(
-                      "relative p-4 rounded-xl border text-left transition-all",
+                      "relative p-3 rounded-xl border text-center transition-all",
                       "bg-gradient-to-br",
                       gameTypeColors[type],
                       "hover:scale-[1.02] active:scale-[0.98]"
                     )}
                   >
-                    <div className={cn("mb-2", gameTypeIconColors[type])}>
+                    <div className={cn("mb-1.5 flex justify-center", gameTypeIconColors[type])}>
                       {gameTypeIcons[type]}
                     </div>
-                    <p className="font-semibold text-white text-sm">
+                    <p className="font-semibold text-white text-xs">
                       {gameTypeLabels[type]}
-                    </p>
-                    <p className="text-xs text-white/60 mt-1 line-clamp-2">
-                      {gameTypeDescriptions[type]}
                     </p>
                   </button>
                 ))}
