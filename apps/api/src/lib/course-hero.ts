@@ -278,10 +278,22 @@ export async function findAndExtractHeroImage(
         url = 'https://' + url;
       }
       possibleUrls.push(url);
+
       // Also try www variant if not present
       if (!url.includes('www.')) {
         const urlObj = new URL(url);
         possibleUrls.push(`${urlObj.protocol}//www.${urlObj.host}${urlObj.pathname}`);
+      }
+
+      // For .com domains, also try .co.uk (common for UK/Scottish courses)
+      if (url.includes('.com')) {
+        const coUkVariant = url.replace('.com', '.co.uk');
+        possibleUrls.push(coUkVariant);
+        // Also try www variant of .co.uk
+        if (!coUkVariant.includes('www.')) {
+          const urlObj = new URL(coUkVariant);
+          possibleUrls.push(`${urlObj.protocol}//www.${urlObj.host}${urlObj.pathname}`);
+        }
       }
     }
 
