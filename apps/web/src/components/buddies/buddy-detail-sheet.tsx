@@ -36,11 +36,6 @@ function getSourceLabel(sourceType: Buddy["sourceType"]): string {
   }
 }
 
-function getInitials(buddy: Buddy): string {
-  const name = buddy.nickname || buddy.user.displayName || buddy.user.firstName || "?";
-  return name.charAt(0).toUpperCase();
-}
-
 function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString("en-US", {
     month: "short",
@@ -113,19 +108,11 @@ export function BuddyDetailSheet({
       <SheetContent>
         <SheetHeader className="text-center">
           <div className="flex flex-col items-center">
-            <Avatar className="h-20 w-20 mb-3">
-              {buddy.user.avatarUrl ? (
-                <img
-                  src={buddy.user.avatarUrl}
-                  alt={displayName}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="h-full w-full bg-brand/20 flex items-center justify-center text-brand text-2xl font-semibold">
-                  {getInitials(buddy)}
-                </div>
-              )}
-            </Avatar>
+            <Avatar
+              className="h-20 w-20 mb-3"
+              src={buddy.user.avatarUrl}
+              name={buddy.nickname || buddy.user.displayName || buddy.user.firstName || "?"}
+            />
             <SheetTitle>{displayName}</SheetTitle>
             {buddy.user.handicapIndex !== undefined && buddy.user.handicapIndex !== null && (
               <p className="text-muted text-sm mt-1">
@@ -155,7 +142,7 @@ export function BuddyDetailSheet({
             </div>
             <div className="flex items-center justify-between py-2">
               <span className="text-muted">Source</span>
-              <Badge variant="secondary">{getSourceLabel(buddy.sourceType)}</Badge>
+              <Badge variant="default">{getSourceLabel(buddy.sourceType)}</Badge>
             </div>
           </div>
 

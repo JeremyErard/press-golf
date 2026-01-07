@@ -110,11 +110,6 @@ export function AddBuddySheet({
     onClose();
   };
 
-  const getInitials = (user: SearchResult): string => {
-    const name = user.displayName || user.firstName || "?";
-    return name.charAt(0).toUpperCase();
-  };
-
   return (
     <>
       <Sheet open={open && !showShareSheet} onOpenChange={handleClose}>
@@ -204,19 +199,11 @@ export function AddBuddySheet({
                     <Card key={user.id} className="bg-background">
                       <CardContent className="p-3">
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10">
-                            {user.avatarUrl ? (
-                              <img
-                                src={user.avatarUrl}
-                                alt={user.displayName || user.firstName || ""}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="h-full w-full bg-brand/20 flex items-center justify-center text-brand font-semibold">
-                                {getInitials(user)}
-                              </div>
-                            )}
-                          </Avatar>
+                          <Avatar
+                            className="h-10 w-10"
+                            src={user.avatarUrl}
+                            name={user.displayName || user.firstName || "?"}
+                          />
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-foreground truncate">
                               {user.displayName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Unknown"}

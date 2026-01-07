@@ -22,11 +22,6 @@ function getSourceLabel(sourceType: Buddy["sourceType"]): string {
   }
 }
 
-function getInitials(buddy: Buddy): string {
-  const name = buddy.nickname || buddy.user.displayName || buddy.user.firstName || "?";
-  return name.charAt(0).toUpperCase();
-}
-
 export default function BuddiesPage() {
   const { getToken } = useAuth();
   const [buddies, setBuddies] = useState<Buddy[]>([]);
@@ -106,19 +101,11 @@ export default function BuddiesPage() {
               >
                 <CardContent className="p-md">
                   <div className="flex items-center gap-md">
-                    <Avatar className="h-12 w-12">
-                      {buddy.user.avatarUrl ? (
-                        <img
-                          src={buddy.user.avatarUrl}
-                          alt={buddy.displayName}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="h-full w-full bg-brand/20 flex items-center justify-center text-brand font-semibold">
-                          {getInitials(buddy)}
-                        </div>
-                      )}
-                    </Avatar>
+                    <Avatar
+                      className="h-12 w-12"
+                      src={buddy.user.avatarUrl}
+                      name={buddy.nickname || buddy.user.displayName || buddy.user.firstName || "?"}
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-foreground truncate">
                         {buddy.nickname || buddy.user.displayName || buddy.user.firstName || "Unknown"}
@@ -127,7 +114,7 @@ export default function BuddiesPage() {
                         {buddy.user.handicapIndex !== undefined && buddy.user.handicapIndex !== null && (
                           <span>HCP: {buddy.user.handicapIndex}</span>
                         )}
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="default" className="text-xs">
                           {getSourceLabel(buddy.sourceType)}
                         </Badge>
                       </div>
