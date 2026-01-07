@@ -107,6 +107,10 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ status }),
     }, token),
+  deleteRound: (token: string, id: string) =>
+    apiRequest<{ deleted: boolean }>(`/rounds/${id}`, {
+      method: "DELETE",
+    }, token),
 
   // Courses
   getCourses: (token: string) => apiRequest<Course[]>("/courses", {}, token),

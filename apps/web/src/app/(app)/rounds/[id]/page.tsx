@@ -27,6 +27,8 @@ import {
   Dices,
   CircleDot,
   Banknote,
+  Trash2,
+  Pencil,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import {
@@ -141,7 +143,7 @@ const ALL_GAME_TYPES: GameType[] = [
 
 export default function RoundDetailPage() {
   const params = useParams();
-  const _router = useRouter();
+  const router = useRouter();
   const { getToken } = useAuth();
   const roundId = params.id as string;
 
@@ -164,6 +166,16 @@ export default function RoundDetailPage() {
 
   // Start Round state
   const [isStartingRound, setIsStartingRound] = useState(false);
+
+  // Edit Game state
+  const [editingGame, setEditingGame] = useState<{ id: string; type: GameType; betAmount: number } | null>(null);
+  const [editBetAmount, setEditBetAmount] = useState("");
+  const [isUpdatingGame, setIsUpdatingGame] = useState(false);
+  const [isDeletingGame, setIsDeletingGame] = useState(false);
+
+  // Delete Round state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeletingRound, setIsDeletingRound] = useState(false);
 
   useEffect(() => {
     async function fetchRound() {
@@ -349,6 +361,79 @@ export default function RoundDetailPage() {
       await navigator.clipboard.writeText(shareText + inviteUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleEditGame = (game: { id: string; type: GameType; betAmount: number }) => {
+    setEditingGame(game);
+    setEditBetAmount(game.betAmount.toString());
+  };
+
+  const handleUpdateGame = async () => {
+    if (!editingGame || !round) return;
+
+    setIsUpdatingGame(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      await api.updateGame(token, editingGame.id, parseFloat(editBetAmount) || 5);
+
+      // Update local state
+      setRound({
+        ...round,
+        games: round.games.map((g) =>
+          g.id === editingGame.id ? { ...g, betAmount: parseFloat(editBetAmount) || 5 } : g
+        ),
+      });
+
+      setEditingGame(null);
+    } catch (error) {
+      console.error("Failed to update game:", error);
+    } finally {
+      setIsUpdatingGame(false);
+    }
+  };
+
+  const handleDeleteGame = async () => {
+    if (!editingGame || !round) return;
+
+    setIsDeletingGame(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      await api.deleteGame(token, editingGame.id);
+
+      // Update local state
+      setRound({
+        ...round,
+        games: round.games.filter((g) => g.id !== editingGame.id),
+      });
+
+      setEditingGame(null);
+    } catch (error) {
+      console.error("Failed to delete game:", error);
+    } finally {
+      setIsDeletingGame(false);
+    }
+  };
+
+  const handleDeleteRound = async () => {
+    if (!round) return;
+
+    setIsDeletingRound(true);
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      await api.deleteRound(token, roundId);
+      router.push("/rounds");
+    } catch (error) {
+      console.error("Failed to delete round:", error);
+    } finally {
+      setIsDeletingRound(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -541,22 +626,41 @@ export default function RoundDetailPage() {
             <Card>
               <CardContent className="p-0 divide-y divide-border">
                 {round.games.map((game) => (
-                  <div
+                  <button
                     key={game.id}
-                    className="flex items-center justify-between p-lg"
+                    onClick={() => round.status !== "COMPLETED" && handleEditGame({
+                      id: game.id,
+                      type: game.type,
+                      betAmount: Number(game.betAmount),
+                    })}
+                    disabled={round.status === "COMPLETED"}
+                    className={cn(
+                      "w-full flex items-center justify-between p-lg text-left",
+                      round.status !== "COMPLETED" && "hover:bg-surface transition-colors"
+                    )}
                   >
-                    <div>
-                      <p className="text-body font-medium">
-                        {gameTypeLabels[game.type]}
-                      </p>
-                      {game.isAutoPress && (
-                        <p className="text-caption text-muted">Auto-press enabled</p>
+                    <div className="flex items-center gap-3">
+                      <div className={cn("p-2 rounded-lg bg-black/20", gameTypeIconColors[game.type])}>
+                        {gameTypeIcons[game.type]}
+                      </div>
+                      <div>
+                        <p className="text-body font-medium">
+                          {gameTypeLabels[game.type]}
+                        </p>
+                        {game.isAutoPress && (
+                          <p className="text-caption text-muted">Auto-press enabled</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="accent">
+                        ${Number(game.betAmount)}
+                      </Badge>
+                      {round.status !== "COMPLETED" && (
+                        <Pencil className="h-4 w-4 text-muted" />
                       )}
                     </div>
-                    <Badge variant="accent">
-                      ${Number(game.betAmount)}
-                    </Badge>
-                  </div>
+                  </button>
                 ))}
               </CardContent>
             </Card>
@@ -578,19 +682,29 @@ export default function RoundDetailPage() {
         {/* Actions */}
         <div className="space-y-md pt-md">
           {round.status === "SETUP" && (
-            <Button
-              className="w-full h-14"
-              size="lg"
-              onClick={handleStartRound}
-              disabled={isStartingRound || round.games.length === 0}
-            >
-              {isStartingRound ? (
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              ) : (
-                <Play className="h-5 w-5 mr-2" />
-              )}
-              {round.games.length === 0 ? "Add a Game to Start" : "Start Round"}
-            </Button>
+            <>
+              <Button
+                className="w-full h-14"
+                size="lg"
+                onClick={handleStartRound}
+                disabled={isStartingRound || round.games.length === 0}
+              >
+                {isStartingRound ? (
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                ) : (
+                  <Play className="h-5 w-5 mr-2" />
+                )}
+                {round.games.length === 0 ? "Add a Game to Start" : "Start Round"}
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full text-error hover:text-error hover:bg-error/10"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Round
+              </Button>
+            </>
           )}
 
           {round.status === "ACTIVE" && (
@@ -863,6 +977,162 @@ export default function RoundDetailPage() {
             <p className="text-caption text-muted text-center">
               When someone accepts your invite, they are automatically added as a buddy for quick invites next time
             </p>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Edit Game Sheet */}
+      <Sheet open={!!editingGame} onOpenChange={(open) => !open && setEditingGame(null)}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Edit Game</SheetTitle>
+            <SheetDescription>
+              {editingGame && `Update ${gameTypeLabels[editingGame.type]} settings`}
+            </SheetDescription>
+          </SheetHeader>
+
+          {editingGame && (
+            <div className="px-5 pb-8 space-y-6">
+              {/* Game Info Card */}
+              <div
+                className={cn(
+                  "p-4 rounded-xl border bg-gradient-to-br",
+                  gameTypeColors[editingGame.type]
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={cn("p-2 rounded-lg bg-black/20", gameTypeIconColors[editingGame.type])}>
+                    {gameTypeIcons[editingGame.type]}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white">
+                      {gameTypeLabels[editingGame.type]}
+                    </p>
+                    <p className="text-sm text-white/70">
+                      {gameTypeDescriptions[editingGame.type]}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bet Amount */}
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-white">
+                  Bet Amount
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[5, 10, 20, 50].map((amount) => (
+                    <button
+                      key={amount}
+                      onClick={() => setEditBetAmount(amount.toString())}
+                      className={cn(
+                        "py-3 rounded-xl font-semibold transition-all",
+                        editBetAmount === amount.toString()
+                          ? "bg-brand text-white"
+                          : "bg-surface border border-border text-white hover:bg-elevated"
+                      )}
+                    >
+                      ${amount}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg text-muted">$</span>
+                  <Input
+                    type="number"
+                    value={editBetAmount}
+                    onChange={(e) => setEditBetAmount(e.target.value)}
+                    className="text-lg font-semibold"
+                    placeholder="Custom amount"
+                    min="1"
+                    step="1"
+                  />
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-3 pt-2">
+                <Button
+                  className="w-full"
+                  onClick={handleUpdateGame}
+                  disabled={isUpdatingGame || parseFloat(editBetAmount) === editingGame.betAmount}
+                >
+                  {isUpdatingGame ? (
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  ) : (
+                    <Check className="h-5 w-5 mr-2" />
+                  )}
+                  Save Changes
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full text-error hover:text-error hover:bg-error/10"
+                  onClick={handleDeleteGame}
+                  disabled={isDeletingGame}
+                >
+                  {isDeletingGame ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Remove Game
+                </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Delete Round Confirmation Sheet */}
+      <Sheet open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Delete Round?</SheetTitle>
+            <SheetDescription>
+              This will permanently delete this round and all associated games. This action cannot be undone.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="px-5 pb-8 space-y-4 pt-6">
+            {/* Warning Card */}
+            <div className="p-4 rounded-xl border border-error/30 bg-error/10">
+              <div className="flex items-start gap-3">
+                <Trash2 className="h-5 w-5 text-error shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-white">Are you sure?</p>
+                  <p className="text-sm text-white/70 mt-1">
+                    You&apos;re about to delete the round at {round?.course.name}.
+                    {round?.games && round.games.length > 0 && (
+                      <> This includes {round.games.length} game{round.games.length !== 1 ? "s" : ""}.</>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1 bg-error hover:bg-error/90"
+                onClick={handleDeleteRound}
+                disabled={isDeletingRound}
+              >
+                {isDeletingRound ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Delete
+              </Button>
+            </div>
           </div>
         </SheetContent>
       </Sheet>
