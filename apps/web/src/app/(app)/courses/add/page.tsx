@@ -59,6 +59,7 @@ export default function AddCoursePage() {
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
+  const [country, setCountry] = useState("");
   const [website, setWebsite] = useState("");
   const [holes, setHoles] = useState<HoleData[]>(defaultHoles);
   const [tees, setTees] = useState<TeeData[]>(defaultTees);
@@ -111,6 +112,7 @@ export default function AddCoursePage() {
       if (data.name) setName(data.name);
       if (data.city) setCity(data.city);
       if (data.state) setState(data.state);
+      if (data.country) setCountry(data.country);
       if (data.website) setWebsite(data.website);
       if (data.confidence) setConfidence(data.confidence);
 
@@ -200,6 +202,8 @@ export default function AddCoursePage() {
     setName("");
     setCity("");
     setState("");
+    setCountry("");
+    setWebsite("");
     setHoles(defaultHoles);
     setTees(defaultTees);
     setConfidence(null);
@@ -253,6 +257,7 @@ export default function AddCoursePage() {
         name: name.trim(),
         city: city.trim() || undefined,
         state: state.trim() || undefined,
+        country: country.trim() || undefined,
         website: website.trim() || undefined,
         holes: holes.map((h) => ({
           holeNumber: h.holeNumber,
@@ -636,7 +641,7 @@ export default function AddCoursePage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-md">
+                <div className="grid grid-cols-3 gap-md">
                   <div>
                     <p className="text-caption text-muted mb-xs">City</p>
                     <Input
@@ -646,11 +651,19 @@ export default function AddCoursePage() {
                     />
                   </div>
                   <div>
-                    <p className="text-caption text-muted mb-xs">State</p>
+                    <p className="text-caption text-muted mb-xs">State/Region</p>
                     <Input
                       value={state}
                       onChange={(e) => setState(e.target.value)}
                       placeholder="State"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-caption text-muted mb-xs">Country</p>
+                    <Input
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      placeholder="USA"
                     />
                   </div>
                 </div>

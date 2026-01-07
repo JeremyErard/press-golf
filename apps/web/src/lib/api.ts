@@ -673,6 +673,7 @@ export interface CreateCourseInput {
   name: string;
   city?: string;
   state?: string;
+  country?: string;
   website?: string;
   holes: {
     holeNumber: number;

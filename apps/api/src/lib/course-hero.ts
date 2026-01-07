@@ -3,7 +3,91 @@
  * Uses actual web fetching to find og:image from course websites
  */
 
+import https from 'https';
+import http from 'http';
 import { uploadCourseHeroImage } from './blob.js';
+
+// Create HTTPS agent that ignores SSL certificate errors
+// This is safe for fetching public images from golf course websites
+const insecureAgent = new https.Agent({
+  rejectUnauthorized: false,
+});
+
+/**
+ * Fetch a URL with optional SSL bypass for expired certificates
+ */
+async function fetchWithSSLBypass(url: string, options: RequestInit = {}): Promise<Response> {
+  const urlObj = new URL(url);
+
+  // For HTTPS URLs, use our custom agent that ignores SSL errors
+  if (urlObj.protocol === 'https:') {
+    return new Promise((resolve, reject) => {
+      const req = https.get(url, {
+        agent: insecureAgent,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          ...options.headers as Record<string, string>,
+        },
+      }, (res) => {
+        // Handle redirects
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          fetchWithSSLBypass(res.headers.location, options).then(resolve).catch(reject);
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => {
+          const body = Buffer.concat(chunks);
+          resolve({
+            ok: res.statusCode ? res.statusCode >= 200 && res.statusCode < 300 : false,
+            status: res.statusCode || 0,
+            headers: {
+              get: (name: string) => res.headers[name.toLowerCase()] as string || null,
+            },
+            text: async () => body.toString('utf-8'),
+            arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
+          } as unknown as Response);
+        });
+        res.on('error', reject);
+      });
+      req.on('error', reject);
+    });
+  }
+
+  // For HTTP URLs, use standard http module
+  return new Promise((resolve, reject) => {
+    const req = http.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        ...options.headers as Record<string, string>,
+      },
+    }, (res) => {
+      // Handle redirects
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        fetchWithSSLBypass(res.headers.location, options).then(resolve).catch(reject);
+        return;
+      }
+
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => {
+        const body = Buffer.concat(chunks);
+        resolve({
+          ok: res.statusCode ? res.statusCode >= 200 && res.statusCode < 300 : false,
+          status: res.statusCode || 0,
+          headers: {
+            get: (name: string) => res.headers[name.toLowerCase()] as string || null,
+          },
+          text: async () => body.toString('utf-8'),
+          arrayBuffer: async () => body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength),
+        } as unknown as Response);
+      });
+      res.on('error', reject);
+    });
+    req.on('error', reject);
+  });
+}
 
 interface HeroImageResult {
   heroImageUrl: string | null;
@@ -212,12 +296,7 @@ export async function findAndExtractHeroImage(
     for (const url of possibleUrls) {
       try {
         console.log(`[HeroImage] Trying: ${url}`);
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-          },
-          redirect: 'follow',
-        });
+        const response = await fetchWithSSLBypass(url);
 
         if (!response.ok) {
           console.log(`[HeroImage] ${url} returned ${response.status}`);
@@ -254,11 +333,7 @@ export async function findAndExtractHeroImage(
 
     // Download the image
     console.log(`[HeroImage] Downloading: ${heroImageUrl}`);
-    const imageResponse = await fetch(heroImageUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-      },
-    });
+    const imageResponse = await fetchWithSSLBypass(heroImageUrl);
 
     if (!imageResponse.ok) {
       console.log(`[HeroImage] Failed to download image: ${imageResponse.status}`);

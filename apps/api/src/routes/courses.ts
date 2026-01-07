@@ -261,6 +261,7 @@ Extract as much data as you can see. If some fields are not visible, omit them b
         name?: string;
         city?: string;
         state?: string;
+        country?: string;
         website?: string;
         holes?: { holeNumber: number; par: number; handicapRank: number; yardages?: { teeName: string; yardage: number }[] }[];
         tees?: { name: string; color?: string; slopeRating?: number; courseRating?: number; totalYardage?: number }[];
@@ -269,6 +270,7 @@ Extract as much data as you can see. If some fields are not visible, omit them b
         name: extracted.courseName,
         city: extracted.city,
         state: extracted.state,
+        country: extracted.country,
         website: extracted.website,
         confidence: extracted.confidence,
       };
