@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-// Using img tag instead of Next.js Image to avoid optimization issues with external URLs
-// import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { Plus, Search, MapPin, ChevronRight, Check } from "lucide-react";
 import { Button, Card, CardContent, Skeleton } from "@/components/ui";
 import { Header } from "@/components/layout/header";
@@ -13,6 +12,8 @@ import { api, type Course } from "@/lib/api";
 
 export default function CoursesPage() {
   const { getToken } = useAuth();
+  const searchParams = useSearchParams();
+  const selectMode = searchParams.get("select"); // "round" when selecting for new round
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,9 +44,20 @@ export default function CoursesPage() {
       )
     : courses;
 
+  // Determine link destination based on mode
+  const getCourseHref = (courseId: string) => {
+    if (selectMode === "round") {
+      return `/rounds/new?courseId=${courseId}`;
+    }
+    return `/courses/${courseId}`;
+  };
+
   return (
     <div>
-      <Header title="Courses" />
+      <Header
+        title={selectMode === "round" ? "Select Course" : "Courses"}
+        showBack={selectMode === "round"}
+      />
 
       <div className="p-lg space-y-lg">
         {/* Search */}
@@ -80,7 +92,7 @@ export default function CoursesPage() {
                 
                 
               >
-                <Link href={`/courses/${course.id}`}>
+                <Link href={getCourseHref(course.id)}>
                   <Card
                     className="relative overflow-hidden rounded-xl animate-fade-in-up group"
                     style={{ animationDelay: `${_index * 30}ms` }}
@@ -166,15 +178,17 @@ export default function CoursesPage() {
         )}
       </div>
 
-      {/* FAB */}
-      <Link
-        href="/courses/add"
-        className="fixed bottom-24 right-lg z-40"
-      >
-        <Button size="icon" className="h-14 w-14 rounded-full shadow-lg">
-          <Plus className="h-6 w-6" />
-        </Button>
-      </Link>
+      {/* FAB - hide in select mode */}
+      {!selectMode && (
+        <Link
+          href="/courses/add"
+          className="fixed bottom-24 right-lg z-40"
+        >
+          <Button size="icon" className="h-14 w-14 rounded-full shadow-lg">
+            <Plus className="h-6 w-6" />
+          </Button>
+        </Link>
+      )}
     </div>
   );
 }
