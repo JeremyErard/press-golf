@@ -530,7 +530,7 @@ Extract as much data as you can see. If some fields are not visible, omit them b
     }
 
     try {
-    // Create course with tees and holes in a transaction
+    // Create course with tees and holes in a transaction with extended timeout
     const course = await prisma.$transaction(async (tx) => {
       // Create the course
       const newCourse = await tx.course.create({
@@ -544,51 +544,81 @@ Extract as much data as you can see. If some fields are not visible, omit them b
         },
       });
 
-      // Create tees
-      const teeMap = new Map<string, string>(); // name -> id
-      for (const tee of tees) {
-        const createdTee = await tx.tee.create({
-          data: {
+      // Create all tees at once using createMany, then fetch them back
+      if (tees.length > 0) {
+        await tx.tee.createMany({
+          data: tees.map(tee => ({
             courseId: newCourse.id,
             name: tee.name,
             color: tee.color || null,
             slopeRating: tee.slopeRating || null,
             courseRating: tee.courseRating || null,
             totalYardage: tee.totalYardage || null,
-          },
+          })),
         });
-        teeMap.set(tee.name, createdTee.id);
       }
 
-      // Create holes and yardages
-      for (const hole of holes) {
-        const createdHole = await tx.hole.create({
-          data: {
+      // Fetch created tees to get their IDs
+      const createdTees = await tx.tee.findMany({
+        where: { courseId: newCourse.id },
+      });
+      const teeMap = new Map<string, string>();
+      for (const tee of createdTees) {
+        teeMap.set(tee.name, tee.id);
+      }
+
+      // Create all holes at once using createMany
+      if (holes.length > 0) {
+        await tx.hole.createMany({
+          data: holes.map(hole => ({
             courseId: newCourse.id,
             holeNumber: hole.holeNumber,
             par: hole.par,
             handicapRank: hole.handicapRank,
-          },
+          })),
         });
+      }
 
-        // Create yardages for each tee
+      // Fetch created holes to get their IDs
+      const createdHoles = await tx.hole.findMany({
+        where: { courseId: newCourse.id },
+        orderBy: { holeNumber: 'asc' },
+      });
+      const holeMap = new Map<number, string>();
+      for (const hole of createdHoles) {
+        holeMap.set(hole.holeNumber, hole.id);
+      }
+
+      // Collect all yardages to create at once
+      const yardageData: { holeId: string; teeId: string; yardage: number }[] = [];
+      for (const hole of holes) {
         if (hole.yardages) {
-          for (const yardage of hole.yardages) {
-            const teeId = teeMap.get(yardage.teeName);
-            if (teeId) {
-              await tx.holeYardage.create({
-                data: {
-                  holeId: createdHole.id,
+          const holeId = holeMap.get(hole.holeNumber);
+          if (holeId) {
+            for (const yardage of hole.yardages) {
+              const teeId = teeMap.get(yardage.teeName);
+              if (teeId) {
+                yardageData.push({
+                  holeId,
                   teeId,
                   yardage: yardage.yardage,
-                },
-              });
+                });
+              }
             }
           }
         }
       }
 
+      // Create all yardages at once
+      if (yardageData.length > 0) {
+        await tx.holeYardage.createMany({
+          data: yardageData,
+        });
+      }
+
       return newCourse;
+    }, {
+      timeout: 30000, // 30 second timeout for complex courses
     });
 
     // Geocode the course location asynchronously (non-blocking)
