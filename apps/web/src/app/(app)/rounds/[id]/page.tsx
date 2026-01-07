@@ -472,7 +472,7 @@ export default function RoundDetailPage() {
 
   return (
     <div>
-      <Header title={round.course.name} showBack />
+      <Header title="Round" showBack />
 
       <div className="p-lg space-y-lg">
         {/* Course Hero Card */}
