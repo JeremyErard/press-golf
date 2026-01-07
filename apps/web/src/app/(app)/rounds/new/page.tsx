@@ -160,25 +160,46 @@ export default function NewRoundPage() {
             {isLoading ? (
               <>
                 {[1, 2, 3, 4].map((i) => (
-                  <Skeleton key={i} className="h-20 w-full" />
+                  <Skeleton key={i} className="h-24 w-full rounded-xl" />
                 ))}
               </>
             ) : filteredCourses.length > 0 ? (
-              filteredCourses.map((course) => (
+              filteredCourses.map((course, index) => (
                 <button
                   key={course.id}
                   onClick={() => handleSelectCourse(course)}
                   className="w-full text-left"
                 >
-                  <Card className="card-hover">
-                    <CardContent className="p-lg">
+                  <Card
+                    className="relative overflow-hidden rounded-xl animate-fade-in-up group"
+                    style={{ animationDelay: `${index * 30}ms` }}
+                  >
+                    {/* Hero Image Background */}
+                    <div className="absolute inset-0">
+                      {course.heroImageUrl ? (
+                        <img
+                          src={course.heroImageUrl}
+                          alt={course.name}
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
+                      )}
+                      {/* Glass overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
+                    </div>
+
+                    {/* Content */}
+                    <CardContent className="relative z-10 p-lg py-6">
                       <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-body font-medium">{course.name}</p>
+                        <div className="space-y-xs flex-1 min-w-0">
+                          <p className="text-body font-semibold text-white truncate drop-shadow-md">
+                            {course.name}
+                          </p>
                           {(course.city || course.state) && (
-                            <div className="flex items-center gap-xs text-caption text-muted mt-xs">
+                            <div className="flex items-center gap-xs text-caption text-white/80">
                               <MapPin className="h-3.5 w-3.5" />
-                              <span>
+                              <span className="drop-shadow-sm">
                                 {[course.city, course.state]
                                   .filter(Boolean)
                                   .join(", ")}
@@ -186,7 +207,7 @@ export default function NewRoundPage() {
                             </div>
                           )}
                         </div>
-                        <ChevronRight className="h-5 w-5 text-muted" />
+                        <ChevronRight className="h-5 w-5 text-white/70 flex-shrink-0 transition-transform group-hover:translate-x-1" />
                       </div>
                     </CardContent>
                   </Card>
