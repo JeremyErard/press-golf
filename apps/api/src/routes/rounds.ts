@@ -39,6 +39,24 @@ interface ConfirmScorecardBody {
   scores: { holeNumber: number; strokes: number }[];
 }
 
+// Helper to check if user has active subscription
+async function requireActiveSubscription(userId: string): Promise<{ valid: boolean; message?: string }> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { subscriptionStatus: true, isFoundingMember: true },
+  });
+
+  if (!user) {
+    return { valid: false, message: 'User not found' };
+  }
+
+  if (user.isFoundingMember || user.subscriptionStatus === 'ACTIVE') {
+    return { valid: true };
+  }
+
+  return { valid: false, message: 'Active subscription required to create or join rounds' };
+}
+
 export const roundRoutes: FastifyPluginAsync = async (app) => {
   // Register multipart for file uploads
   await app.register(multipart, {
@@ -95,6 +113,12 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
   }, async (request, reply) => {
     const user = getUser(request);
     const { courseId, teeId, date } = request.body;
+
+    // Check subscription status
+    const subscription = await requireActiveSubscription(user.id as string);
+    if (!subscription.valid) {
+      return forbidden(reply, subscription.message || 'Subscription required');
+    }
 
     if (!courseId) {
       return badRequest(reply, 'Course is required');
@@ -211,6 +235,12 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
   }, async (request, reply) => {
     const user = getUser(request);
     const { inviteCode } = request.body;
+
+    // Check subscription status
+    const subscription = await requireActiveSubscription(user.id as string);
+    if (!subscription.valid) {
+      return forbidden(reply, subscription.message || 'Subscription required');
+    }
 
     if (!inviteCode) {
       return badRequest(reply, 'Invite code is required');

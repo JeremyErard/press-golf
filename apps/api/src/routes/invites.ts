@@ -13,6 +13,15 @@ const createInviteSchema = z.object({
   { message: 'Either email, phone, roundId, or type=BUDDY must be provided' }
 );
 
+// Helper to check if user has active subscription
+async function hasActiveSubscription(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { subscriptionStatus: true, isFoundingMember: true },
+  });
+  return user?.isFoundingMember === true || user?.subscriptionStatus === 'ACTIVE';
+}
+
 export default async function inviteRoutes(fastify: FastifyInstance) {
   // Create Invite
   fastify.post(
@@ -263,6 +272,15 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
 
       // If round specified, add user to round
       if (invite.roundId && invite.round) {
+        // Check subscription status for joining rounds
+        const hasSubscription = await hasActiveSubscription(userId);
+        if (!hasSubscription) {
+          return reply.code(403).send({
+            success: false,
+            error: { code: "SUBSCRIPTION_REQUIRED", message: "Active subscription required to join rounds" },
+          });
+        }
+
         // Check if user is already in round
         const existingPlayer = await prisma.roundPlayer.findFirst({
           where: {
