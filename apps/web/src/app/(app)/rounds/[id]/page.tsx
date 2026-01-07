@@ -616,7 +616,7 @@ export default function RoundDetailPage() {
       {/* Add Game Sheet */}
       <Sheet open={showAddGame} onOpenChange={setShowAddGame}>
         <SheetContent className="overflow-y-auto">
-          <SheetHeader>
+          <SheetHeader className="pb-2">
             <SheetTitle>Add a Game</SheetTitle>
             <SheetDescription>
               {selectedGameType
@@ -625,7 +625,7 @@ export default function RoundDetailPage() {
             </SheetDescription>
           </SheetHeader>
 
-          <div className="px-5 pb-8">
+          <div className="px-5 pb-28">
             {!selectedGameType ? (
               /* Game Type Selection - 2 column grid */
               <div className="grid grid-cols-2 gap-3">
