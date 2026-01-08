@@ -3,10 +3,9 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { ChevronRight, Play, UserPlus } from "lucide-react";
+import { ChevronRight, Play, UserPlus, Flag } from "lucide-react";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton, SectionHeader } from "@/components/ui";
 import { PendingApprovals } from "@/components/handicap/pending-approvals";
-import { GolferIllustration } from "@/components/illustrations";
 import { api, type Round, type RoundDetail, type CalculateResultsResponse, type User as ApiUser } from "@/lib/api";
 import { formatDate, formatMoney } from "@/lib/utils";
 
@@ -481,11 +480,11 @@ export default function DashboardPage() {
             </div>
           ) : !hasAnyRounds ? (
             <Card className="glass-card overflow-hidden">
-              <CardContent className="py-8 px-5">
-                {/* Welcome message with floating illustration */}
-                <div className="text-center mb-6">
-                  <div className="w-24 h-24 mx-auto mb-4 animate-float">
-                    <GolferIllustration className="w-full h-full" />
+              <CardContent className="py-6 px-5">
+                {/* Welcome message */}
+                <div className="text-center mb-5">
+                  <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-brand/20 flex items-center justify-center">
+                    <Flag className="w-6 h-6 text-brand" />
                   </div>
                   <h3 className="text-white font-semibold text-lg">Welcome to Press!</h3>
                   <p className="text-muted text-sm mt-1">Get started with these quick steps</p>

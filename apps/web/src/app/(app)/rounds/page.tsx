@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { Plus, ChevronRight } from "lucide-react";
+import { Plus, ChevronRight, Flag } from "lucide-react";
 import { Card, CardContent, Badge, Tabs, TabsList, TabsTrigger, Skeleton, EmptyState, FAB } from "@/components/ui";
 import { Header } from "@/components/layout/header";
-import { GolferIllustration } from "@/components/illustrations";
 import { api, type Round } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 
@@ -128,7 +127,7 @@ export default function RoundsPage() {
           </div>
         ) : (
           <EmptyState
-            illustration={<GolferIllustration className="w-full h-full" />}
+            icon={<Flag className="h-8 w-8" />}
             title="No rounds found"
             description={
               filter === "all"
