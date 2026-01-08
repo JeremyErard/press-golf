@@ -37,18 +37,18 @@ export default function AppLayout({
   return (
     <OnboardingCheck>
       <div className={`min-h-screen relative ${isOnboarding ? "" : "pb-20"}`}>
-        {/* Subtle golf course background */}
+        {/* Subtle fairway texture background */}
         <div className="fixed inset-0 -z-10">
           <Image
-            src="/images/golf-hero.jpg"
+            src="/images/fairway-texture.jpg"
             alt=""
             fill
-            className="object-cover opacity-[0.07]"
+            className="object-cover opacity-[0.15]"
             priority
-            quality={60}
+            quality={70}
           />
-          {/* Dark gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-background" />
+          {/* Soft gradient overlay - lets texture show through */}
+          <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/70 to-background/80" />
         </div>
         <main className="max-w-lg mx-auto">
           {children}
