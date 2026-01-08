@@ -3,10 +3,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { ChevronRight, ChevronDown, Check } from "lucide-react";
+import { ChevronRight, ChevronDown, Check, Crown } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Skeleton, Input } from "@/components/ui";
-import { api, type Tee, type CourseDetail } from "@/lib/api";
+import { api, type Tee, type CourseDetail, type BillingStatus } from "@/lib/api";
 import { getTeeColor } from "@/lib/utils";
 
 type Step = "tee" | "confirm";
@@ -54,6 +54,27 @@ export default function NewRoundPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [showAlternateTees, setShowAlternateTees] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
+  const [checkingSubscription, setCheckingSubscription] = useState(true);
+
+  // Check subscription status
+  useEffect(() => {
+    async function checkSubscription() {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const status = await api.getBillingStatus(token);
+        setBillingStatus(status);
+      } catch (error) {
+        console.error("Failed to check subscription:", error);
+      } finally {
+        setCheckingSubscription(false);
+      }
+    }
+    checkSubscription();
+  }, [getToken]);
+
+  const isSubscribed = billingStatus?.status === "ACTIVE" || billingStatus?.isFoundingMember;
 
   // Redirect to course selection if no courseId
   useEffect(() => {
@@ -120,6 +141,57 @@ export default function NewRoundPage() {
   // Don't render until we have courseId (will redirect)
   if (!courseId) {
     return null;
+  }
+
+  // Show loading while checking subscription
+  if (checkingSubscription) {
+    return (
+      <div>
+        <Header title="Start Round" showBack />
+        <div className="p-lg">
+          <div className="space-y-md">
+            <Skeleton className="h-20 w-full" />
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-20 w-full" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Subscription gate
+  if (!isSubscribed) {
+    return (
+      <div>
+        <Header title="Start Round" showBack />
+        <div className="p-lg">
+          <Card className="relative overflow-hidden rounded-xl">
+            <div className="absolute inset-0">
+              <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-black/20" />
+            </div>
+            <CardContent className="relative z-10 p-xl text-center">
+              <div className="w-16 h-16 mx-auto mb-lg rounded-full bg-amber-500/20 flex items-center justify-center">
+                <Crown className="w-8 h-8 text-amber-400" />
+              </div>
+              <h2 className="text-xl font-semibold text-white mb-sm">Subscribe to Start Rounds</h2>
+              <p className="text-white/70 mb-lg">
+                Get unlimited rounds, score tracking, and betting games for just $1.99/month. Cancel anytime.
+              </p>
+              <Button
+                className="w-full h-12"
+                size="lg"
+                onClick={() => router.push("/profile/subscription")}
+              >
+                <Crown className="h-5 w-5 mr-2" />
+                Subscribe Now
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   return (

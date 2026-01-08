@@ -600,16 +600,6 @@ export default function OnboardingPage() {
                   </>
                 )}
               </button>
-              <button
-                onClick={() => {
-                  setFirstName(clerkUser?.firstName || "");
-                  setLastName(clerkUser?.lastName || "");
-                  setCurrentStep(2);
-                }}
-                className="text-sm text-muted hover:text-foreground py-2"
-              >
-                Skip for now
-              </button>
             </div>
           ) : (
             <button
