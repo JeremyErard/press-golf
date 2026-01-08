@@ -364,9 +364,16 @@ Extract as much data as you can see. If some fields are not visible, omit them b
       prisma.course.count({ where }),
     ]);
 
+    // Convert Decimal fields to numbers for JSON serialization
+    const coursesWithNumbers = courses.map(course => ({
+      ...course,
+      latitude: course.latitude ? Number(course.latitude) : null,
+      longitude: course.longitude ? Number(course.longitude) : null,
+    }));
+
     return {
       success: true,
-      data: courses,
+      data: coursesWithNumbers,
       meta: {
         total,
         limit,
