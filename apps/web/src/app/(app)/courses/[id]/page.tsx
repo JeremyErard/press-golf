@@ -3,12 +3,11 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { MapPin, Check, Flag, ChevronDown, Play, Home } from "lucide-react";
+import { MapPin, Check, ChevronDown, Play, Home } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, Skeleton, Button, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui";
 import { api, type CourseDetail, type Tee } from "@/lib/api";
 import { getTeeColor } from "@/lib/utils";
-import { CourseImage } from "@/components/course-image";
 
 // Helper to categorize tees as primary vs alternate
 function categorizeTees(tees: Tee[]): { primary: Tee[]; alternate: Tee[] } {
@@ -205,23 +204,35 @@ export default function CourseDetailPage() {
     <div>
       <Header title={course.name} showBack />
 
-      {/* Compact Hero Image */}
-      <div className="relative h-28 -mt-px">
-        <CourseImage courseName={course.name} className="absolute inset-0" />
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent" />
-      </div>
+      <div className="p-lg space-y-md">
+        {/* Course Info Card with Hero Backdrop */}
+        <Card className="relative overflow-hidden rounded-xl animate-fade-in-up">
+          {/* Hero Image Background */}
+          <div className="absolute inset-0">
+            {course.heroImageUrl ? (
+              <img
+                src={course.heroImageUrl}
+                alt={course.name}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
+            )}
+            {/* Glass overlay */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
+          </div>
 
-      <div className="p-lg space-y-md -mt-6 relative z-10">
-        {/* Course Info Card */}
-        <Card className="glass-card animate-fade-in-up">
-          <CardContent className="p-md">
+          {/* Content */}
+          <CardContent className="relative z-10 p-md py-5">
             <div className="flex items-start gap-md">
-              <div className="w-10 h-10 rounded-xl bg-brand/20 flex items-center justify-center flex-shrink-0">
-                <Flag className="w-5 h-5 text-brand" />
-              </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-sm">
-                  <h2 className="text-base font-semibold text-foreground truncate">
+                  {isHomeCourse && (
+                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                      <Home className="h-3 w-3 text-white" />
+                    </div>
+                  )}
+                  <h2 className="text-base font-semibold text-white truncate drop-shadow-md">
                     {course.name}
                   </h2>
                   {course.isVerified && (
@@ -231,9 +242,9 @@ export default function CourseDetailPage() {
                   )}
                 </div>
                 {(course.city || course.state) && (
-                  <div className="flex items-center gap-xs text-xs text-muted mt-0.5">
+                  <div className="flex items-center gap-xs text-xs text-white/80 mt-1">
                     <MapPin className="h-3 w-3" />
-                    <span>
+                    <span className="drop-shadow-sm">
                       {[course.city, course.state, course.country]
                         .filter(Boolean)
                         .join(", ")}
@@ -245,10 +256,10 @@ export default function CourseDetailPage() {
               <button
                 onClick={toggleHomeCourse}
                 disabled={isTogglingHome}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all flex-shrink-0 ${
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all flex-shrink-0 ${
                   isHomeCourse
                     ? "bg-amber-500 text-white"
-                    : "bg-white/10 text-muted hover:bg-white/20"
+                    : "bg-white/20 text-white hover:bg-white/30"
                 } ${isTogglingHome ? "opacity-50" : ""}`}
               >
                 <Home className="h-3.5 w-3.5" />
