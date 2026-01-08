@@ -143,10 +143,23 @@ export default function NewRoundPage() {
             {/* Step: Select Tee */}
             {step === "tee" && (
               <div className="space-y-md">
-                <Card className="mb-lg">
-                  <CardContent className="p-lg">
-                    <p className="text-caption text-muted">Course</p>
-                    <p className="text-body font-medium">{course.name}</p>
+                {/* Course Card with Hero Backdrop */}
+                <Card className="relative overflow-hidden rounded-xl mb-lg">
+                  <div className="absolute inset-0">
+                    {course.heroImageUrl ? (
+                      <img
+                        src={course.heroImageUrl}
+                        alt={course.name}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
+                  </div>
+                  <CardContent className="relative z-10 p-lg">
+                    <p className="text-caption text-white/70">Course</p>
+                    <p className="text-body font-semibold text-white drop-shadow-md">{course.name}</p>
                   </CardContent>
                 </Card>
 
@@ -249,31 +262,47 @@ export default function NewRoundPage() {
             {/* Step: Confirm */}
             {step === "confirm" && selectedTee && (
               <div className="space-y-lg">
-                <Card>
-                  <CardContent className="p-lg space-y-lg">
+                {/* Course Card with Hero Backdrop */}
+                <Card className="relative overflow-hidden rounded-xl">
+                  <div className="absolute inset-0">
+                    {course.heroImageUrl ? (
+                      <img
+                        src={course.heroImageUrl}
+                        alt={course.name}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
+                  </div>
+                  <CardContent className="relative z-10 p-lg space-y-md">
                     <div>
-                      <p className="text-caption text-muted">Course</p>
-                      <p className="text-body font-medium">{course.name}</p>
+                      <p className="text-caption text-white/70">Course</p>
+                      <p className="text-body font-semibold text-white drop-shadow-md">{course.name}</p>
                     </div>
                     <div>
-                      <p className="text-caption text-muted">Tees</p>
+                      <p className="text-caption text-white/70">Tees</p>
                       <div className="flex items-center gap-sm">
                         <div
-                          className="w-4 h-4 rounded-full"
+                          className="w-4 h-4 rounded-full border-2 border-white/30"
                           style={{ backgroundColor: getTeeColor(selectedTee.name, selectedTee.color) }}
                         />
-                        <p className="text-body font-medium">{selectedTee.name}</p>
+                        <p className="text-body font-semibold text-white drop-shadow-md">{selectedTee.name}</p>
                       </div>
                     </div>
-                    <div>
-                      <p className="text-caption text-muted">Date</p>
-                      <Input
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Date Selection Card */}
+                <Card>
+                  <CardContent className="p-lg">
+                    <p className="text-caption text-muted mb-1">Date</p>
+                    <Input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                    />
                   </CardContent>
                 </Card>
 

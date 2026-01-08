@@ -70,34 +70,36 @@ export default function ProfilePage() {
       <Header title="Profile" />
 
       <div className="p-lg space-y-xl">
-        {/* User Info Card */}
-        <div>
-          <Card>
-            <CardContent className="p-lg">
-              <div className="flex items-center gap-lg">
-                <AvatarEditor
-                  currentAvatarUrl={apiUser?.avatarUrl || user?.imageUrl}
-                  displayName={apiUser?.displayName || user?.fullName}
-                  onAvatarUpdated={handleAvatarUpdated}
-                />
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-h2 font-semibold truncate">
-                    {apiUser?.displayName || user?.fullName || "Golfer"}
-                  </h2>
-                  <p className="text-caption text-muted truncate">
-                    {user?.primaryEmailAddress?.emailAddress}
-                  </p>
-                  {isFoundingMember && (
-                    <Badge variant="accent" className="mt-sm">
-                      <Crown className="h-3 w-3 mr-1" />
-                      Founding Member
-                    </Badge>
-                  )}
-                </div>
+        {/* User Info Card with Hero Backdrop */}
+        <Card className="relative overflow-hidden rounded-xl">
+          <div className="absolute inset-0">
+            <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-black/20" />
+          </div>
+          <CardContent className="relative z-10 p-lg">
+            <div className="flex items-center gap-lg">
+              <AvatarEditor
+                currentAvatarUrl={apiUser?.avatarUrl || user?.imageUrl}
+                displayName={apiUser?.displayName || user?.fullName}
+                onAvatarUpdated={handleAvatarUpdated}
+              />
+              <div className="flex-1 min-w-0">
+                <h2 className="text-h2 font-semibold truncate text-white drop-shadow-md">
+                  {apiUser?.displayName || user?.fullName || "Golfer"}
+                </h2>
+                <p className="text-caption text-white/70 truncate">
+                  {user?.primaryEmailAddress?.emailAddress}
+                </p>
+                {isFoundingMember && (
+                  <Badge variant="accent" className="mt-sm">
+                    <Crown className="h-3 w-3 mr-1" />
+                    Founding Member
+                  </Badge>
+                )}
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Handicap */}
         <div>
