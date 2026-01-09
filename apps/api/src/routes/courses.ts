@@ -659,11 +659,23 @@ Extract as much data as you can see. If some fields are not visible, omit them b
           }
 
           // Create tees and hole yardages
+          // Track used tee names to avoid duplicates (male/female tees may have same name)
+          const usedTeeNames = new Set<string>();
+
           for (const tee of allTees) {
+            // Handle duplicate tee names by appending a number
+            let teeName = tee.tee_name;
+            let counter = 2;
+            while (usedTeeNames.has(teeName)) {
+              teeName = `${tee.tee_name} ${counter}`;
+              counter++;
+            }
+            usedTeeNames.add(teeName);
+
             const createdTee = await prisma.tee.create({
               data: {
                 courseId: course.id,
-                name: tee.tee_name,
+                name: teeName,
                 slopeRating: tee.slope_rating,
                 courseRating: tee.course_rating,
                 totalYardage: tee.total_yards,
