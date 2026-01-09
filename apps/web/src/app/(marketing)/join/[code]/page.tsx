@@ -25,6 +25,11 @@ const gameTypeLabels: Record<GameType, string> = {
 
 const features = [
   {
+    icon: UsersRound,
+    title: "Up to 16 Players",
+    description: "Manage everyone's bets in a single round",
+  },
+  {
     icon: Radio,
     title: "Live Bet Tracking",
     description: "See who's winning in real-time, hole by hole",
@@ -43,11 +48,6 @@ const features = [
     icon: DollarSign,
     title: "Settle Up Easy",
     description: "Pay via Apple Pay, Venmo, Cash App & more",
-  },
-  {
-    icon: UsersRound,
-    title: "Up to 16 Players",
-    description: "Manage everyone's bets in a single round",
   },
 ];
 
@@ -300,7 +300,7 @@ export default function InviteLandingPage() {
                       <p className="font-medium text-white text-xs">{feature.title}</p>
                       <p className="text-[10px] text-white/40">{feature.description}</p>
                     </div>
-                    <Check className="w-3.5 h-3.5 text-brand/60 flex-shrink-0" />
+                    <Check className="w-5 h-5 text-brand/60 flex-shrink-0" />
                   </div>
                 ))}
               </CardContent>
@@ -458,14 +458,14 @@ export default function InviteLandingPage() {
                   key={feature.title}
                   className={`flex items-center gap-2.5 py-2 ${index !== features.length - 1 ? 'border-b border-white/5' : ''}`}
                 >
-                  <div className="w-8 h-8 rounded-md bg-brand/20 flex items-center justify-center flex-shrink-0">
-                    <feature.icon className="w-3.5 h-3.5 text-brand" />
+                  <div className="w-10 h-10 rounded-lg bg-brand/20 flex items-center justify-center flex-shrink-0">
+                    <feature.icon className="w-5 h-5 text-brand" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-white text-xs">{feature.title}</p>
                     <p className="text-[10px] text-white/40">{feature.description}</p>
                   </div>
-                  <Check className="w-3.5 h-3.5 text-brand/60 flex-shrink-0" />
+                  <Check className="w-5 h-5 text-brand/60 flex-shrink-0" />
                 </div>
               ))}
             </CardContent>
