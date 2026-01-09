@@ -42,7 +42,7 @@ const features = [
   {
     icon: Handshake,
     title: "Settle Up Easy",
-    description: "See exactly who owes who after every round",
+    description: "Pay via Apple Pay, Venmo, Cash App & more",
   },
   {
     icon: UserPlus,
