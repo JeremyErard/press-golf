@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { Flag, Users, Calendar, Loader2, Crown } from "lucide-react";
+import { Flag, Users, Calendar, Loader2, Crown, Check, Target, Calculator, Handshake, UserPlus } from "lucide-react";
 import { Button, Card, CardContent, Avatar, Badge, Skeleton } from "@/components/ui";
 import { api, type InviteDetails, type GameType, type BillingStatus } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
@@ -22,6 +22,34 @@ const gameTypeLabels: Record<GameType, string> = {
   SNAKE: "Snake",
   BANKER: "Banker",
 };
+
+const features = [
+  {
+    icon: Target,
+    title: "Track Every Shot",
+    description: "Hole-by-hole scoring for your entire group",
+  },
+  {
+    icon: Crown,
+    title: "10 Betting Games",
+    description: "Nassau, Skins, Wolf, Match Play & more",
+  },
+  {
+    icon: Calculator,
+    title: "Auto-Calculate",
+    description: "Winnings computed instantly, no math needed",
+  },
+  {
+    icon: Handshake,
+    title: "Settle Up Easy",
+    description: "See exactly who owes who after every round",
+  },
+  {
+    icon: UserPlus,
+    title: "Play Together",
+    description: "Invite your regular golf buddies",
+  },
+];
 
 export default function InviteLandingPage() {
   const params = useParams();
@@ -140,12 +168,20 @@ export default function InviteLandingPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen p-lg">
-        <div className="max-w-md mx-auto space-y-lg pt-xl">
-          <Skeleton className="h-20 w-20 rounded-full mx-auto" />
-          <Skeleton className="h-8 w-3/4 mx-auto" />
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-12 w-full" />
+      <div className="min-h-screen relative">
+        {/* Background */}
+        <div className="fixed inset-0 -z-10">
+          <img
+            src="/images/golf-hero.jpg"
+            alt="Golf course"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+        </div>
+        <div className="max-w-md mx-auto px-lg pt-xl pb-24 space-y-lg">
+          <Skeleton className="h-32 w-full rounded-2xl" />
+          <Skeleton className="h-48 w-full rounded-2xl" />
+          <Skeleton className="h-64 w-full rounded-2xl" />
         </div>
       </div>
     );
@@ -153,18 +189,29 @@ export default function InviteLandingPage() {
 
   if (error || !invite) {
     return (
-      <div className="min-h-screen p-lg flex items-center justify-center">
-        <div className="max-w-md text-center">
-          <div className="w-20 h-20 rounded-full bg-error/20 flex items-center justify-center mx-auto mb-xl">
-            <Flag className="h-10 w-10 text-error" />
+      <div className="min-h-screen relative">
+        {/* Background */}
+        <div className="fixed inset-0 -z-10">
+          <img
+            src="/images/golf-hero.jpg"
+            alt="Golf course"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+        </div>
+        <div className="flex items-center justify-center min-h-screen p-lg">
+          <div className="max-w-md text-center">
+            <div className="w-20 h-20 rounded-full bg-error/20 flex items-center justify-center mx-auto mb-xl backdrop-blur-sm">
+              <Flag className="h-10 w-10 text-error" />
+            </div>
+            <h1 className="text-h1 mb-md text-white">Invalid Invite</h1>
+            <p className="text-white/70 mb-xl">
+              {error || "This invite link is invalid or has expired."}
+            </p>
+            <Link href="/">
+              <Button>Go to Press</Button>
+            </Link>
           </div>
-          <h1 className="text-h1 mb-md">Invalid Invite</h1>
-          <p className="text-muted mb-xl">
-            {error || "This invite link is invalid or has expired."}
-          </p>
-          <Link href="/">
-            <Button>Go to Press</Button>
-          </Link>
         </div>
       </div>
     );
@@ -173,146 +220,213 @@ export default function InviteLandingPage() {
   // Show subscription prompt if user is signed in but not subscribed
   if (showSubscriptionPrompt) {
     return (
-      <div className="min-h-screen p-lg">
-        <div className="max-w-md mx-auto">
-          {/* Header */}
+      <div className="min-h-screen relative">
+        {/* Background */}
+        <div className="fixed inset-0 -z-10">
+          <img
+            src="/images/golf-hero.jpg"
+            alt="Golf course"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+        </div>
+
+        <div className="max-w-md mx-auto px-lg pb-24">
+          {/* Hero Section */}
           <div className="text-center py-xl">
-            <h1 className="text-hero gradient-text">Press</h1>
-            <p className="text-muted mt-sm">Golf Betting Made Simple</p>
+            <h1 className="text-hero gradient-text drop-shadow-lg">Press</h1>
+            <p className="text-white/70 mt-sm text-lg">Golf Betting Made Simple</p>
           </div>
 
-          {/* Subscription Required Card */}
-          <Card className="relative overflow-hidden rounded-xl">
-            <div className="absolute inset-0">
-              <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-black/20" />
-            </div>
-            <CardContent className="relative z-10 p-xl text-center">
-              <div className="w-16 h-16 mx-auto mb-lg rounded-full bg-amber-500/20 flex items-center justify-center">
-                <Crown className="w-8 h-8 text-amber-400" />
-              </div>
-              <h2 className="text-xl font-semibold text-white mb-sm">Subscribe to Join</h2>
-              <p className="text-white/70 mb-md">
-                {invite.inviter.displayName} invited you to play at {invite.round?.course.name}
-              </p>
-              <p className="text-white/60 text-sm mb-lg">
-                Get unlimited rounds, score tracking, and betting games for just $1.99/month. Cancel anytime.
-              </p>
-              <Button
-                className="w-full h-12"
-                size="lg"
-                onClick={() => router.push(`/profile/subscription?redirect=/join/${code}`)}
-              >
-                <Crown className="h-5 w-5 mr-2" />
-                Subscribe to Join Round
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen p-lg">
-      <div className="max-w-md mx-auto">
-        {/* Header */}
-        <div className="text-center py-xl">
-          <h1 className="text-hero gradient-text">Press</h1>
-          <p className="text-muted mt-sm">Golf Betting Made Simple</p>
-        </div>
-
-        {/* Invite Card */}
-        <div>
-          <Card className="overflow-hidden">
-            <div className="bg-gradient-to-br from-brand/20 to-accent/20 p-lg border-b border-border">
-              <div className="flex items-center gap-md">
+          {/* Invite Info Card */}
+          <Card className="glass-card animate-fade-in-up overflow-hidden mb-lg">
+            <CardContent className="p-lg">
+              <div className="flex items-center gap-md mb-md">
                 <Avatar
                   src={invite.inviter.avatarUrl}
                   name={invite.inviter.displayName}
                   size="lg"
                 />
                 <div>
-                  <p className="text-caption text-muted">You're invited by</p>
-                  <p className="text-h2 font-semibold">
-                    {invite.inviter.displayName}
+                  <p className="text-xs text-white/60 uppercase tracking-wide">Invited by</p>
+                  <p className="text-lg font-semibold text-white">{invite.inviter.displayName}</p>
+                </div>
+              </div>
+              {invite.round && (
+                <div className="flex items-center gap-md p-md rounded-xl bg-white/5">
+                  <Flag className="h-5 w-5 text-brand" />
+                  <div>
+                    <p className="font-medium text-white">{invite.round.course.name}</p>
+                    <p className="text-sm text-white/60">{formatDate(invite.round.date)}</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Features Section */}
+          <div className="animate-fade-in-up mb-lg" style={{ animationDelay: "100ms" }}>
+            <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wide mb-md px-1">
+              What you get with Press
+            </h2>
+            <Card className="glass-card">
+              <CardContent className="p-md divide-y divide-white/5">
+                {features.map((feature) => (
+                  <div key={feature.title} className="flex items-start gap-md py-md first:pt-0 last:pb-0">
+                    <div className="w-10 h-10 rounded-xl bg-brand/20 flex items-center justify-center flex-shrink-0">
+                      <feature.icon className="w-5 h-5 text-brand" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-white">{feature.title}</p>
+                      <p className="text-sm text-white/60">{feature.description}</p>
+                    </div>
+                    <Check className="w-5 h-5 text-brand flex-shrink-0 mt-0.5" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* CTA Button */}
+          <div className="animate-fade-in-up" style={{ animationDelay: "200ms" }}>
+            <Button
+              className="w-full h-16 text-lg font-semibold shadow-lg shadow-brand/30"
+              size="lg"
+              onClick={() => router.push(`/profile/subscription?redirect=/join/${code}`)}
+            >
+              <Crown className="h-5 w-5 mr-2" />
+              Join the Round for $1.99 a month
+            </Button>
+            <p className="text-center text-white/50 text-sm mt-md">Cancel anytime</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen relative">
+      {/* Background */}
+      <div className="fixed inset-0 -z-10">
+        <img
+          src="/images/golf-hero.jpg"
+          alt="Golf course"
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+      </div>
+
+      <div className="max-w-md mx-auto px-lg pb-24">
+        {/* Hero Section */}
+        <div className="text-center py-xl">
+          <h1 className="text-hero gradient-text drop-shadow-lg">Press</h1>
+          <p className="text-xl text-white mt-sm">You've been invited to play</p>
+        </div>
+
+        {/* Invite Card */}
+        <Card className="glass-card animate-fade-in-up overflow-hidden">
+          {/* Inviter Header */}
+          <div className="bg-gradient-to-r from-brand/20 to-accent/10 p-lg border-b border-white/10">
+            <div className="flex items-center gap-md">
+              <Avatar
+                src={invite.inviter.avatarUrl}
+                name={invite.inviter.displayName}
+                size="lg"
+              />
+              <div>
+                <p className="text-xs text-white/60 uppercase tracking-wide">Invited by</p>
+                <p className="text-xl font-semibold text-white">
+                  {invite.inviter.displayName}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {invite.round && (
+            <CardContent className="p-lg space-y-md">
+              {/* Course */}
+              <div className="flex items-center gap-md">
+                <div className="w-12 h-12 rounded-xl bg-brand/20 flex items-center justify-center">
+                  <Flag className="h-6 w-6 text-brand" />
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-white">
+                    {invite.round.course.name}
+                  </p>
+                  <p className="text-sm text-white/60">
+                    {[invite.round.course.city, invite.round.course.state]
+                      .filter(Boolean)
+                      .join(", ")}
                   </p>
                 </div>
               </div>
-            </div>
 
-            {invite.round && (
-              <CardContent className="p-lg space-y-lg">
-                {/* Course & Date */}
-                <div className="space-y-md">
-                  <div className="flex items-center gap-md">
-                    <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center">
-                      <Flag className="h-5 w-5 text-brand" />
-                    </div>
-                    <div>
-                      <p className="text-body font-medium">
-                        {invite.round.course.name}
-                      </p>
-                      <p className="text-caption text-muted">
-                        {[invite.round.course.city, invite.round.course.state]
-                          .filter(Boolean)
-                          .join(", ")}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-md">
-                    <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center">
-                      <Calendar className="h-5 w-5 text-accent" />
-                    </div>
-                    <div>
-                      <p className="text-body font-medium">
-                        {formatDate(invite.round.date)}
-                      </p>
-                      <p className="text-caption text-muted">Round date</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-md">
-                    <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center">
-                      <Users className="h-5 w-5 text-info" />
-                    </div>
-                    <div>
-                      <p className="text-body font-medium">
-                        {invite.round.playerCount} players
-                      </p>
-                      <p className="text-caption text-muted">In this round</p>
-                    </div>
+              {/* Date & Players Row */}
+              <div className="flex gap-md">
+                <div className="flex-1 flex items-center gap-md p-md rounded-xl bg-white/5">
+                  <Calendar className="h-5 w-5 text-accent" />
+                  <div>
+                    <p className="text-sm font-medium text-white">
+                      {formatDate(invite.round.date)}
+                    </p>
+                    <p className="text-xs text-white/50">Date</p>
                   </div>
                 </div>
-
-                {/* Games */}
-                {invite.round.games.length > 0 && (
+                <div className="flex-1 flex items-center gap-md p-md rounded-xl bg-white/5">
+                  <Users className="h-5 w-5 text-info" />
                   <div>
-                    <p className="text-caption text-muted mb-sm">Games</p>
-                    <div className="flex flex-wrap gap-sm">
-                      {invite.round.games.map((game, i) => (
-                        <Badge key={i} variant="brand">
-                          {gameTypeLabels[game.type]} ${game.betAmount}
-                        </Badge>
-                      ))}
-                    </div>
+                    <p className="text-sm font-medium text-white">
+                      {invite.round.playerCount} player{invite.round.playerCount !== 1 ? "s" : ""}
+                    </p>
+                    <p className="text-xs text-white/50">Joined</p>
                   </div>
-                )}
-              </CardContent>
-            )}
+                </div>
+              </div>
+
+              {/* Games */}
+              {invite.round.games.length > 0 && (
+                <div>
+                  <p className="text-xs text-white/50 uppercase tracking-wide mb-sm">Games</p>
+                  <div className="flex flex-wrap gap-sm">
+                    {invite.round.games.map((game, i) => (
+                      <Badge key={i} variant="brand">
+                        {gameTypeLabels[game.type]} ${game.betAmount}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Features Section */}
+        <div className="mt-xl animate-fade-in-up" style={{ animationDelay: "100ms" }}>
+          <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wide mb-md px-1">
+            What you get with Press
+          </h2>
+          <Card className="glass-card">
+            <CardContent className="p-md divide-y divide-white/5">
+              {features.map((feature) => (
+                <div key={feature.title} className="flex items-start gap-md py-md first:pt-0 last:pb-0">
+                  <div className="w-10 h-10 rounded-xl bg-brand/20 flex items-center justify-center flex-shrink-0">
+                    <feature.icon className="w-5 h-5 text-brand" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-white">{feature.title}</p>
+                    <p className="text-sm text-white/60">{feature.description}</p>
+                  </div>
+                  <Check className="w-5 h-5 text-brand flex-shrink-0 mt-0.5" />
+                </div>
+              ))}
+            </CardContent>
           </Card>
         </div>
 
-        {/* CTA */}
-        <div
-          
-          
-          
-          className="mt-xl space-y-md"
-        >
+        {/* CTA Section */}
+        <div className="mt-xl animate-fade-in-up" style={{ animationDelay: "200ms" }}>
           <Button
-            className="w-full h-14"
+            className="w-full h-16 text-lg font-semibold shadow-lg shadow-brand/30"
             size="lg"
             onClick={handleGetStarted}
             disabled={isJoining}
@@ -323,61 +437,65 @@ export default function InviteLandingPage() {
                 Joining...
               </>
             ) : isPWAInstalled ? (
-              isSignedIn ? "Join Round" : "Sign Up to Join"
+              isSignedIn ? (
+                "Join Round"
+              ) : (
+                <>
+                  <Crown className="h-5 w-5 mr-2" />
+                  Join the Round for $1.99 a month
+                </>
+              )
             ) : (
-              "Get Press App"
+              <>
+                <Crown className="h-5 w-5 mr-2" />
+                Join the Round for $1.99 a month
+              </>
             )}
           </Button>
 
           {!isPWAInstalled && (
-            <p className="text-caption text-muted text-center">
-              Add Press to your home screen to join this round
+            <p className="text-xs text-white/50 mt-md text-center">
+              Cancel anytime
             </p>
           )}
         </div>
 
         {/* Install Guide Modal */}
         {showInstallGuide && (
+          <div
+            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end justify-center p-lg"
+            onClick={() => setShowInstallGuide(false)}
+          >
             <div
-              
-              
-              
-              className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-end justify-center p-lg"
-              onClick={() => setShowInstallGuide(false)}
+              className="w-full max-w-md bg-surface rounded-t-2xl border border-white/10 p-xl animate-fade-in-up"
+              onClick={(e) => e.stopPropagation()}
             >
-              <div
-                
-                
-                
-                className="w-full max-w-md bg-surface rounded-t-xl border border-border p-xl"
-                onClick={(e) => e.stopPropagation()}
+              <h2 className="text-h2 font-semibold mb-lg text-white">
+                Add Press to Home Screen
+              </h2>
+
+              <ol className="space-y-lg">
+                {instructions.steps.map((step, i) => (
+                  <li key={i} className="flex items-start gap-md">
+                    <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center flex-shrink-0">
+                      <span className="text-label font-semibold text-white">
+                        {i + 1}
+                      </span>
+                    </div>
+                    <p className="text-body pt-1 text-white/80">{step}</p>
+                  </li>
+                ))}
+              </ol>
+
+              <Button
+                className="w-full mt-xl"
+                variant="secondary"
+                onClick={() => setShowInstallGuide(false)}
               >
-                <h2 className="text-h2 font-semibold mb-lg">
-                  Add Press to Home Screen
-                </h2>
-
-                <ol className="space-y-lg">
-                  {instructions.steps.map((step, i) => (
-                    <li key={i} className="flex items-start gap-md">
-                      <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center flex-shrink-0">
-                        <span className="text-label font-semibold text-white">
-                          {i + 1}
-                        </span>
-                      </div>
-                      <p className="text-body pt-1">{step}</p>
-                    </li>
-                  ))}
-                </ol>
-
-                <Button
-                  className="w-full mt-xl"
-                  variant="secondary"
-                  onClick={() => setShowInstallGuide(false)}
-                >
-                  Got it
-                </Button>
-              </div>
+                Got it
+              </Button>
             </div>
+          </div>
         )}
       </div>
     </div>
