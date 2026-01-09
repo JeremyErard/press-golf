@@ -8,6 +8,42 @@ import { fetchWebpage, extractCourseData, findScorecardLinks, fetchPdf, extractC
 import { geocodeAddress } from '../lib/geocode.js';
 import { findAndExtractHeroImage } from '../lib/course-hero.js';
 
+// GolfCourseAPI types
+interface GolfCourseAPIHole {
+  par: number;
+  yardage: number;
+  handicap: number;
+}
+
+interface GolfCourseAPITee {
+  tee_name: string;
+  course_rating: number;
+  slope_rating: number;
+  total_yards: number;
+  par_total: number;
+  holes: GolfCourseAPIHole[];
+}
+
+interface GolfCourseAPILocation {
+  address?: string;
+  city: string;
+  state: string;
+  country: string;
+  latitude: number;
+  longitude: number;
+}
+
+interface GolfCourseAPICourse {
+  id: number;
+  club_name: string;
+  course_name: string;
+  location: GolfCourseAPILocation;
+  tees: {
+    male?: GolfCourseAPITee[];
+    female?: GolfCourseAPITee[];
+  };
+}
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
@@ -491,6 +527,195 @@ Extract as much data as you can see. If some fields are not visible, omit them b
         featured: featuredCourses.map(convertCourse),
       },
     };
+  });
+
+  // =====================
+  // POST /api/courses/import-from-api
+  // Import courses from GolfCourseAPI (requires auth)
+  // =====================
+  interface ImportFromAPIBody {
+    search: string;
+    limit?: number;
+    dryRun?: boolean;
+  }
+
+  const GOLF_COURSE_API_KEY = process.env.GOLF_COURSE_API_KEY || '';
+  const GOLF_COURSE_API_BASE = 'https://api.golfcourseapi.com/v1';
+
+  app.post<{ Body: ImportFromAPIBody }>('/import-from-api', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const { search, limit = 10, dryRun = false } = request.body;
+
+    if (!search || search.trim().length === 0) {
+      return badRequest(reply, 'Search query is required');
+    }
+
+    if (!GOLF_COURSE_API_KEY) {
+      return badRequest(reply, 'GolfCourseAPI key not configured');
+    }
+
+    const results: { imported: string[]; skipped: string[]; errors: string[] } = {
+      imported: [],
+      skipped: [],
+      errors: [],
+    };
+
+    try {
+      // Search for courses
+      const searchUrl = `${GOLF_COURSE_API_BASE}/search?search_query=${encodeURIComponent(search.trim())}`;
+      const searchResponse = await fetch(searchUrl, {
+        headers: {
+          'Authorization': `Key ${GOLF_COURSE_API_KEY}`,
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!searchResponse.ok) {
+        const error = await searchResponse.text();
+        return badRequest(reply, `GolfCourseAPI error: ${error}`);
+      }
+
+      const searchData = await searchResponse.json() as { courses: GolfCourseAPICourse[] };
+      const courses = (searchData.courses || []).slice(0, Math.min(limit, 20));
+
+      if (courses.length === 0) {
+        return { success: true, message: 'No courses found', data: results };
+      }
+
+      for (const apiCourse of courses) {
+        const courseName = apiCourse.course_name || apiCourse.club_name;
+        const city = apiCourse.location.city;
+        const state = apiCourse.location.state;
+
+        try {
+          // Check for duplicates
+          const existing = await prisma.course.findFirst({
+            where: {
+              name: { equals: courseName, mode: 'insensitive' },
+              city: { equals: city, mode: 'insensitive' },
+              state: { equals: state, mode: 'insensitive' },
+            },
+          });
+
+          if (existing) {
+            results.skipped.push(`${courseName} (already exists)`);
+            continue;
+          }
+
+          // Get full details
+          const detailsUrl = `${GOLF_COURSE_API_BASE}/courses/${apiCourse.id}`;
+          const detailsResponse = await fetch(detailsUrl, {
+            headers: {
+              'Authorization': `Key ${GOLF_COURSE_API_KEY}`,
+              'Accept': 'application/json',
+            },
+          });
+
+          if (!detailsResponse.ok) {
+            results.errors.push(`${courseName}: failed to fetch details`);
+            continue;
+          }
+
+          const detailsData = await detailsResponse.json() as { course: GolfCourseAPICourse };
+          const details = detailsData.course;
+
+          const allTees = [...(details.tees.male || []), ...(details.tees.female || [])];
+
+          if (allTees.length === 0) {
+            results.skipped.push(`${courseName} (no tee data)`);
+            continue;
+          }
+
+          if (dryRun) {
+            results.imported.push(`${courseName} (${city}, ${state}) - ${allTees.length} tees`);
+            continue;
+          }
+
+          // Create the course
+          const course = await prisma.course.create({
+            data: {
+              name: courseName,
+              city: city,
+              state: state,
+              country: details.location.country || 'USA',
+              latitude: details.location.latitude,
+              longitude: details.location.longitude,
+              isVerified: false,
+            },
+          });
+
+          // Create holes (using data from first tee)
+          const firstTee = allTees[0];
+          if (firstTee?.holes?.length) {
+            await prisma.hole.createMany({
+              data: firstTee.holes.map((hole, index) => ({
+                courseId: course.id,
+                holeNumber: index + 1,
+                par: hole.par,
+                handicapRank: hole.handicap,
+              })),
+            });
+          }
+
+          // Create tees and hole yardages
+          for (const tee of allTees) {
+            const createdTee = await prisma.tee.create({
+              data: {
+                courseId: course.id,
+                name: tee.tee_name,
+                slopeRating: tee.slope_rating,
+                courseRating: tee.course_rating,
+                totalYardage: tee.total_yards,
+              },
+            });
+
+            // Create hole yardages for this tee
+            if (tee.holes?.length) {
+              const holes = await prisma.hole.findMany({
+                where: { courseId: course.id },
+                orderBy: { holeNumber: 'asc' },
+              });
+
+              await prisma.holeYardage.createMany({
+                data: holes.map((hole, index) => ({
+                  holeId: hole.id,
+                  teeId: createdTee.id,
+                  yardage: tee.holes[index]?.yardage || 0,
+                })),
+              });
+            }
+          }
+
+          results.imported.push(`${courseName} (${city}, ${state})`);
+
+          // Trigger hero image finder (async, don't wait)
+          findAndExtractHeroImage(
+            courseName,
+            city,
+            state,
+            course.id,
+            prisma
+          ).catch(() => {
+            // Ignore hero image errors
+          });
+
+          // Small delay to avoid rate limiting
+          await new Promise(r => setTimeout(r, 300));
+        } catch (error: any) {
+          results.errors.push(`${courseName}: ${error.message || 'unknown error'}`);
+        }
+      }
+
+      return {
+        success: true,
+        message: dryRun ? 'Dry run complete' : 'Import complete',
+        data: results,
+      };
+    } catch (error: any) {
+      request.log.error(error, 'Failed to import courses from API');
+      return sendError(reply, 500, ErrorCodes.COURSE_CREATION_FAILED, `Import failed: ${error.message}`);
+    }
   });
 
   // =====================
