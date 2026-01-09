@@ -26,7 +26,6 @@ interface UpdateScoreBody {
   holeNumber: number;
   strokes: number | null;
   putts?: number | null;
-  playerId?: string; // Optional: score for another player in the round
 }
 
 interface ExtractedScore {
@@ -444,14 +443,14 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
 
   // =====================
   // POST /api/rounds/:id/scores
-  // Submit or update a score (can submit for any player in round)
+  // Submit or update a score (players can only enter their own scores)
   // =====================
   app.post<{ Params: { id: string }; Body: UpdateScoreBody }>('/:id/scores', {
     preHandler: requireAuth,
   }, async (request, reply) => {
     const user = getUser(request);
     const { id } = request.params;
-    const { holeNumber, strokes, putts, playerId } = request.body;
+    const { holeNumber, strokes, putts } = request.body;
 
     if (holeNumber < 1 || holeNumber > 18) {
       return badRequest(reply, 'Hole number must be between 1 and 18');
@@ -483,15 +482,8 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
       return badRequest(reply, 'Round must be active to submit scores');
     }
 
-    // Determine which player to score for (self or specified player)
-    let targetPlayer = requestingPlayer;
-    if (playerId && playerId !== requestingPlayer.id) {
-      const foundPlayer = round.players.find(p => p.id === playerId);
-      if (!foundPlayer) {
-        return badRequest(reply, 'Player not found in this round');
-      }
-      targetPlayer = foundPlayer;
-    }
+    // Players can only enter their own scores
+    const targetPlayer = requestingPlayer;
 
     // Upsert the score
     const score = await prisma.holeScore.upsert({

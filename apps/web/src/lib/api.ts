@@ -666,6 +666,7 @@ export interface Invite {
 
 export interface InviteDetails {
   code: string;
+  redirectCode?: string; // Present when user used round ID instead of inviteCode
   inviter: {
     displayName: string;
     avatarUrl?: string;

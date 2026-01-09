@@ -89,6 +89,12 @@ export default function InviteLandingPage() {
     async function fetchInvite() {
       try {
         const data = await api.getInvite(code);
+        // If the API returns a redirectCode, the user used a round ID instead of inviteCode
+        // Redirect them to the correct URL
+        if (data.redirectCode && data.redirectCode !== code) {
+          router.replace(`/join/${data.redirectCode}`);
+          return;
+        }
         setInvite(data);
       } catch (_err) {
         setError("This invite link is invalid or has expired.");
@@ -98,7 +104,7 @@ export default function InviteLandingPage() {
     }
 
     fetchInvite();
-  }, [code]);
+  }, [code, router]);
 
   const handleJoinRound = useCallback(async () => {
     if (!invite?.round?.id) return;
