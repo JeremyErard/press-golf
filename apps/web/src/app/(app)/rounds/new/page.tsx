@@ -177,7 +177,7 @@ export default function NewRoundPage() {
               </div>
               <h2 className="text-xl font-semibold text-white mb-sm">Subscribe to Start Rounds</h2>
               <p className="text-white/70 mb-lg">
-                Get unlimited rounds, score tracking, and betting games for just $1.99/month. Cancel anytime.
+                Get unlimited rounds, score tracking, and betting games for just $2.49/month or $19.99/year. Cancel anytime.
               </p>
               <Button
                 className="w-full h-12"

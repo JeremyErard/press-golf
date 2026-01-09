@@ -228,10 +228,10 @@ export const api = {
     }, token),
 
   // Billing
-  createCheckoutSession: (token: string) =>
+  createCheckoutSession: (token: string, billingPeriod: "monthly" | "annual" = "monthly") =>
     apiRequest<{ url: string }>("/billing/checkout", {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({ billingPeriod }),
     }, token),
   createPortalSession: (token: string) =>
     apiRequest<{ url: string }>("/billing/portal", {

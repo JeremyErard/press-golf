@@ -12,5 +12,6 @@ export const stripe = process.env.STRIPE_SECRET_KEY
   : null;
 
 export const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID || "";
+export const STRIPE_ANNUAL_PRICE_ID = process.env.STRIPE_ANNUAL_PRICE_ID || "";
 export const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3000";
 export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";

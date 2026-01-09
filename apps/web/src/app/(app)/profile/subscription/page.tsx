@@ -16,6 +16,7 @@ export default function SubscriptionPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("annual");
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -48,7 +49,7 @@ export default function SubscriptionPage() {
         sessionStorage.setItem("subscriptionRedirect", redirectUrl);
       }
 
-      const { url } = await api.createCheckoutSession(token);
+      const { url } = await api.createCheckoutSession(token, billingPeriod);
       window.location.href = url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start checkout");
@@ -210,14 +211,51 @@ export default function SubscriptionPage() {
         {/* Pricing & Upgrade Button (only for free users) */}
         {!isActive && (
           <div className="space-y-4">
+            {/* Billing Period Toggle */}
+            <div className="flex items-center justify-center gap-2 p-1 bg-elevated rounded-xl">
+              <button
+                onClick={() => setBillingPeriod("monthly")}
+                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                  billingPeriod === "monthly"
+                    ? "bg-brand text-white"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingPeriod("annual")}
+                className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                  billingPeriod === "annual"
+                    ? "bg-brand text-white"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                Annual
+                <span className="ml-1 text-xs opacity-75">Save 33%</span>
+              </button>
+            </div>
+
             {/* Pricing Card */}
             <div className="bg-gradient-to-br from-brand/20 to-green-600/10 border border-brand/30 rounded-2xl p-6 text-center">
               <p className="text-sm text-brand font-medium mb-2">Press Pro</p>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-bold text-white">$1.99</span>
-                <span className="text-muted">/month</span>
-              </div>
-              <p className="text-sm text-muted mt-2">Cancel anytime</p>
+              {billingPeriod === "monthly" ? (
+                <>
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="text-4xl font-bold text-white">$2.49</span>
+                    <span className="text-muted">/month</span>
+                  </div>
+                  <p className="text-sm text-muted mt-2">Cancel anytime</p>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="text-4xl font-bold text-white">$19.99</span>
+                    <span className="text-muted">/year</span>
+                  </div>
+                  <p className="text-sm text-muted mt-2">Just $1.67/month • Best value</p>
+                </>
+              )}
             </div>
 
             <button

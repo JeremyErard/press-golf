@@ -338,10 +338,10 @@ export default function OnboardingPage() {
             {/* Pricing */}
             <div className="bg-gradient-to-br from-brand/20 to-green-600/10 border border-brand/30 rounded-2xl p-6 text-center">
               <div className="flex items-baseline justify-center gap-1">
-                <span className="text-4xl font-bold text-white">$1.99</span>
+                <span className="text-4xl font-bold text-white">$2.49</span>
                 <span className="text-muted">/month</span>
               </div>
-              <p className="text-sm text-muted mt-2">Cancel anytime</p>
+              <p className="text-sm text-muted mt-2">Or $19.99/year (save 33%) • Cancel anytime</p>
             </div>
 
             {/* Features */}
@@ -596,7 +596,7 @@ export default function OnboardingPage() {
                 ) : (
                   <>
                     <Crown className="w-5 h-5" />
-                    Subscribe - $1.99/mo
+                    Subscribe - $2.49/mo
                   </>
                 )}
               </button>

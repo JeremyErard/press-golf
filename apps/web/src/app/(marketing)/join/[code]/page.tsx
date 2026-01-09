@@ -282,7 +282,7 @@ export default function InviteLandingPage() {
               onClick={() => router.push(`/profile/subscription?redirect=/join/${code}`)}
             >
               <Crown className="h-4 w-4 mr-2" />
-              Join the Round for $1.99/month
+              Join the Round for $2.49/month
             </Button>
             <p className="text-[10px] text-white/40 mt-2 text-center">Cancel anytime</p>
           </div>
@@ -437,13 +437,13 @@ export default function InviteLandingPage() {
               ) : (
                 <>
                   <Crown className="h-4 w-4 mr-2" />
-                  Join the Round for $1.99/month
+                  Join the Round for $2.49/month
                 </>
               )
             ) : (
               <>
                 <Crown className="h-4 w-4 mr-2" />
-                Join the Round for $1.99/month
+                Join the Round for $2.49/month
               </>
             )}
           </Button>

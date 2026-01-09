@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, getUser } from "../lib/auth.js";
-import { stripe, STRIPE_PRICE_ID, FRONTEND_URL } from "../lib/stripe.js";
+import { stripe, STRIPE_PRICE_ID, STRIPE_ANNUAL_PRICE_ID, FRONTEND_URL } from "../lib/stripe.js";
 
 export default async function billingRoutes(fastify: FastifyInstance) {
   // Check if Stripe is configured
@@ -14,8 +14,9 @@ export default async function billingRoutes(fastify: FastifyInstance) {
   fastify.post(
     "/billing/checkout",
     { preHandler: requireAuth },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request: FastifyRequest<{ Body: { billingPeriod?: "monthly" | "annual" } }>, reply: FastifyReply) => {
       const user = getUser(request);
+      const { billingPeriod = "monthly" } = request.body || {};
 
       // Check if user already has an active subscription
       const dbUser = await prisma.user.findUnique({
@@ -71,6 +72,9 @@ export default async function billingRoutes(fastify: FastifyInstance) {
         });
       }
 
+      // Select price based on billing period
+      const priceId = billingPeriod === "annual" ? STRIPE_ANNUAL_PRICE_ID : STRIPE_PRICE_ID;
+
       // Create checkout session
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
@@ -79,7 +83,7 @@ export default async function billingRoutes(fastify: FastifyInstance) {
         allow_promotion_codes: true,
         line_items: [
           {
-            price: STRIPE_PRICE_ID,
+            price: priceId,
             quantity: 1,
           },
         ],
