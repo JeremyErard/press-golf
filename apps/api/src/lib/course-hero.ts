@@ -119,12 +119,21 @@ function generatePossibleUrls(courseName: string): string[] {
 
   // Common patterns for golf course websites
   return [
+    // .com variants
     `https://www.${normalized}golf.com`,
     `https://www.${normalized}golfclub.com`,
     `https://www.${normalized}cc.com`,
     `https://www.${withHyphens}-golf.com`,
     `https://${normalized}golf.com`,
     `https://${normalized}.com`,
+    // .org variants (many country clubs use .org)
+    `https://www.${normalized}cc.org`,
+    `https://www.${normalized}golfclub.org`,
+    `https://www.${normalized}.org`,
+    `https://${normalized}cc.org`,
+    // .net variants
+    `https://www.${normalized}golf.net`,
+    `https://www.${normalized}cc.net`,
   ];
 }
 
