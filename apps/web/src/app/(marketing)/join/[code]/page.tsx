@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { Flag, Users, Calendar, Loader2, Crown, Check, Target, Calculator, Handshake, UserPlus } from "lucide-react";
+import { Flag, Users, Calendar, Loader2, Crown, Check, Radio, Dog, Calculator, DollarSign, UsersRound } from "lucide-react";
 import { Button, Card, CardContent, Avatar, Badge, Skeleton } from "@/components/ui";
 import { api, type InviteDetails, type GameType, type BillingStatus } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
@@ -25,12 +25,12 @@ const gameTypeLabels: Record<GameType, string> = {
 
 const features = [
   {
-    icon: Target,
+    icon: Radio,
     title: "Live Bet Tracking",
     description: "See who's winning in real-time, hole by hole",
   },
   {
-    icon: Crown,
+    icon: Dog,
     title: "10 Betting Games",
     description: "Nassau, Skins, Wolf, Match Play & more",
   },
@@ -40,14 +40,14 @@ const features = [
     description: "Winnings computed instantly, no math needed",
   },
   {
-    icon: Handshake,
+    icon: DollarSign,
     title: "Settle Up Easy",
     description: "Pay via Apple Pay, Venmo, Cash App & more",
   },
   {
-    icon: UserPlus,
-    title: "Play Together",
-    description: "Invite your regular golf buddies",
+    icon: UsersRound,
+    title: "Up to 16 Players",
+    description: "Manage everyone's bets in a single round",
   },
 ];
 
@@ -448,7 +448,7 @@ export default function InviteLandingPage() {
 
         {/* Features Section */}
         <div className="mt-5 animate-fade-in-up" style={{ animationDelay: "150ms" }}>
-          <h2 className="text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-2 text-center">
+          <h2 className="text-sm font-bold text-white/80 uppercase tracking-wide mb-3 text-center">
             What you get with Press
           </h2>
           <Card className="glass-card">
