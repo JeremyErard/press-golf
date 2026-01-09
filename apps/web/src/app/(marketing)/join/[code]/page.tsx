@@ -233,37 +233,35 @@ export default function InviteLandingPage() {
 
         <div className="max-w-md mx-auto px-lg pb-24">
           {/* Hero Section */}
-          <div className="text-center py-xl">
-            <h1 className="text-6xl md:text-7xl font-black tracking-tight text-white drop-shadow-2xl">
+          <div className="text-center pt-12 pb-8">
+            <h1 className="text-5xl md:text-6xl font-black tracking-tight text-white drop-shadow-2xl">
               PRESS
             </h1>
-            <div className="flex items-center justify-center gap-3 mt-4">
-              <div className="h-px w-12 bg-gradient-to-r from-transparent to-white/50"></div>
-              <p className="text-white/70 text-sm uppercase tracking-[0.3em] font-medium">Golf Betting Made Simple</p>
-              <div className="h-px w-12 bg-gradient-to-l from-transparent to-white/50"></div>
-            </div>
+            <p className="text-white/60 text-xs uppercase tracking-[0.2em] font-medium mt-2">
+              Golf Betting Made Simple
+            </p>
           </div>
 
           {/* Invite Info Card */}
-          <Card className="glass-card animate-fade-in-up overflow-hidden mb-lg">
-            <CardContent className="p-lg">
-              <div className="flex items-center gap-md mb-md">
+          <Card className="glass-card animate-fade-in-up overflow-hidden mb-6">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3 mb-3">
                 <Avatar
                   src={invite.inviter.avatarUrl}
                   name={invite.inviter.displayName}
-                  size="lg"
+                  size="md"
                 />
                 <div>
-                  <p className="text-xs text-white/60 uppercase tracking-wide">Invited by</p>
-                  <p className="text-lg font-semibold text-white">{invite.inviter.displayName}</p>
+                  <p className="text-xs text-white/50 uppercase tracking-wide">Invited by</p>
+                  <p className="text-base font-semibold text-white">{invite.inviter.displayName}</p>
                 </div>
               </div>
               {invite.round && (
-                <div className="flex items-center gap-md p-md rounded-xl bg-white/5">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
                   <Flag className="h-5 w-5 text-brand" />
                   <div>
-                    <p className="font-medium text-white">{invite.round.course.name}</p>
-                    <p className="text-sm text-white/60">{formatDate(invite.round.date)}</p>
+                    <p className="font-medium text-white text-sm">{invite.round.course.name}</p>
+                    <p className="text-xs text-white/50">{formatDate(invite.round.date)}</p>
                   </div>
                 </div>
               )}
@@ -271,22 +269,25 @@ export default function InviteLandingPage() {
           </Card>
 
           {/* Features Section */}
-          <div className="animate-fade-in-up mb-lg" style={{ animationDelay: "100ms" }}>
-            <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wide mb-md px-1">
+          <div className="animate-fade-in-up mb-6" style={{ animationDelay: "100ms" }}>
+            <h2 className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3 text-center">
               What you get with Press
             </h2>
             <Card className="glass-card">
-              <CardContent className="p-md divide-y divide-white/5">
-                {features.map((feature) => (
-                  <div key={feature.title} className="flex items-start gap-md py-md first:pt-0 last:pb-0">
-                    <div className="w-10 h-10 rounded-xl bg-brand/20 flex items-center justify-center flex-shrink-0">
-                      <feature.icon className="w-5 h-5 text-brand" />
+              <CardContent className="p-4">
+                {features.map((feature, index) => (
+                  <div
+                    key={feature.title}
+                    className={`flex items-center gap-3 py-3 ${index !== features.length - 1 ? 'border-b border-white/5' : ''}`}
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-brand/20 flex items-center justify-center flex-shrink-0">
+                      <feature.icon className="w-4 h-4 text-brand" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-white">{feature.title}</p>
-                      <p className="text-sm text-white/60">{feature.description}</p>
+                      <p className="font-medium text-white text-sm">{feature.title}</p>
+                      <p className="text-xs text-white/50">{feature.description}</p>
                     </div>
-                    <Check className="w-5 h-5 text-brand flex-shrink-0 mt-0.5" />
+                    <Check className="w-4 h-4 text-brand/70 flex-shrink-0" />
                   </div>
                 ))}
               </CardContent>
@@ -296,14 +297,14 @@ export default function InviteLandingPage() {
           {/* CTA Button */}
           <div className="animate-fade-in-up" style={{ animationDelay: "200ms" }}>
             <Button
-              className="w-full h-16 text-lg font-semibold shadow-lg shadow-brand/30"
+              className="w-full h-14 text-base font-semibold shadow-lg shadow-brand/30"
               size="lg"
               onClick={() => router.push(`/profile/subscription?redirect=/join/${code}`)}
             >
               <Crown className="h-5 w-5 mr-2" />
-              Join the Round for $1.99 a month
+              Join the Round for $1.99/month
             </Button>
-            <p className="text-center text-white/50 text-sm mt-md">Cancel anytime</p>
+            <p className="text-center text-white/40 text-xs mt-3">Cancel anytime</p>
           </div>
         </div>
       </div>
@@ -324,16 +325,14 @@ export default function InviteLandingPage() {
 
       <div className="max-w-md mx-auto px-lg pb-24">
         {/* Hero Section */}
-        <div className="text-center py-xl">
-          <h1 className="text-6xl md:text-7xl font-black tracking-tight text-white drop-shadow-2xl">
+        <div className="text-center pt-12 pb-8">
+          <h1 className="text-5xl md:text-6xl font-black tracking-tight text-white drop-shadow-2xl">
             PRESS
           </h1>
-          <div className="flex items-center justify-center gap-3 mt-4">
-            <div className="h-px w-12 bg-gradient-to-r from-transparent to-white/50"></div>
-            <p className="text-white/70 text-sm uppercase tracking-[0.3em] font-medium">Golf Betting Made Simple</p>
-            <div className="h-px w-12 bg-gradient-to-l from-transparent to-white/50"></div>
-          </div>
-          <p className="text-xl text-white mt-4">You've been invited to play</p>
+          <p className="text-white/60 text-xs uppercase tracking-[0.2em] font-medium mt-2">
+            Golf Betting Made Simple
+          </p>
+          <p className="text-lg text-white/90 mt-6 font-medium">You've been invited to play</p>
         </div>
 
         {/* Invite Card */}
@@ -414,22 +413,25 @@ export default function InviteLandingPage() {
         </Card>
 
         {/* Features Section */}
-        <div className="mt-xl animate-fade-in-up" style={{ animationDelay: "100ms" }}>
-          <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wide mb-md px-1">
+        <div className="mt-6 animate-fade-in-up" style={{ animationDelay: "100ms" }}>
+          <h2 className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-3 text-center">
             What you get with Press
           </h2>
           <Card className="glass-card">
-            <CardContent className="p-md divide-y divide-white/5">
-              {features.map((feature) => (
-                <div key={feature.title} className="flex items-start gap-md py-md first:pt-0 last:pb-0">
-                  <div className="w-10 h-10 rounded-xl bg-brand/20 flex items-center justify-center flex-shrink-0">
-                    <feature.icon className="w-5 h-5 text-brand" />
+            <CardContent className="p-4">
+              {features.map((feature, index) => (
+                <div
+                  key={feature.title}
+                  className={`flex items-center gap-3 py-3 ${index !== features.length - 1 ? 'border-b border-white/5' : ''}`}
+                >
+                  <div className="w-9 h-9 rounded-lg bg-brand/20 flex items-center justify-center flex-shrink-0">
+                    <feature.icon className="w-4 h-4 text-brand" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-white">{feature.title}</p>
-                    <p className="text-sm text-white/60">{feature.description}</p>
+                    <p className="font-medium text-white text-sm">{feature.title}</p>
+                    <p className="text-xs text-white/50">{feature.description}</p>
                   </div>
-                  <Check className="w-5 h-5 text-brand flex-shrink-0 mt-0.5" />
+                  <Check className="w-4 h-4 text-brand/70 flex-shrink-0" />
                 </div>
               ))}
             </CardContent>
@@ -437,9 +439,9 @@ export default function InviteLandingPage() {
         </div>
 
         {/* CTA Section */}
-        <div className="mt-xl animate-fade-in-up" style={{ animationDelay: "200ms" }}>
+        <div className="mt-6 animate-fade-in-up" style={{ animationDelay: "200ms" }}>
           <Button
-            className="w-full h-16 text-lg font-semibold shadow-lg shadow-brand/30"
+            className="w-full h-14 text-base font-semibold shadow-lg shadow-brand/30"
             size="lg"
             onClick={handleGetStarted}
             disabled={isJoining}
@@ -455,19 +457,19 @@ export default function InviteLandingPage() {
               ) : (
                 <>
                   <Crown className="h-5 w-5 mr-2" />
-                  Join the Round for $1.99 a month
+                  Join the Round for $1.99/month
                 </>
               )
             ) : (
               <>
                 <Crown className="h-5 w-5 mr-2" />
-                Join the Round for $1.99 a month
+                Join the Round for $1.99/month
               </>
             )}
           </Button>
 
           {!isPWAInstalled && (
-            <p className="text-xs text-white/50 mt-md text-center">
+            <p className="text-xs text-white/40 mt-3 text-center">
               Cancel anytime
             </p>
           )}
