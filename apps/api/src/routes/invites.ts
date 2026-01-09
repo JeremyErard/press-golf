@@ -87,6 +87,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest<{ Params: { code: string } }>, reply: FastifyReply) => {
       const { code } = request.params;
 
+      // First, try to find an Invite record by code
       const invite = await prisma.invite.findUnique({
         where: { code },
         include: {
@@ -121,10 +122,84 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         },
       });
 
+      // If no Invite found, check if it's a Round inviteCode
       if (!invite) {
-        return reply.code(404).send({
-          success: false,
-          error: { code: "INVITE_NOT_FOUND", message: "Invite not found" },
+        const round = await prisma.round.findUnique({
+          where: { inviteCode: code },
+          include: {
+            course: {
+              select: {
+                name: true,
+                city: true,
+                state: true,
+              },
+            },
+            games: {
+              select: {
+                type: true,
+                betAmount: true,
+              },
+            },
+            players: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    displayName: true,
+                    firstName: true,
+                    lastName: true,
+                    avatarUrl: true,
+                  },
+                },
+              },
+              orderBy: { position: 'asc' },
+              take: 1, // Get the first player (round creator)
+            },
+            _count: {
+              select: { players: true },
+            },
+          },
+        });
+
+        if (!round) {
+          return reply.code(404).send({
+            success: false,
+            error: { code: "INVITE_NOT_FOUND", message: "Invite not found" },
+          });
+        }
+
+        // Get the round creator (first player) as the inviter
+        const creator = round.players[0]?.user;
+        const inviterName = creator
+          ? creator.displayName ||
+            [creator.firstName, creator.lastName].filter(Boolean).join(" ") ||
+            "A golfer"
+          : "A golfer";
+
+        // Return round-based invite data
+        return reply.send({
+          success: true,
+          data: {
+            code: round.inviteCode,
+            inviter: {
+              displayName: inviterName,
+              avatarUrl: creator?.avatarUrl || null,
+            },
+            round: {
+              id: round.id,
+              date: round.date,
+              course: {
+                name: round.course.name,
+                city: round.course.city,
+                state: round.course.state,
+              },
+              games: round.games.map((g) => ({
+                type: g.type,
+                betAmount: Number(g.betAmount),
+              })),
+              playerCount: round._count.players,
+            },
+          },
         });
       }
 
@@ -156,8 +231,7 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         [invite.inviter.firstName, invite.inviter.lastName].filter(Boolean).join(" ") ||
         "A golfer";
 
-      // Only expose minimal round info to prevent information leakage
-      // Don't expose: round ID, bet amounts, player details
+      // Return invite details with round info
       return reply.send({
         success: true,
         data: {
@@ -168,14 +242,18 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
           },
           round: invite.round
             ? {
+                id: invite.round.id,
                 date: invite.round.date,
                 course: {
                   name: invite.round.course.name,
                   city: invite.round.course.city,
                   state: invite.round.course.state,
                 },
-                // Only show game types, not bet amounts
-                gameTypes: invite.round.games.map((g: { type: string }) => g.type),
+                games: invite.round.games.map((g: { type: string; betAmount: unknown }) => ({
+                  type: g.type,
+                  betAmount: Number(g.betAmount),
+                })),
+                playerCount: invite.round._count.players,
               }
             : null,
         },
@@ -192,18 +270,126 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
       const { code } = request.params;
       const userId = user.id as string;
 
+      // First, try to find an Invite record
       const invite = await prisma.invite.findUnique({
         where: { code },
         include: { round: true },
       });
 
+      // If no Invite found, check if it's a Round inviteCode
       if (!invite) {
-        return reply.code(404).send({
-          success: false,
-          error: { code: "INVITE_NOT_FOUND", message: "Invite not found" },
+        const round = await prisma.round.findUnique({
+          where: { inviteCode: code },
+          include: {
+            players: {
+              orderBy: { position: 'asc' },
+              take: 1,
+              select: { userId: true },
+            },
+          },
+        });
+
+        if (!round) {
+          return reply.code(404).send({
+            success: false,
+            error: { code: "INVITE_NOT_FOUND", message: "Invite not found" },
+          });
+        }
+
+        // Check subscription status for joining rounds
+        const hasSubscription = await hasActiveSubscription(userId);
+        if (!hasSubscription) {
+          return reply.code(403).send({
+            success: false,
+            error: { code: "SUBSCRIPTION_REQUIRED", message: "Active subscription required to join rounds" },
+          });
+        }
+
+        // Check if user is already in round
+        const existingPlayer = await prisma.roundPlayer.findFirst({
+          where: {
+            roundId: round.id,
+            userId: userId,
+          },
+        });
+
+        if (existingPlayer) {
+          return reply.send({
+            success: true,
+            data: {
+              roundId: round.id,
+              message: "You are already in this round!",
+            },
+          });
+        }
+
+        // Get next position and add player
+        const playerCount = await prisma.roundPlayer.count({
+          where: { roundId: round.id },
+        });
+
+        await prisma.roundPlayer.create({
+          data: {
+            roundId: round.id,
+            userId: userId,
+            position: playerCount + 1,
+          },
+        });
+
+        // Create buddy relationship with round creator
+        const creatorId = round.players[0]?.userId;
+        if (creatorId && creatorId !== userId) {
+          // Creator adds accepter as buddy
+          const existingBuddy1 = await prisma.buddy.findUnique({
+            where: {
+              userId_buddyUserId: {
+                userId: creatorId,
+                buddyUserId: userId,
+              },
+            },
+          });
+
+          if (!existingBuddy1) {
+            await prisma.buddy.create({
+              data: {
+                userId: creatorId,
+                buddyUserId: userId,
+                sourceType: "ROUND",
+              },
+            });
+          }
+
+          // Accepter adds creator as buddy
+          const existingBuddy2 = await prisma.buddy.findUnique({
+            where: {
+              userId_buddyUserId: {
+                userId: userId,
+                buddyUserId: creatorId,
+              },
+            },
+          });
+
+          if (!existingBuddy2) {
+            await prisma.buddy.create({
+              data: {
+                userId: userId,
+                buddyUserId: creatorId,
+                sourceType: "ROUND",
+              },
+            });
+          }
+        }
+
+        return reply.send({
+          success: true,
+          data: {
+            roundId: round.id,
+            message: "You have joined the round!",
+          },
         });
       }
 
+      // Handle existing Invite record
       if (invite.status !== "PENDING") {
         return reply.code(410).send({
           success: false,
