@@ -170,10 +170,12 @@ function looksLikeCoursePhoto(url: string): boolean {
 }
 
 /**
- * Extract hero image from HTML, preferring course photos over logos
+ * Extract hero image candidates from HTML, preferring course photos over logos
+ * Returns multiple candidates sorted by score so we can try alternatives if first fails
  */
-function extractHeroImage(html: string, baseUrl: string): string | null {
+function extractHeroImageCandidates(html: string, baseUrl: string): string[] {
   const candidates: { url: string; score: number }[] = [];
+  const seenUrls = new Set<string>();
 
   // Helper to make URLs absolute
   const makeAbsolute = (imageUrl: string): string => {
@@ -191,31 +193,36 @@ function extractHeroImage(html: string, baseUrl: string): string | null {
     return imageUrl;
   };
 
-  // Helper to score an image URL
-  const scoreImage = (url: string): number => {
-    let score = 0;
+  // Helper to add candidate without duplicates
+  const addCandidate = (imageUrl: string, bonus: number) => {
+    const url = makeAbsolute(imageUrl);
+    if (seenUrls.has(url)) return;
+    seenUrls.add(url);
+
+    let score = bonus;
     if (looksLikeLogo(url)) score -= 100; // Heavily penalize logos
     if (looksLikeCoursePhoto(url)) score += 50; // Prefer course photos
     // Prefer larger image paths (often have dimensions in name)
     if (url.match(/\d{3,4}x\d{3,4}/) || url.match(/large|big|full|hd|high/i)) score += 20;
     // Prefer jpg/jpeg (usually photos vs png logos)
     if (url.match(/\.jpe?g/i)) score += 10;
-    return score;
+    // Bonus for banner/portlet images (common in CMS systems)
+    if (url.toLowerCase().includes('banner') || url.toLowerCase().includes('portlet')) score += 35;
+
+    candidates.push({ url, score });
   };
 
   // Try og:image
   const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
     || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
   if (ogImageMatch) {
-    const url = makeAbsolute(ogImageMatch[1]);
-    candidates.push({ url, score: scoreImage(url) + 30 }); // Bonus for og:image
+    addCandidate(ogImageMatch[1], 30); // Bonus for og:image
   }
 
   // Try twitter:image
   const twitterMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
   if (twitterMatch) {
-    const url = makeAbsolute(twitterMatch[1]);
-    candidates.push({ url, score: scoreImage(url) + 25 });
+    addCandidate(twitterMatch[1], 25);
   }
 
   // Look for hero/banner images in HTML
@@ -230,10 +237,7 @@ function extractHeroImage(html: string, baseUrl: string): string | null {
   for (const pattern of heroPatterns) {
     let match;
     while ((match = pattern.exec(html)) !== null) {
-      const url = makeAbsolute(match[1]);
-      if (!looksLikeLogo(url)) {
-        candidates.push({ url, score: scoreImage(url) + 40 }); // Bonus for hero class
-      }
+      addCandidate(match[1], 40); // Bonus for hero class
     }
   }
 
@@ -241,20 +245,32 @@ function extractHeroImage(html: string, baseUrl: string): string | null {
   const bgPattern = /background(?:-image)?:\s*url\(['"]?([^"')]+)['"]?\)/gi;
   let bgMatch;
   while ((bgMatch = bgPattern.exec(html)) !== null) {
-    const url = makeAbsolute(bgMatch[1]);
-    if (!looksLikeLogo(url)) {
-      candidates.push({ url, score: scoreImage(url) + 15 });
+    addCandidate(bgMatch[1], 15);
+  }
+
+  // Look for large images in <img> tags (fallback for when og:image is broken)
+  // Match images with banner, portlet, hero in their path, or from /documents/ paths (CMS)
+  const imgPattern = /<img[^>]*src=["']([^"']+)["'][^>]*>/gi;
+  let imgMatch;
+  while ((imgMatch = imgPattern.exec(html)) !== null) {
+    const src = imgMatch[1];
+    // Only add if it looks like a potential hero image
+    if (src.match(/banner|portlet|hero|slider|featured|main/i) ||
+        src.match(/\/documents\//i) ||
+        src.match(/\.(jpg|jpeg)$/i)) {
+      addCandidate(src, 10);
     }
   }
 
-  // Sort by score and return best candidate
+  // Sort by score
   candidates.sort((a, b) => b.score - a.score);
 
   console.log('[HeroImage] Candidates:', candidates.slice(0, 5).map(c => ({ url: c.url.substring(0, 80), score: c.score })));
 
-  // Return best non-logo candidate, or og:image as fallback
-  const best = candidates.find(c => !looksLikeLogo(c.url)) || candidates[0];
-  return best?.url || null;
+  // Return URLs only, filtered to exclude logos
+  return candidates
+    .filter(c => !looksLikeLogo(c.url))
+    .map(c => c.url);
 }
 
 /**
@@ -311,9 +327,9 @@ export async function findAndExtractHeroImage(
     console.log(`[HeroImage] Trying URLs:`, possibleUrls);
 
     let foundWebsite: string | null = null;
-    let heroImageUrl: string | null = null;
+    let imageCandidates: string[] = [];
 
-    // Try each possible URL
+    // Try each possible URL to find the course website
     for (const url of possibleUrls) {
       try {
         console.log(`[HeroImage] Trying: ${url}`);
@@ -333,12 +349,12 @@ export async function findAndExtractHeroImage(
           continue;
         }
 
-        // Extract hero image
-        const imageUrl = extractHeroImage(html, url);
-        if (imageUrl) {
+        // Extract hero image candidates (returns multiple sorted by score)
+        const candidates = extractHeroImageCandidates(html, url);
+        if (candidates.length > 0) {
           foundWebsite = url;
-          heroImageUrl = imageUrl;
-          console.log(`[HeroImage] Found image at ${url}: ${imageUrl}`);
+          imageCandidates = candidates;
+          console.log(`[HeroImage] Found ${candidates.length} candidates at ${url}`);
           break;
         }
       } catch (err) {
@@ -347,38 +363,60 @@ export async function findAndExtractHeroImage(
       }
     }
 
-    if (!heroImageUrl) {
+    if (imageCandidates.length === 0) {
       console.log(`[HeroImage] No hero image found for: ${courseName}`);
       return { heroImageUrl: null, website: foundWebsite };
     }
 
-    // Download the image
-    console.log(`[HeroImage] Downloading: ${heroImageUrl}`);
-    const imageResponse = await fetchWithSSLBypass(heroImageUrl);
+    // Try downloading each candidate until one succeeds
+    let downloadedBuffer: Buffer | null = null;
+    let contentType: string = 'image/jpeg';
+    let successfulImageUrl: string | null = null;
 
-    if (!imageResponse.ok) {
-      console.log(`[HeroImage] Failed to download image: ${imageResponse.status}`);
-      return { heroImageUrl: null, website: foundWebsite };
+    for (const imageUrl of imageCandidates.slice(0, 5)) { // Try up to 5 candidates
+      try {
+        console.log(`[HeroImage] Downloading: ${imageUrl}`);
+        const imageResponse = await fetchWithSSLBypass(imageUrl);
+
+        if (!imageResponse.ok) {
+          console.log(`[HeroImage] Failed to download image: ${imageResponse.status}`);
+          continue;
+        }
+
+        contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+
+        // Make sure it's actually an image
+        if (!contentType.includes('image')) {
+          console.log(`[HeroImage] Not an image: ${contentType}`);
+          continue;
+        }
+
+        const buffer = Buffer.from(await imageResponse.arrayBuffer());
+
+        // Validate size
+        if (buffer.length > 10 * 1024 * 1024) {
+          console.log(`[HeroImage] Image too large: ${buffer.length} bytes`);
+          continue;
+        }
+
+        if (buffer.length < 1000) {
+          console.log(`[HeroImage] Image too small (probably a placeholder): ${buffer.length} bytes`);
+          continue;
+        }
+
+        // Success!
+        downloadedBuffer = buffer;
+        successfulImageUrl = imageUrl;
+        console.log(`[HeroImage] Successfully downloaded: ${imageUrl} (${buffer.length} bytes)`);
+        break;
+      } catch (err) {
+        console.log(`[HeroImage] Error downloading ${imageUrl}:`, err);
+        continue;
+      }
     }
 
-    const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
-
-    // Make sure it's actually an image
-    if (!contentType.includes('image')) {
-      console.log(`[HeroImage] Not an image: ${contentType}`);
-      return { heroImageUrl: null, website: foundWebsite };
-    }
-
-    const buffer = Buffer.from(await imageResponse.arrayBuffer());
-
-    // Validate size
-    if (buffer.length > 10 * 1024 * 1024) {
-      console.log(`[HeroImage] Image too large: ${buffer.length} bytes`);
-      return { heroImageUrl: null, website: foundWebsite };
-    }
-
-    if (buffer.length < 1000) {
-      console.log(`[HeroImage] Image too small (probably a placeholder): ${buffer.length} bytes`);
+    if (!downloadedBuffer || !successfulImageUrl) {
+      console.log(`[HeroImage] All download attempts failed for: ${courseName}`);
       return { heroImageUrl: null, website: foundWebsite };
     }
 
@@ -389,7 +427,7 @@ export async function findAndExtractHeroImage(
     else if (contentType.includes('gif')) extension = 'gif';
 
     // Upload to Vercel Blob
-    const uploaded = await uploadCourseHeroImage(buffer, courseId, extension);
+    const uploaded = await uploadCourseHeroImage(downloadedBuffer, courseId, extension);
 
     // Update the course record
     await prisma.course.update({
