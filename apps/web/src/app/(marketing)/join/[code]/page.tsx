@@ -67,7 +67,7 @@ export default function InviteLandingPage() {
 
   const instructions = getInstallInstructions();
   const isPWAInstalled = instructions.platform === "installed";
-  const isSubscribed = billingStatus?.status === "ACTIVE" || billingStatus?.isFoundingMember;
+  const _isSubscribed = billingStatus?.status === "ACTIVE" || billingStatus?.isFoundingMember;
 
   // Check subscription status when signed in
   useEffect(() => {
