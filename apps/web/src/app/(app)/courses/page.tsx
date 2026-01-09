@@ -9,6 +9,7 @@ import { Card, CardContent, Skeleton, EmptyState, FAB } from "@/components/ui";
 import { Header } from "@/components/layout/header";
 import { CourseMapIllustration } from "@/components/illustrations";
 import { api, type Course, type CourseWithMeta, type DiscoverCoursesResponse } from "@/lib/api";
+import { formatCourseName } from "@/lib/utils";
 
 interface UserLocation {
   latitude: number;
@@ -146,7 +147,7 @@ export default function CoursesPage() {
                   </div>
                 )}
                 <p className="text-body font-semibold text-white truncate drop-shadow-md">
-                  {course.name}
+                  {formatCourseName(course.name)}
                 </p>
                 {course.isVerified && (
                   <div className="flex-shrink-0 w-4 h-4 rounded-full bg-brand flex items-center justify-center">

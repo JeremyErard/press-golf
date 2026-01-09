@@ -9,7 +9,7 @@ import { api, type RoundDetail, type PressStatus, type PressSegment, type GameLi
 import { ScorecardGrid } from "@/components/scorecard/scorecard-grid";
 import { ScoreEntryModal } from "@/components/scorecard/score-entry-modal";
 import { GamesSummary } from "@/components/scorecard/games-summary";
-import { cn } from "@/lib/utils";
+import { cn, formatCourseName } from "@/lib/utils";
 import { useRealtimeScores, type RealtimeScoreUpdate, type RealtimePlayerJoined } from "@/hooks/use-realtime-scores";
 import { toast } from "@/components/ui/sonner";
 import Link from "next/link";
@@ -386,7 +386,7 @@ export default function ScorecardPage() {
             </Link>
             <div>
               <h1 className="text-sm font-semibold truncate max-w-[200px] text-white drop-shadow">
-                {round.course.name}
+                {formatCourseName(round.course.name)}
               </h1>
               <p className="text-xs text-white/80">
                 {round.tee?.name || "Tees"} • {round.players.length} player{round.players.length !== 1 ? "s" : ""}

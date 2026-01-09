@@ -7,7 +7,7 @@ import { ChevronRight, Play, UserPlus, Flag } from "lucide-react";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton, SectionHeader } from "@/components/ui";
 import { PendingApprovals } from "@/components/handicap/pending-approvals";
 import { api, type Round, type RoundDetail, type CalculateResultsResponse, type User as ApiUser } from "@/lib/api";
-import { formatDate, formatMoney } from "@/lib/utils";
+import { formatDate, formatMoney, formatCourseName } from "@/lib/utils";
 
 interface RoundWithEarnings extends Round {
   earnings?: number;
@@ -364,7 +364,7 @@ export default function DashboardPage() {
                 </div>
 
                 <h3 className="text-white font-bold text-lg mb-1">
-                  {activeRoundStatus.courseName}
+                  {formatCourseName(activeRoundStatus.courseName)}
                   {activeRoundStatus.netPosition !== 0 && (
                     <span className={activeRoundStatus.netPosition > 0 ? "text-green-400" : "text-red-400"}>
                       {" - "}You are {Math.abs(activeRoundStatus.netPosition)} {activeRoundStatus.netPosition > 0 ? "UP" : "DOWN"}
@@ -415,7 +415,7 @@ export default function DashboardPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-white font-semibold">
-                            {round.courseName || "Round Setup"}
+                            {round.courseName ? formatCourseName(round.courseName) : "Round Setup"}
                           </p>
                           <p className="text-sm text-muted mt-0.5">
                             {formatDate(round.date)} • {round._count?.players || 0} player{(round._count?.players || 0) !== 1 ? "s" : ""}
@@ -458,7 +458,7 @@ export default function DashboardPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-white font-semibold">
-                            {round.courseName || formatDate(round.date)}
+                            {round.courseName ? formatCourseName(round.courseName) : formatDate(round.date)}
                           </p>
                           <p className="text-sm text-muted mt-0.5">
                             {formatDate(round.date)} • {round._count?.players || 0} player{(round._count?.players || 0) !== 1 ? "s" : ""}

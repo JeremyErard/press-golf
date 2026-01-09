@@ -61,6 +61,74 @@ export function isAndroid(): boolean {
   return /Android/.test(navigator.userAgent);
 }
 
+/**
+ * Format course name for proper capitalization.
+ * Handles common golf abbreviations and title casing.
+ * Examples: "Cc Of Lansing" → "CC of Lansing", "PEBBLE BEACH GC" → "Pebble Beach GC"
+ */
+export function formatCourseName(name: string): string {
+  if (!name) return name;
+
+  // Common golf abbreviations that should be uppercase
+  const golfAbbreviations = ["cc", "gc", "g.c.", "c.c."];
+  // Words that should be lowercase (unless first word)
+  const lowercaseWords = ["of", "the", "at", "and", "in", "on", "by", "for"];
+
+  // Split into words and process each
+  const words = name.split(/\s+/);
+
+  return words
+    .map((word, index) => {
+      const lowerWord = word.toLowerCase();
+
+      // Golf abbreviations should be uppercase
+      if (golfAbbreviations.includes(lowerWord)) {
+        return word.toUpperCase();
+      }
+
+      // Common lowercase words (except if first word)
+      if (index > 0 && lowercaseWords.includes(lowerWord)) {
+        return lowerWord;
+      }
+
+      // Title case: first letter uppercase, rest lowercase
+      // But preserve all-caps if it looks intentional (2+ letters)
+      if (word === word.toUpperCase() && word.length > 2) {
+        // Convert from ALL CAPS to Title Case
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      }
+
+      // Standard title case
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
+/**
+ * Format tee name for display with optional "Tees" suffix.
+ * Avoids redundant suffixes like "'64 Course Tees" by detecting
+ * when the name already contains descriptive terms.
+ */
+export function formatTeeDisplayName(teeName: string, includeTeesSuffix = true): string {
+  if (!teeName) return "Tees";
+
+  const lowerName = teeName.toLowerCase().trim();
+
+  // Don't add "Tees" if name already ends with it
+  if (lowerName.endsWith("tees") || lowerName.endsWith("tee")) {
+    return teeName;
+  }
+
+  // Don't add "Tees" if name contains descriptive course-related terms
+  // This handles cases like "'64 Course" which would be redundant as "'64 Course Tees"
+  if (lowerName.includes("course")) {
+    return teeName;
+  }
+
+  // For standard tee names (Blue, Black, White, etc.) add "Tees" suffix
+  return includeTeesSuffix ? `${teeName} Tees` : teeName;
+}
+
 // Tee color mapping - provides consistent colors based on tee name
 const TEE_COLOR_MAP: Record<string, string> = {
   // Black variants

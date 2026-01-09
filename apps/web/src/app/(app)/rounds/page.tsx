@@ -7,7 +7,7 @@ import { Plus, ChevronRight, Flag } from "lucide-react";
 import { Card, CardContent, Badge, Tabs, TabsList, TabsTrigger, Skeleton, EmptyState, FAB } from "@/components/ui";
 import { Header } from "@/components/layout/header";
 import { api, type Round } from "@/lib/api";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatCourseName } from "@/lib/utils";
 
 const statusBadgeVariant = {
   SETUP: "warning" as const,
@@ -111,7 +111,7 @@ export default function RoundsPage() {
                             {statusLabel[round.status]}
                           </Badge>
                           <p className="text-body font-medium">
-                            {round.courseName || formatDate(round.date)}
+                            {round.courseName ? formatCourseName(round.courseName) : formatDate(round.date)}
                           </p>
                           <p className="text-caption text-muted">
                             {formatDate(round.date)} • {round._count?.players || 0} player{(round._count?.players || 0) !== 1 ? "s" : ""}

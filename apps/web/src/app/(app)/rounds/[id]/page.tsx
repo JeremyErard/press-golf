@@ -46,7 +46,7 @@ import {
   Input,
 } from "@/components/ui";
 import { api, type RoundDetail, type GameType, type Buddy } from "@/lib/api";
-import { formatDate, cn, getTeeColor } from "@/lib/utils";
+import { formatDate, cn, getTeeColor, formatTeeDisplayName, formatCourseName } from "@/lib/utils";
 import { BettingIllustration } from "@/components/illustrations";
 
 // Remove framer-motion - causes hydration issues with Clerk
@@ -506,7 +506,7 @@ export default function RoundDetailPage() {
 
             <div>
               <p className="text-h3 font-semibold text-white drop-shadow-md">
-                {round.course.name}
+                {formatCourseName(round.course.name)}
               </p>
               {(round.course.city || round.course.state) && (
                 <p className="text-caption text-white/70">
@@ -520,7 +520,7 @@ export default function RoundDetailPage() {
                 className="w-4 h-4 rounded-full border border-white/30"
                 style={{ backgroundColor: getTeeColor(round.tee.name, round.tee.color) }}
               />
-              <p className="text-body text-white/90">{round.tee.name} Tees</p>
+              <p className="text-body text-white/90">{formatTeeDisplayName(round.tee.name)}</p>
               {round.tee.totalYardage && (
                 <span className="text-caption text-white/60">
                   • {round.tee.totalYardage.toLocaleString()} yds

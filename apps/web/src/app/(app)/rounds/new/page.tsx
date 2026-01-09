@@ -7,7 +7,7 @@ import { ChevronRight, ChevronDown, Check, Crown } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Skeleton, Input } from "@/components/ui";
 import { api, type Tee, type CourseDetail, type BillingStatus } from "@/lib/api";
-import { getTeeColor } from "@/lib/utils";
+import { getTeeColor, formatCourseName } from "@/lib/utils";
 
 type Step = "tee" | "confirm";
 
@@ -231,7 +231,7 @@ export default function NewRoundPage() {
                   </div>
                   <CardContent className="relative z-10 p-lg">
                     <p className="text-caption text-white/70">Course</p>
-                    <p className="text-body font-semibold text-white drop-shadow-md">{course.name}</p>
+                    <p className="text-body font-semibold text-white drop-shadow-md">{formatCourseName(course.name)}</p>
                   </CardContent>
                 </Card>
 
@@ -351,7 +351,7 @@ export default function NewRoundPage() {
                   <CardContent className="relative z-10 p-lg space-y-md">
                     <div>
                       <p className="text-caption text-white/70">Course</p>
-                      <p className="text-body font-semibold text-white drop-shadow-md">{course.name}</p>
+                      <p className="text-body font-semibold text-white drop-shadow-md">{formatCourseName(course.name)}</p>
                     </div>
                     <div>
                       <p className="text-caption text-white/70">Tees</p>

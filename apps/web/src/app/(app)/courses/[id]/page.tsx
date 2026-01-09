@@ -7,7 +7,7 @@ import { MapPin, Check, ChevronDown, Play, Home } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, Skeleton, Button, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui";
 import { api, type CourseDetail, type Tee } from "@/lib/api";
-import { getTeeColor } from "@/lib/utils";
+import { getTeeColor, formatCourseName } from "@/lib/utils";
 
 // Helper to categorize tees as primary vs alternate
 function categorizeTees(tees: Tee[]): { primary: Tee[]; alternate: Tee[] } {
@@ -202,7 +202,7 @@ export default function CourseDetailPage() {
 
   return (
     <div>
-      <Header title={course.name} showBack />
+      <Header title={formatCourseName(course.name)} showBack />
 
       <div className="p-lg space-y-md">
         {/* Course Info Card with Hero Backdrop */}
@@ -233,7 +233,7 @@ export default function CourseDetailPage() {
                     </div>
                   )}
                   <h2 className="text-base font-semibold text-white truncate drop-shadow-md">
-                    {course.name}
+                    {formatCourseName(course.name)}
                   </h2>
                   {course.isVerified && (
                     <div className="w-4 h-4 rounded-full bg-brand flex items-center justify-center flex-shrink-0">
