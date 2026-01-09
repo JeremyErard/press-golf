@@ -124,6 +124,17 @@ export const api = {
 
   // Courses
   getCourses: (token: string) => apiRequest<Course[]>("/courses", {}, token),
+  discoverCourses: (token: string, lat?: number, lng?: number) => {
+    const params = new URLSearchParams();
+    if (lat !== undefined) params.set("lat", lat.toString());
+    if (lng !== undefined) params.set("lng", lng.toString());
+    const queryString = params.toString();
+    return apiRequest<DiscoverCoursesResponse>(
+      `/courses/discover${queryString ? `?${queryString}` : ""}`,
+      {},
+      token
+    );
+  },
   getCourse: (token: string, id: string) =>
     apiRequest<CourseDetail>(`/courses/${id}`, {}, token),
   createCourse: (token: string, data: CreateCourseInput) =>
@@ -502,6 +513,18 @@ export interface Course {
   website?: string;
   heroImageUrl?: string;
   isVerified: boolean;
+}
+
+export interface CourseWithMeta extends Course {
+  tees?: Tee[];
+  roundCount?: number;
+  distance?: number;
+}
+
+export interface DiscoverCoursesResponse {
+  nearby: CourseWithMeta[];
+  homeCourses: CourseWithMeta[];
+  featured: CourseWithMeta[];
 }
 
 export interface CourseDetail extends Course {

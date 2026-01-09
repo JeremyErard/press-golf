@@ -383,6 +383,117 @@ Extract as much data as you can see. If some fields are not visible, omit them b
   });
 
   // =====================
+  // GET /api/courses/discover
+  // Smart course loading: nearby + home + featured courses
+  // Requires auth to get personalized home courses
+  // =====================
+  interface DiscoverQuery {
+    lat?: string;
+    lng?: string;
+    limit?: string;
+  }
+
+  app.get<{ Querystring: DiscoverQuery }>('/discover', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { lat, lng, limit: limitStr = '5' } = request.query;
+    const nearbyLimit = Math.min(Math.max(1, parseInt(limitStr, 10) || 5), 10);
+
+    const userLat = lat ? parseFloat(lat) : null;
+    const userLng = lng ? parseFloat(lng) : null;
+
+    // Fetch home courses, featured courses, and all courses with coordinates in parallel
+    const [homeCourses, featuredCourses, allCourses] = await Promise.all([
+      // User's home courses
+      prisma.homeCourse.findMany({
+        where: { userId: user.id as string },
+        include: {
+          course: {
+            include: {
+              tees: { orderBy: { totalYardage: 'desc' } },
+              _count: { select: { rounds: true } },
+            },
+          },
+        },
+      }),
+
+      // Featured courses with round counts
+      prisma.course.findMany({
+        where: { isFeatured: true },
+        include: {
+          tees: { orderBy: { totalYardage: 'desc' } },
+          _count: { select: { rounds: true } },
+        },
+        orderBy: { name: 'asc' },
+        take: 5,
+      }),
+
+      // All courses with coordinates (for nearby calculation)
+      userLat && userLng ? prisma.course.findMany({
+        where: {
+          latitude: { not: null },
+          longitude: { not: null },
+        },
+        include: {
+          tees: { orderBy: { totalYardage: 'desc' } },
+          _count: { select: { rounds: true } },
+        },
+      }) : Promise.resolve([]),
+    ]);
+
+    // Calculate distances and get nearest courses
+    let nearbyCourses: typeof allCourses = [];
+    if (userLat && userLng && allCourses.length > 0) {
+      // Get home course IDs to exclude from nearby
+      const homeCourseIds = new Set(homeCourses.map(hc => hc.courseId));
+
+      // Calculate distance for each course using Haversine formula
+      const coursesWithDistance = allCourses
+        .filter(c => !homeCourseIds.has(c.id)) // Exclude home courses
+        .map(course => {
+          const courseLat = Number(course.latitude);
+          const courseLng = Number(course.longitude);
+
+          // Haversine formula
+          const R = 3959; // Earth's radius in miles
+          const dLat = (courseLat - userLat) * Math.PI / 180;
+          const dLng = (courseLng - userLng) * Math.PI / 180;
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(userLat * Math.PI / 180) * Math.cos(courseLat * Math.PI / 180) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distance = R * c;
+
+          return { ...course, distance };
+        })
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, nearbyLimit);
+
+      nearbyCourses = coursesWithDistance;
+    }
+
+    // Helper to convert Decimal fields
+    const convertCourse = (course: typeof allCourses[0] & { distance?: number }) => ({
+      ...course,
+      latitude: course.latitude ? Number(course.latitude) : null,
+      longitude: course.longitude ? Number(course.longitude) : null,
+      roundCount: course._count?.rounds || 0,
+      distance: course.distance,
+    });
+
+    return {
+      success: true,
+      data: {
+        nearby: nearbyCourses.map(convertCourse),
+        homeCourses: homeCourses.map(hc => convertCourse(hc.course as typeof allCourses[0])),
+        featured: featuredCourses.map(convertCourse),
+      },
+    };
+  });
+
+  // =====================
   // POST /api/courses/fetch-from-url
   // Extract course data from a website URL using Claude
   // =====================
