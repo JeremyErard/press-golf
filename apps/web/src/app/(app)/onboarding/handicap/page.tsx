@@ -128,13 +128,13 @@ export default function HandicapOnboardingPage() {
       <div className="max-w-md mx-auto pt-8">
         {/* Header */}
         <div className="mb-8">
-          {step !== "choice" && step !== "success" && (
+          {step !== "success" && (
             <button
-              onClick={handleBack}
+              onClick={step === "choice" ? () => router.push("/profile") : handleBack}
               className="flex items-center gap-1 text-muted hover:text-foreground mb-4 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span className="text-sm">Back</span>
+              <span className="text-sm">{step === "choice" ? "Back to Profile" : "Back"}</span>
             </button>
           )}
           <h1 className="text-2xl font-bold text-foreground">
@@ -208,7 +208,7 @@ export default function HandicapOnboardingPage() {
                 <div className="text-left">
                   <h3 className="font-semibold text-foreground">Enter Manually</h3>
                   <p className="text-sm text-muted mt-1">
-                    Type your handicap (requires approval)
+                    Type your handicap (round creator must approve)
                   </p>
                 </div>
               </div>
@@ -282,7 +282,7 @@ export default function HandicapOnboardingPage() {
           <div className="space-y-6">
             <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
               <p className="text-amber-400 text-sm">
-                Manual handicaps require approval from the round creator before you can play in games.
+                Manual handicaps require approval from the person who creates each round before you can play in their games.
               </p>
             </div>
 

@@ -537,7 +537,7 @@ export default function RoundDetailPage() {
               <CardContent className="p-lg space-y-md">
                 <div className="flex items-center justify-between">
                   <p className="text-body font-medium">Invite Players</p>
-                  <Badge variant="brand">{round.players.length}/4</Badge>
+                  <Badge variant="brand" title="Maximum 4 players per foursome">{round.players.length}/4</Badge>
                 </div>
 
                 {/* Share Button - Primary Action */}

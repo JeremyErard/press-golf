@@ -34,23 +34,10 @@ const validateDisplayName = (name: string): string | null => {
   return null;
 };
 
-const validateHandicapIndex = (handicap: string): string | null => {
-  if (!handicap) return null; // Optional field
-  const num = parseFloat(handicap);
-  if (isNaN(num)) {
-    return "Handicap must be a number";
-  }
-  if (num < -10 || num > 54) {
-    return "Handicap must be between -10 and 54";
-  }
-  return null;
-};
-
 interface FormErrors {
   phone?: string | null;
   ghinNumber?: string | null;
   displayName?: string | null;
-  handicapIndex?: string | null;
 }
 
 export default function EditProfilePage() {
@@ -66,7 +53,6 @@ export default function EditProfilePage() {
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
   const [ghinNumber, setGhinNumber] = useState("");
-  const [handicapIndex, setHandicapIndex] = useState("");
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -82,7 +68,6 @@ export default function EditProfilePage() {
         setDisplayName(user.displayName || "");
         setPhone(user.phone || "");
         setGhinNumber(user.ghinNumber || "");
-        setHandicapIndex(user.handicapIndex?.toString() || "");
       } catch (err) {
         console.error("Failed to fetch profile:", err);
         toast.error("Failed to load profile");
@@ -98,11 +83,10 @@ export default function EditProfilePage() {
       phone: validatePhone(phone),
       ghinNumber: validateGhinNumber(ghinNumber),
       displayName: validateDisplayName(displayName),
-      handicapIndex: validateHandicapIndex(handicapIndex),
     };
     setErrors(newErrors);
     return !Object.values(newErrors).some(Boolean);
-  }, [phone, ghinNumber, displayName, handicapIndex]);
+  }, [phone, ghinNumber, displayName]);
 
   const handleBlur = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -114,8 +98,6 @@ export default function EditProfilePage() {
       setErrors((prev) => ({ ...prev, ghinNumber: validateGhinNumber(ghinNumber) }));
     } else if (field === "displayName") {
       setErrors((prev) => ({ ...prev, displayName: validateDisplayName(displayName) }));
-    } else if (field === "handicapIndex") {
-      setErrors((prev) => ({ ...prev, handicapIndex: validateHandicapIndex(handicapIndex) }));
     }
   };
 
@@ -127,7 +109,6 @@ export default function EditProfilePage() {
       displayName: true,
       phone: true,
       ghinNumber: true,
-      handicapIndex: true,
     });
 
     if (!validateForm()) {
@@ -147,7 +128,6 @@ export default function EditProfilePage() {
         displayName: displayName || undefined,
         phone: phone || undefined,
         ghinNumber: ghinNumber || undefined,
-        handicapIndex: handicapIndex ? parseFloat(handicapIndex) : undefined,
       });
 
       toast.success("Profile saved successfully");
@@ -245,22 +225,6 @@ export default function EditProfilePage() {
             />
             <p className="text-xs text-muted mt-1">
               Your official USGA handicap ID (7 digits)
-            </p>
-          </div>
-
-          <div>
-            <Input
-              label="Handicap Index"
-              type="number"
-              value={handicapIndex}
-              onChange={(e) => setHandicapIndex(e.target.value)}
-              onBlur={() => handleBlur("handicapIndex")}
-              placeholder="e.g., 8.5"
-              error={touched.handicapIndex ? errors.handicapIndex ?? undefined : undefined}
-              step="0.1"
-            />
-            <p className="text-xs text-muted mt-1">
-              Your current handicap index (-10 to 54)
             </p>
           </div>
         </div>

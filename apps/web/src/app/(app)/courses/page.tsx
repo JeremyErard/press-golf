@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -22,15 +22,17 @@ export default function CoursesPage() {
   const selectMode = searchParams.get("select"); // "round" when selecting for new round
 
   const [discoverData, setDiscoverData] = useState<DiscoverCoursesResponse | null>(null);
-  const [searchResults, setSearchResults] = useState<Course[]>([]);
+  const [searchResults, setSearchResults] = useState<(Course & { roundCount?: number })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [locationStatus, setLocationStatus] = useState<"loading" | "granted" | "denied" | "unavailable">("loading");
 
   // Get user's location
   useEffect(() => {
     if (!navigator.geolocation) {
+      setLocationStatus("unavailable");
       return;
     }
 
@@ -40,9 +42,11 @@ export default function CoursesPage() {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         });
+        setLocationStatus("granted");
       },
       (error) => {
         console.log("Location access denied or unavailable:", error.message);
+        setLocationStatus("denied");
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
     );
@@ -72,6 +76,19 @@ export default function CoursesPage() {
     fetchDiscoverData();
   }, [fetchDiscoverData]);
 
+  // Build a map of course IDs to round counts from discover data for enrichment
+  const courseRoundCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (discoverData) {
+      [...(discoverData.homeCourses || []), ...(discoverData.nearby || []), ...(discoverData.featured || [])].forEach(c => {
+        if (c.roundCount !== undefined) {
+          counts.set(c.id, c.roundCount);
+        }
+      });
+    }
+    return counts;
+  }, [discoverData]);
+
   // Search courses
   const handleSearch = useCallback(async (query: string) => {
     if (!query.trim()) {
@@ -91,13 +108,18 @@ export default function CoursesPage() {
           c.city?.toLowerCase().includes(query.toLowerCase()) ||
           c.state?.toLowerCase().includes(query.toLowerCase())
       );
-      setSearchResults(filtered);
+      // Enrich search results with round counts from discover data if available
+      const enriched = filtered.map(c => ({
+        ...c,
+        roundCount: courseRoundCounts.get(c.id),
+      }));
+      setSearchResults(enriched);
     } catch (error) {
       console.error("Failed to search courses:", error);
     } finally {
       setIsSearching(false);
     }
-  }, [getToken]);
+  }, [getToken, courseRoundCounts]);
 
   // Debounced search
   useEffect(() => {
@@ -156,11 +178,11 @@ export default function CoursesPage() {
                 )}
               </div>
               <div className="flex items-center gap-md text-caption text-white/80">
-                {(course.city || course.state) && (
+                {(course.city || course.state || course.country) && (
                   <div className="flex items-center gap-xs">
                     <MapPin className="h-3.5 w-3.5" />
                     <span className="drop-shadow-sm">
-                      {[course.city, course.state].filter(Boolean).join(", ")}
+                      {[course.city, course.state, course.country && course.country !== 'USA' ? course.country : null].filter(Boolean).join(", ")}
                     </span>
                   </div>
                 )}
@@ -262,13 +284,27 @@ export default function CoursesPage() {
             )}
 
             {/* Nearby Courses */}
-            {discoverData?.nearby && discoverData.nearby.length > 0 && (
+            {discoverData?.nearby && discoverData.nearby.length > 0 ? (
               <div>
                 <SectionHeader icon={Navigation} title="Nearby" />
                 <div className="space-y-md">
                   {discoverData.nearby.map((course, index) => (
                     <CourseCard key={course.id} course={course} index={index} />
                   ))}
+                </div>
+              </div>
+            ) : (locationStatus === "denied" || locationStatus === "unavailable") && (
+              <div className="p-4 rounded-xl bg-card border border-border">
+                <div className="flex items-start gap-3">
+                  <Navigation className="h-5 w-5 text-muted flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Enable location for nearby courses</p>
+                    <p className="text-xs text-muted mt-1">
+                      {locationStatus === "denied"
+                        ? "Allow location access in your browser settings to see courses near you."
+                        : "Location services are not available on this device."}
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

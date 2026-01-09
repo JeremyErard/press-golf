@@ -15,6 +15,11 @@ export function formatMoney(amount: number): string {
     maximumFractionDigits: 2,
   }).format(absAmount);
 
+  // Don't add +/- prefix for zero
+  if (amount === 0) {
+    return formatted;
+  }
+
   return isNegative ? `-${formatted}` : `+${formatted}`;
 }
 
