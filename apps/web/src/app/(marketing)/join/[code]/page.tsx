@@ -4,9 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
-import { Flag, Users, Calendar, Loader2 } from "lucide-react";
+import { Flag, Users, Calendar, Loader2, Crown } from "lucide-react";
 import { Button, Card, CardContent, Avatar, Badge, Skeleton } from "@/components/ui";
-import { api, type InviteDetails, type GameType } from "@/lib/api";
+import { api, type InviteDetails, type GameType, type BillingStatus } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { getInstallInstructions, showInstallPrompt } from "@/lib/pwa";
 
@@ -34,9 +34,28 @@ export default function InviteLandingPage() {
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showInstallGuide, setShowInstallGuide] = useState(false);
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
+  const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
 
   const instructions = getInstallInstructions();
   const isPWAInstalled = instructions.platform === "installed";
+  const isSubscribed = billingStatus?.status === "ACTIVE" || billingStatus?.isFoundingMember;
+
+  // Check subscription status when signed in
+  useEffect(() => {
+    async function checkSubscription() {
+      if (!isSignedIn) return;
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const status = await api.getBillingStatus(token);
+        setBillingStatus(status);
+      } catch (error) {
+        console.error("Failed to check subscription:", error);
+      }
+    }
+    checkSubscription();
+  }, [isSignedIn, getToken]);
 
   useEffect(() => {
     async function fetchInvite() {
@@ -65,6 +84,17 @@ export default function InviteLandingPage() {
         return;
       }
 
+      // Check subscription status
+      const status = await api.getBillingStatus(token);
+      const subscribed = status?.status === "ACTIVE" || status?.isFoundingMember;
+
+      if (!subscribed) {
+        setBillingStatus(status);
+        setShowSubscriptionPrompt(true);
+        setIsJoining(false);
+        return;
+      }
+
       // Accept the invite to join the round
       await api.acceptInvite(token, code);
 
@@ -77,12 +107,12 @@ export default function InviteLandingPage() {
     }
   }, [code, getToken, invite?.round?.id, router]);
 
-  // Auto-join if user is signed in and PWA is installed (returning after sign-up)
+  // Auto-join if user is signed in, subscribed, and PWA is installed (returning after sign-up/subscription)
   useEffect(() => {
-    if (isSignedIn && isPWAInstalled && invite?.round?.id && !isJoining && !error) {
+    if (isSignedIn && isPWAInstalled && invite?.round?.id && !isJoining && !error && !showSubscriptionPrompt) {
       handleJoinRound();
     }
-  }, [isSignedIn, isPWAInstalled, invite?.round?.id, isJoining, error, handleJoinRound]);
+  }, [isSignedIn, isPWAInstalled, invite?.round?.id, isJoining, error, showSubscriptionPrompt, handleJoinRound]);
 
   const handleGetStarted = async () => {
     // If PWA is installed, go to sign up/sign in
@@ -135,6 +165,49 @@ export default function InviteLandingPage() {
           <Link href="/">
             <Button>Go to Press</Button>
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Show subscription prompt if user is signed in but not subscribed
+  if (showSubscriptionPrompt) {
+    return (
+      <div className="min-h-screen p-lg">
+        <div className="max-w-md mx-auto">
+          {/* Header */}
+          <div className="text-center py-xl">
+            <h1 className="text-hero gradient-text">Press</h1>
+            <p className="text-muted mt-sm">Golf Betting Made Simple</p>
+          </div>
+
+          {/* Subscription Required Card */}
+          <Card className="relative overflow-hidden rounded-xl">
+            <div className="absolute inset-0">
+              <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/40 to-black/20" />
+            </div>
+            <CardContent className="relative z-10 p-xl text-center">
+              <div className="w-16 h-16 mx-auto mb-lg rounded-full bg-amber-500/20 flex items-center justify-center">
+                <Crown className="w-8 h-8 text-amber-400" />
+              </div>
+              <h2 className="text-xl font-semibold text-white mb-sm">Subscribe to Join</h2>
+              <p className="text-white/70 mb-md">
+                {invite.inviter.displayName} invited you to play at {invite.round?.course.name}
+              </p>
+              <p className="text-white/60 text-sm mb-lg">
+                Get unlimited rounds, score tracking, and betting games for just $1.99/month. Cancel anytime.
+              </p>
+              <Button
+                className="w-full h-12"
+                size="lg"
+                onClick={() => router.push(`/profile/subscription?redirect=/join/${code}`)}
+              >
+                <Crown className="h-5 w-5 mr-2" />
+                Subscribe to Join Round
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );

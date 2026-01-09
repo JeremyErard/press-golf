@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { ArrowLeft, Crown, Check, ExternalLink, Loader2 } from "lucide-react";
 import { api, BillingStatus } from "@/lib/api";
 
 export default function SubscriptionPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { getToken } = useAuth();
+  const redirectUrl = searchParams.get("redirect");
 
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,6 +43,11 @@ export default function SubscriptionPage() {
       const token = await getToken();
       if (!token) throw new Error("Not authenticated");
 
+      // Store redirect URL for after checkout completes
+      if (redirectUrl) {
+        sessionStorage.setItem("subscriptionRedirect", redirectUrl);
+      }
+
       const { url } = await api.createCheckoutSession(token);
       window.location.href = url;
     } catch (err) {
@@ -48,6 +55,18 @@ export default function SubscriptionPage() {
       setActionLoading(false);
     }
   };
+
+  // Check for stored redirect after subscription becomes active
+  useEffect(() => {
+    const isActive = status?.status === "ACTIVE" || status?.isFoundingMember;
+    if (isActive && !loading) {
+      const storedRedirect = sessionStorage.getItem("subscriptionRedirect");
+      if (storedRedirect) {
+        sessionStorage.removeItem("subscriptionRedirect");
+        router.push(storedRedirect);
+      }
+    }
+  }, [status, loading, router]);
 
   const handleManage = async () => {
     setActionLoading(true);
