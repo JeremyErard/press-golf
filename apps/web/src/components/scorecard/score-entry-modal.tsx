@@ -128,7 +128,7 @@ export function ScoreEntryModal({
           <p className="text-sm text-muted">{playerName}</p>
         </SheetHeader>
 
-        <div className="px-4 pb-6 space-y-6">
+        <div className="px-4 pb-24 space-y-6">
           {/* Score display */}
           <div className="text-center py-4">
             <div className="relative">

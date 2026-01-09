@@ -122,7 +122,7 @@ export function BuddyDetailSheet({
           </div>
         </SheetHeader>
 
-        <div className="px-5 pb-6 space-y-6">
+        <div className="px-5 pb-24 space-y-6">
           {/* Nickname input */}
           <div className="space-y-2">
             <label className="text-sm text-muted">Nickname (optional)</label>

@@ -94,7 +94,7 @@ export function ShareInviteSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="px-5 pb-6 space-y-6">
+        <div className="px-5 pb-24 space-y-6">
           {/* Primary action - Native Share */}
           {canShare && (
             <Button

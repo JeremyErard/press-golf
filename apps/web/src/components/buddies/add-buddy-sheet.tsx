@@ -121,7 +121,7 @@ export function AddBuddySheet({
             </SheetDescription>
           </SheetHeader>
 
-          <div className="px-5 pb-6 space-y-6">
+          <div className="px-5 pb-24 space-y-6">
             {/* Invite via Link */}
             <Card className="bg-brand/10 border-brand/20">
               <CardContent className="p-4">

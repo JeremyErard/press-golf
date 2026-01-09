@@ -116,7 +116,7 @@ export function AvatarEditor({
             </SheetDescription>
           </SheetHeader>
 
-          <div className="px-5 pb-6 space-y-lg">
+          <div className="px-5 pb-24 space-y-lg">
             {/* Current/Preview Avatar */}
             <div className="flex justify-center">
               <Avatar

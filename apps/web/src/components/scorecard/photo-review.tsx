@@ -134,7 +134,7 @@ export function ScorecardPhotoReview({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="px-5 pb-6 space-y-lg">
+        <div className="px-5 pb-24 space-y-lg">
           {/* Error display */}
           {error && (
             <div className="p-3 rounded-lg bg-error/10 border border-error/20 flex items-start gap-2">
