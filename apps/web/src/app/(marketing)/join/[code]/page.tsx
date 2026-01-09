@@ -234,8 +234,14 @@ export default function InviteLandingPage() {
         <div className="max-w-md mx-auto px-lg pb-24">
           {/* Hero Section */}
           <div className="text-center py-xl">
-            <h1 className="text-hero gradient-text drop-shadow-lg">Press</h1>
-            <p className="text-white/70 mt-sm text-lg">Golf Betting Made Simple</p>
+            <h1 className="text-6xl md:text-7xl font-black tracking-tight text-white drop-shadow-2xl">
+              PRESS
+            </h1>
+            <div className="flex items-center justify-center gap-3 mt-4">
+              <div className="h-px w-12 bg-gradient-to-r from-transparent to-white/50"></div>
+              <p className="text-white/70 text-sm uppercase tracking-[0.3em] font-medium">Golf Betting Made Simple</p>
+              <div className="h-px w-12 bg-gradient-to-l from-transparent to-white/50"></div>
+            </div>
           </div>
 
           {/* Invite Info Card */}
@@ -319,8 +325,15 @@ export default function InviteLandingPage() {
       <div className="max-w-md mx-auto px-lg pb-24">
         {/* Hero Section */}
         <div className="text-center py-xl">
-          <h1 className="text-hero gradient-text drop-shadow-lg">Press</h1>
-          <p className="text-xl text-white mt-sm">You've been invited to play</p>
+          <h1 className="text-6xl md:text-7xl font-black tracking-tight text-white drop-shadow-2xl">
+            PRESS
+          </h1>
+          <div className="flex items-center justify-center gap-3 mt-4">
+            <div className="h-px w-12 bg-gradient-to-r from-transparent to-white/50"></div>
+            <p className="text-white/70 text-sm uppercase tracking-[0.3em] font-medium">Golf Betting Made Simple</p>
+            <div className="h-px w-12 bg-gradient-to-l from-transparent to-white/50"></div>
+          </div>
+          <p className="text-xl text-white mt-4">You've been invited to play</p>
         </div>
 
         {/* Invite Card */}
