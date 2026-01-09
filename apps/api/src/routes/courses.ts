@@ -1160,4 +1160,41 @@ Extract as much data as you can see. If some fields are not visible, omit them b
       data: tee,
     };
   });
+
+  // =====================
+  // POST /api/courses/:id/refresh-hero
+  // Re-trigger hero image search for a course (requires auth)
+  // =====================
+  app.post<{ Params: { id: string } }>('/:id/refresh-hero', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const { id } = request.params;
+
+    const course = await prisma.course.findUnique({
+      where: { id },
+    });
+
+    if (!course) {
+      return notFound(reply, 'Course not found');
+    }
+
+    // Trigger hero image search asynchronously
+    findAndExtractHeroImage(
+      course.name,
+      course.city,
+      course.state,
+      course.id,
+      prisma,
+      course.website
+    ).then((result) => {
+      console.log(`[RefreshHero] Result for ${course.name}:`, result);
+    }).catch((err) => {
+      console.error(`[RefreshHero] Error for ${course.name}:`, err);
+    });
+
+    return {
+      success: true,
+      message: 'Hero image refresh triggered',
+    };
+  });
 };
