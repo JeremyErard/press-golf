@@ -26,8 +26,8 @@ const gameTypeLabels: Record<GameType, string> = {
 const features = [
   {
     icon: Target,
-    title: "Track Every Shot",
-    description: "Hole-by-hole scoring for your entire group",
+    title: "Live Bet Tracking",
+    description: "See who's winning in real-time, hole by hole",
   },
   {
     icon: Crown,
