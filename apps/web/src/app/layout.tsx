@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/ui/sonner";
+import { ReturningUserTracker } from "@/components/auth/returning-user-tracker";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -77,6 +78,7 @@ export default function RootLayout({
           <meta name="mobile-web-app-capable" content="yes" />
         </head>
         <body className={`${geistSans.variable} ${geistMono.variable} font-sans min-h-screen`}>
+          <ReturningUserTracker />
           {children}
           <Toaster />
         </body>
