@@ -244,7 +244,7 @@ export default function InviteLandingPage() {
               PRESS
             </h1>
             <p className="text-white/50 text-[10px] uppercase tracking-[0.2em] font-medium mt-1">
-              Golf Betting Made Simple
+              Your Side Games Managed For You
             </p>
           </div>
 
@@ -336,7 +336,7 @@ export default function InviteLandingPage() {
             PRESS
           </h1>
           <p className="text-white/50 text-[10px] uppercase tracking-[0.2em] font-medium mt-1">
-            Golf Betting Made Simple
+            Your Side Games Managed For You
           </p>
           <p className="text-base text-white/90 mt-4 font-medium">You've been invited to play</p>
         </div>

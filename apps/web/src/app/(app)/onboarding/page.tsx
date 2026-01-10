@@ -332,7 +332,7 @@ export default function OnboardingPage() {
                 <Crown className="w-10 h-10 text-brand" />
               </div>
               <h2 className="text-2xl font-bold text-foreground">Welcome to Press!</h2>
-              <p className="text-muted mt-2">Golf betting made simple</p>
+              <p className="text-muted mt-2">Your side games managed for you</p>
             </div>
 
             {/* Pricing */}

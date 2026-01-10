@@ -17,7 +17,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Press - Golf Betting Made Simple",
+  title: "Press - Your Side Games Managed For You",
   description: "Track golf bets with your buddies. Nassau, Skins, Wolf, and more.",
   manifest: "/manifest.json",
   appleWebApp: {
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    title: "Press - Golf Betting Made Simple",
+    title: "Press - Your Side Games Managed For You",
     description: "Track golf bets with your buddies. Nassau, Skins, Wolf, and more.",
     siteName: "Press",
     url: "https://pressbet.golf",
@@ -39,13 +39,13 @@ export const metadata: Metadata = {
         url: "https://pressbet.golf/images/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "Press - Golf Betting Made Simple",
+        alt: "Press - Your Side Games Managed For You",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Press - Golf Betting Made Simple",
+    title: "Press - Your Side Games Managed For You",
     description: "Track golf bets with your buddies. Nassau, Skins, Wolf, and more.",
     images: ["https://pressbet.golf/images/og-image.jpg"],
   },

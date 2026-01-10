@@ -247,7 +247,7 @@ export default function DashboardPage() {
               PRESS
             </h1>
             <p className="text-white/60 text-[10px] uppercase tracking-[0.2em] font-medium mt-0.5">
-              Golf Betting Made Simple
+              Your Side Games Managed For You
             </p>
           </div>
           <Link href="/profile" className="group">

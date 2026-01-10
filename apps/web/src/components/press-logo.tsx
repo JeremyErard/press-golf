@@ -18,7 +18,7 @@ export function PressLogo({ size = "xl", className = "" }: PressLogoProps) {
   return (
     <Image
       src="/icons/press-logo-p.png"
-      alt="Press - Golf Betting Made Simple"
+      alt="Press - Your Side Games Managed For You"
       width={config.width}
       height={config.height}
       className={`object-contain ${className}`}

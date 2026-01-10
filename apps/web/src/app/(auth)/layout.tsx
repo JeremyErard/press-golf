@@ -30,7 +30,7 @@ export default function AuthLayout({
           </h1>
           <div className="flex items-center justify-center gap-3 mt-4">
             <div className="h-px w-12 bg-gradient-to-r from-transparent to-white/50"></div>
-            <p className="text-white/70 text-sm uppercase tracking-[0.3em] font-medium">Golf Betting Made Simple</p>
+            <p className="text-white/70 text-sm uppercase tracking-[0.3em] font-medium">Your Side Games Managed For You</p>
             <div className="h-px w-12 bg-gradient-to-l from-transparent to-white/50"></div>
           </div>
         </div>
