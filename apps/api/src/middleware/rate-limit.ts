@@ -1,8 +1,8 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { sendError, ErrorCodes } from '../lib/errors.js';
+import { getRedisClient, KEY_PREFIX } from '../lib/redis.js';
 
-// In-memory rate limit store
-// For production, consider using Redis for distributed rate limiting
+// In-memory rate limit store (fallback when Redis is unavailable)
 interface RateLimitEntry {
   count: number;
   resetAt: number;
@@ -50,10 +50,56 @@ function getRateLimitKey(request: FastifyRequest): string {
 }
 
 /**
- * Check and update rate limit for a key
- * Returns { allowed: boolean, remaining: number, resetAt: number }
+ * Check rate limit using Redis (distributed)
  */
-function checkRateLimit(
+async function checkRateLimitRedis(
+  key: string,
+  config: RateLimitConfig
+): Promise<{ allowed: boolean; remaining: number; resetAt: number; total: number }> {
+  const redis = getRedisClient();
+  if (!redis) {
+    // Fallback to in-memory if Redis not available
+    return checkRateLimitLocal(key, config);
+  }
+
+  const prefix = config.keyPrefix || 'default';
+  // Note: KEY_PREFIX is already added by ioredis keyPrefix option
+  const redisKey = `ratelimit:${prefix}:${key}`;
+  const windowMs = config.window * 1000;
+
+  try {
+    // Use Redis MULTI for atomic increment + expire
+    const now = Date.now();
+    const count = await redis.incr(redisKey);
+
+    // Set expiry only on first request (when count is 1)
+    if (count === 1) {
+      await redis.pexpire(redisKey, windowMs);
+    }
+
+    // Get TTL to calculate reset time
+    const ttl = await redis.pttl(redisKey);
+    const resetAt = ttl > 0 ? now + ttl : now + windowMs;
+
+    const allowed = count <= config.max;
+    const remaining = Math.max(0, config.max - count);
+
+    return {
+      allowed,
+      remaining,
+      resetAt,
+      total: config.max,
+    };
+  } catch (error) {
+    console.error('Redis rate limit error, falling back to local:', error);
+    return checkRateLimitLocal(key, config);
+  }
+}
+
+/**
+ * Check rate limit using in-memory store (fallback)
+ */
+function checkRateLimitLocal(
   key: string,
   config: RateLimitConfig
 ): { allowed: boolean; remaining: number; resetAt: number; total: number } {
@@ -111,7 +157,7 @@ function checkRateLimit(
 export function createRateLimitHook(config: RateLimitConfig) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const key = getRateLimitKey(request);
-    const result = checkRateLimit(key, config);
+    const result = await checkRateLimitRedis(key, config);
 
     // Set rate limit headers
     reply.header('X-RateLimit-Limit', result.total);
@@ -141,10 +187,24 @@ export function createRateLimitHook(config: RateLimitConfig) {
  * Register global rate limiting on the Fastify instance
  */
 export async function registerRateLimiting(app: FastifyInstance) {
+  // Log Redis status on startup
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      await redis.ping();
+      app.log.info('Rate limiting using Redis (distributed)');
+    } catch (error) {
+      app.log.warn({ error }, 'Redis connection failed, using in-memory rate limiting');
+    }
+  } else {
+    app.log.info('Rate limiting using in-memory store (single instance only)');
+  }
+
   // Global rate limit hook
   app.addHook('preHandler', createRateLimitHook(RateLimits.global));
 
-  // Periodic cleanup of expired entries (every 5 minutes)
+  // Periodic cleanup of expired in-memory entries (every 5 minutes)
+  // Redis handles its own expiry via TTL
   const cleanupInterval = setInterval(() => {
     const now = Date.now();
     let cleaned = 0;

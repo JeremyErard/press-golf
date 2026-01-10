@@ -3,6 +3,7 @@ import { EventEmitter } from 'events';
 import { verifyToken } from '@clerk/backend';
 import { prisma } from '../lib/prisma.js';
 import { forbidden } from '../lib/errors.js';
+import { getRedisClient, getRedisSubscriber, getRoundChannel, isRedisAvailable } from '../lib/redis.js';
 
 // Custom auth handler for SSE that reads token from query params
 // (EventSource doesn't support custom headers)
@@ -50,10 +51,12 @@ async function requireAuthFromQuery(
   }
 }
 
-// In-memory event emitter for SSE broadcasts
-// For production scaling, replace with Redis pub/sub
-const roundEvents = new EventEmitter();
-roundEvents.setMaxListeners(1000); // Support many concurrent connections
+// Fallback in-memory event emitter (used when Redis is not available)
+const localEvents = new EventEmitter();
+localEvents.setMaxListeners(1000);
+
+// Track active subscriptions for cleanup
+const activeSubscriptions = new Map<string, Set<(event: RoundEvent) => void>>();
 
 // Event types
 export type RoundEventType = 'score_updated' | 'game_updated' | 'round_completed' | 'player_joined' | 'press_created';
@@ -65,14 +68,32 @@ export interface RoundEvent {
   data: Record<string, unknown>;
 }
 
-// Broadcast an event to all listeners for a round
-export function broadcastRoundEvent(roundId: string, event: Omit<RoundEvent, 'roundId' | 'timestamp'>) {
+/**
+ * Broadcast an event to all listeners for a round
+ * Uses Redis pub/sub if available, falls back to in-memory EventEmitter
+ */
+export async function broadcastRoundEvent(roundId: string, event: Omit<RoundEvent, 'roundId' | 'timestamp'>) {
   const fullEvent: RoundEvent = {
     ...event,
     roundId,
     timestamp: new Date().toISOString(),
   };
-  roundEvents.emit(`round:${roundId}`, fullEvent);
+
+  const redis = getRedisClient();
+  if (redis) {
+    // Publish to Redis channel
+    const channel = getRoundChannel(roundId);
+    try {
+      await redis.publish(channel, JSON.stringify(fullEvent));
+    } catch (error) {
+      console.error('Redis publish error, falling back to local:', error);
+      // Fallback to local if Redis fails
+      localEvents.emit(`round:${roundId}`, fullEvent);
+    }
+  } else {
+    // No Redis, use local EventEmitter
+    localEvents.emit(`round:${roundId}`, fullEvent);
+  }
 }
 
 // Helper function to emit score updates (call from rounds.ts after score entry)
@@ -113,6 +134,71 @@ export function emitPressCreated(roundId: string, gameId: string, segment: strin
     type: 'press_created',
     data: { gameId, segment, startHole },
   });
+}
+
+/**
+ * Subscribe to round events
+ * Returns cleanup function to unsubscribe
+ */
+async function subscribeToRound(
+  roundId: string,
+  handler: (event: RoundEvent) => void,
+  logger: { info: (obj: object, msg: string) => void; error: (obj: object, msg: string) => void }
+): Promise<() => void> {
+  const subscriber = getRedisSubscriber();
+
+  if (subscriber) {
+    const channel = getRoundChannel(roundId);
+
+    // Track this handler for cleanup
+    if (!activeSubscriptions.has(channel)) {
+      activeSubscriptions.set(channel, new Set());
+
+      // Subscribe to the channel (only once per channel)
+      try {
+        await subscriber.subscribe(channel);
+        logger.info({ channel }, 'Subscribed to Redis channel');
+      } catch (error) {
+        logger.error({ error, channel }, 'Failed to subscribe to Redis channel');
+        // Fall back to local
+        localEvents.on(`round:${roundId}`, handler);
+        return () => localEvents.off(`round:${roundId}`, handler);
+      }
+    }
+
+    activeSubscriptions.get(channel)!.add(handler);
+
+    // Listen for messages on this channel
+    const messageHandler = (ch: string, message: string) => {
+      if (ch === channel) {
+        try {
+          const event = JSON.parse(message) as RoundEvent;
+          handler(event);
+        } catch (error) {
+          logger.error({ error, message }, 'Failed to parse Redis message');
+        }
+      }
+    };
+
+    subscriber.on('message', messageHandler);
+
+    // Return cleanup function
+    return () => {
+      subscriber.off('message', messageHandler);
+      const handlers = activeSubscriptions.get(channel);
+      if (handlers) {
+        handlers.delete(handler);
+        if (handlers.size === 0) {
+          activeSubscriptions.delete(channel);
+          subscriber.unsubscribe(channel).catch(() => {});
+        }
+      }
+    };
+  } else {
+    // No Redis, use local EventEmitter
+    localEvents.on(`round:${roundId}`, handler);
+    return () => localEvents.off(`round:${roundId}`, handler);
+  }
 }
 
 export const realtimeRoutes: FastifyPluginAsync = async (app) => {
@@ -164,20 +250,28 @@ export const realtimeRoutes: FastifyPluginAsync = async (app) => {
     });
 
     // Send initial connection event
-    reply.raw.write(`event: connected\ndata: ${JSON.stringify({ roundId, status: round.status })}\n\n`);
+    const usingRedis = isRedisAvailable();
+    reply.raw.write(`event: connected\ndata: ${JSON.stringify({ roundId, status: round.status, redis: usingRedis })}\n\n`);
 
-    // Event listener for round updates
+    // Event handler for round updates
     const eventHandler = (event: RoundEvent) => {
       try {
         reply.raw.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
       } catch {
-        // Connection closed, clean up
-        roundEvents.off(`round:${roundId}`, eventHandler);
+        // Connection closed - cleanup will happen in 'close' handler
       }
     };
 
-    // Subscribe to round events
-    roundEvents.on(`round:${roundId}`, eventHandler);
+    // Subscribe to round events (Redis or local)
+    let cleanup: (() => void) | null = null;
+    try {
+      cleanup = await subscribeToRound(roundId, eventHandler, request.log);
+    } catch (error) {
+      request.log.error({ error }, 'Failed to subscribe to round events');
+      // Continue with local fallback
+      localEvents.on(`round:${roundId}`, eventHandler);
+      cleanup = () => localEvents.off(`round:${roundId}`, eventHandler);
+    }
 
     // Keep-alive ping every 15 seconds (more frequent to prevent proxy timeouts)
     const pingInterval = setInterval(() => {
@@ -186,19 +280,18 @@ export const realtimeRoutes: FastifyPluginAsync = async (app) => {
       } catch {
         // Connection closed
         clearInterval(pingInterval);
-        roundEvents.off(`round:${roundId}`, eventHandler);
       }
     }, 15000);
 
     // Clean up on connection close
     request.raw.on('close', () => {
       clearInterval(pingInterval);
-      roundEvents.off(`round:${roundId}`, eventHandler);
+      if (cleanup) cleanup();
       request.log.info({ roundId, userId }, 'SSE connection closed');
     });
 
     // Log connection
-    request.log.info({ roundId, userId }, 'SSE connection established');
+    request.log.info({ roundId, userId, redis: usingRedis }, 'SSE connection established');
 
     // Don't return anything - connection is hijacked and stays open
   });
@@ -208,9 +301,23 @@ export const realtimeRoutes: FastifyPluginAsync = async (app) => {
   // Health check for SSE system
   // =====================
   app.get('/health', async () => {
+    const redis = getRedisClient();
+    let redisStatus = 'not_configured';
+
+    if (redis) {
+      try {
+        await redis.ping();
+        redisStatus = 'connected';
+      } catch {
+        redisStatus = 'error';
+      }
+    }
+
     return {
       status: 'ok',
-      listeners: roundEvents.listenerCount('*'),
+      redis: redisStatus,
+      localListeners: localEvents.listenerCount('*'),
+      activeChannels: activeSubscriptions.size,
       timestamp: new Date().toISOString(),
     };
   });
