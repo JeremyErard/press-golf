@@ -150,12 +150,17 @@ export const realtimeRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ error: 'Round not found' });
     }
 
-    // Set up SSE headers
+    // Disable Fastify's automatic response handling for SSE
+    reply.hijack();
+
+    // Set up SSE headers with Render/proxy compatibility
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': 'no-cache, no-transform',
       'Connection': 'keep-alive',
       'X-Accel-Buffering': 'no', // Disable nginx buffering
+      'Access-Control-Allow-Origin': request.headers.origin || '*',
+      'Access-Control-Allow-Credentials': 'true',
     });
 
     // Send initial connection event
@@ -174,16 +179,16 @@ export const realtimeRoutes: FastifyPluginAsync = async (app) => {
     // Subscribe to round events
     roundEvents.on(`round:${roundId}`, eventHandler);
 
-    // Keep-alive ping every 30 seconds
+    // Keep-alive ping every 15 seconds (more frequent to prevent proxy timeouts)
     const pingInterval = setInterval(() => {
       try {
-        reply.raw.write(`:ping\n\n`);
+        reply.raw.write(`event: ping\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`);
       } catch {
         // Connection closed
         clearInterval(pingInterval);
         roundEvents.off(`round:${roundId}`, eventHandler);
       }
-    }, 30000);
+    }, 15000);
 
     // Clean up on connection close
     request.raw.on('close', () => {
@@ -195,8 +200,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (app) => {
     // Log connection
     request.log.info({ roundId, userId }, 'SSE connection established');
 
-    // Don't call reply.send() - we're streaming
-    return reply;
+    // Don't return anything - connection is hijacked and stays open
   });
 
   // =====================

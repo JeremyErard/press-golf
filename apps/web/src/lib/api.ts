@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://press-api.onrender.com/api";
 
 interface ApiResponse<T> {
   success: boolean;
@@ -155,7 +155,7 @@ export const api = {
       formData.append("backImage", backImage);
     }
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://press-api.onrender.com/api";
     const response = await fetch(`${API_URL}/courses/extract-from-image`, {
       method: "POST",
       headers: {
@@ -308,7 +308,7 @@ export const api = {
     const formData = new FormData();
     formData.append("file", file);
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://press-api.onrender.com/api";
     const response = await fetch(`${API_URL}/handicap/extract`, {
       method: "POST",
       headers: {
@@ -393,7 +393,7 @@ export const api = {
     const formData = new FormData();
     formData.append("file", file);
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://press-api.onrender.com/api";
     const response = await fetch(`${API_URL}/users/me/avatar`, {
       method: "POST",
       headers: {
@@ -424,7 +424,7 @@ export const api = {
     const formData = new FormData();
     formData.append("file", file);
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://press-api.onrender.com/api";
     const response = await fetch(`${API_URL}/rounds/${roundId}/scorecard-photo`, {
       method: "POST",
       headers: {

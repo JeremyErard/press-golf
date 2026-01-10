@@ -3,7 +3,8 @@
  * Handles connection, reconnection, and event parsing
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+// Use production API URL as fallback (same as api.ts)
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://press-api.onrender.com/api";
 
 export type SSEEventType =
   | "score_updated"
