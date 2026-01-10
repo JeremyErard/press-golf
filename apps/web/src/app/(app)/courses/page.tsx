@@ -294,19 +294,43 @@ export default function CoursesPage() {
                 </div>
               </div>
             ) : (locationStatus === "denied" || locationStatus === "unavailable") && (
-              <div className="p-4 rounded-xl bg-card border border-border">
+              <button
+                onClick={() => {
+                  if (!navigator.geolocation) return;
+                  setLocationStatus("loading");
+                  navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                      setUserLocation({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                      });
+                      setLocationStatus("granted");
+                    },
+                    () => {
+                      setLocationStatus("denied");
+                      // On iOS/Android, if permanently denied, we can't do much
+                      // Show an alert with instructions
+                      alert("Location access is blocked. Please enable location for this site in your browser or device settings, then refresh the page.");
+                    },
+                    { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
+                  );
+                }}
+                className="w-full p-4 rounded-xl bg-card border border-border hover:bg-white/5 transition-colors text-left"
+              >
                 <div className="flex items-start gap-3">
-                  <Navigation className="h-5 w-5 text-muted flex-shrink-0 mt-0.5" />
+                  <Navigation className="h-5 w-5 text-brand flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-medium text-foreground">Enable location for nearby courses</p>
                     <p className="text-xs text-muted mt-1">
-                      {locationStatus === "denied"
-                        ? "Allow location access in your browser settings to see courses near you."
+                      {locationStatus === "loading"
+                        ? "Requesting location..."
+                        : locationStatus === "denied"
+                        ? "Tap to enable location access and see courses near you."
                         : "Location services are not available on this device."}
                     </p>
                   </div>
                 </div>
-              </div>
+              </button>
             )}
 
             {/* Featured Courses */}
