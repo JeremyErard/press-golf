@@ -62,12 +62,12 @@ export default function DashboardPage() {
                 if (results.nassau) {
                   const betAmount = results.nassau.betAmount || 0;
                   // Calculate Nassau earnings based on wins
-                  if (results.nassau.front.winnerId === currentPlayer.userId) earnings += betAmount;
-                  else if (results.nassau.front.winnerId) earnings -= betAmount;
-                  if (results.nassau.back.winnerId === currentPlayer.userId) earnings += betAmount;
-                  else if (results.nassau.back.winnerId) earnings -= betAmount;
-                  if (results.nassau.overall.winnerId === currentPlayer.userId) earnings += betAmount;
-                  else if (results.nassau.overall.winnerId) earnings -= betAmount;
+                  if (results.nassau.front?.winnerId === currentPlayer.userId) earnings += betAmount;
+                  else if (results.nassau.front?.winnerId) earnings -= betAmount;
+                  if (results.nassau.back?.winnerId === currentPlayer.userId) earnings += betAmount;
+                  else if (results.nassau.back?.winnerId) earnings -= betAmount;
+                  if (results.nassau.overall?.winnerId === currentPlayer.userId) earnings += betAmount;
+                  else if (results.nassau.overall?.winnerId) earnings -= betAmount;
                 }
                 if (results.matchPlay?.standings) {
                   const standing = results.matchPlay.standings.find(s => s.userId === currentPlayer.userId);
@@ -178,7 +178,7 @@ export default function DashboardPage() {
     if (currentPlayer && activeRoundResults?.results) {
       const { results } = activeRoundResults;
       // For Nassau and Match Play, show holes up/down rather than money
-      if (results.nassau) {
+      if (results.nassau?.overall) {
         const { overall } = results.nassau;
         // Use overall score for net position
         if (overall.winnerId === currentPlayer.userId) {

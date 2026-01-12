@@ -76,6 +76,20 @@ const gameTypeLabels: Record<GameType, string> = {
   BANKER: "Banker",
 };
 
+// Minimum players required for each game type
+const gameTypeMinPlayers: Record<GameType, number> = {
+  NASSAU: 2,
+  SKINS: 2,
+  MATCH_PLAY: 2,
+  WOLF: 4,
+  NINES: 2,
+  STABLEFORD: 1,
+  BINGO_BANGO_BONGO: 3,
+  VEGAS: 4,
+  SNAKE: 2,
+  BANKER: 3,
+};
+
 const gameTypeDescriptions: Record<GameType, string> = {
   NASSAU: "Front 9, Back 9, Overall - classic 3-bet format",
   SKINS: "Win the hole outright to take the skin",
@@ -702,20 +716,36 @@ export default function RoundDetailPage() {
 
         {/* Actions */}
         <div className="space-y-md pt-md">
-          {round.status === "SETUP" && (
+          {round.status === "SETUP" && (() => {
+            // Calculate minimum players required across all games
+            const minPlayersRequired = round.games.reduce((max, game) =>
+              Math.max(max, gameTypeMinPlayers[game.type] || 1), 1);
+            const hasEnoughPlayers = round.players.length >= minPlayersRequired;
+            const canStartRound = round.games.length > 0 && hasEnoughPlayers;
+
+            // Find the game that requires more players
+            const gameNeedingMorePlayers = round.games.find(
+              game => round.players.length < (gameTypeMinPlayers[game.type] || 1)
+            );
+
+            return (
             <>
               <Button
                 className="w-full h-14"
                 size="lg"
                 onClick={handleStartRound}
-                disabled={isStartingRound || round.games.length === 0}
+                disabled={isStartingRound || !canStartRound}
               >
                 {isStartingRound ? (
                   <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                 ) : (
                   <Play className="h-5 w-5 mr-2" />
                 )}
-                {round.games.length === 0 ? "Add a Game to Start" : "Start Round"}
+                {round.games.length === 0
+                  ? "Add a Game to Start"
+                  : !hasEnoughPlayers && gameNeedingMorePlayers
+                    ? `${gameTypeLabels[gameNeedingMorePlayers.type]} needs ${gameTypeMinPlayers[gameNeedingMorePlayers.type]} players`
+                    : "Start Round"}
               </Button>
               <Button
                 variant="ghost"
@@ -726,7 +756,8 @@ export default function RoundDetailPage() {
                 Delete Round
               </Button>
             </>
-          )}
+            );
+          })()}
 
           {round.status === "ACTIVE" && (
             <Link href={`/rounds/${round.id}/scorecard`} className="block">
@@ -908,11 +939,20 @@ export default function RoundDetailPage() {
             {/* Invite New Player Button */}
             <Button
               className="w-full h-14"
-              variant="secondary"
+              variant={copied ? "default" : "secondary"}
               onClick={handleInviteNew}
             >
-              <MessageSquare className="h-5 w-5 mr-2" />
-              Invite via Text/Email
+              {copied ? (
+                <>
+                  <Check className="h-5 w-5 mr-2" />
+                  Copied to Clipboard!
+                </>
+              ) : (
+                <>
+                  <MessageSquare className="h-5 w-5 mr-2" />
+                  Invite via Text/Email
+                </>
+              )}
             </Button>
 
             {/* Buddies List */}

@@ -52,7 +52,10 @@ interface GamesSummaryProps {
 }
 
 // Format currency for display
-function formatBet(amount: number): string {
+function formatBet(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined) {
+    return '$0';
+  }
   return `$${amount}`;
 }
 

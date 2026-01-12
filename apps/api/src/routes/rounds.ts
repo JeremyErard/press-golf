@@ -390,7 +390,7 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
 
     const round = await prisma.round.findUnique({
       where: { id },
-      include: { players: true },
+      include: { players: true, games: true },
     });
 
     if (!round) {
@@ -412,6 +412,29 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
     const allowedNextStates = validTransitions[round.status] || [];
     if (!allowedNextStates.includes(status)) {
       return badRequest(reply, `Cannot transition from ${round.status} to ${status}. Valid transitions: ${allowedNextStates.join(', ') || 'none'}`);
+    }
+
+    // Validate minimum players for each game type when starting a round
+    if (status === 'ACTIVE') {
+      const minPlayersPerGame: Record<string, number> = {
+        'NASSAU': 2,
+        'SKINS': 2,
+        'MATCH_PLAY': 2,
+        'WOLF': 4,
+        'NINES': 2,
+        'STABLEFORD': 1,
+        'BINGO_BANGO_BONGO': 3,
+        'VEGAS': 4,
+        'SNAKE': 2,
+        'BANKER': 3,
+      };
+
+      for (const game of round.games) {
+        const minPlayers = minPlayersPerGame[game.type] || 1;
+        if (round.players.length < minPlayers) {
+          return badRequest(reply, `${game.type.replace(/_/g, ' ')} requires at least ${minPlayers} players. You have ${round.players.length}.`);
+        }
+      }
     }
 
     const updatedRound = await prisma.round.update({

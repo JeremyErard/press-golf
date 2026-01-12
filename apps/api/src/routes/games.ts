@@ -557,6 +557,25 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         ? round.players.filter(p => game.participantIds.includes(p.userId))
         : round.players;
 
+      // Skip games with insufficient players
+      const minPlayersPerGame: Record<string, number> = {
+        'NASSAU': 2,
+        'SKINS': 2,
+        'MATCH_PLAY': 2,
+        'WOLF': 4,
+        'NINES': 2,
+        'STABLEFORD': 1,
+        'BINGO_BANGO_BONGO': 3,
+        'VEGAS': 4,
+        'SNAKE': 2,
+        'BANKER': 3,
+      };
+      const minPlayers = minPlayersPerGame[game.type] || 1;
+      if (gamePlayers.length < minPlayers) {
+        request.log.warn({ gameType: game.type, players: gamePlayers.length, required: minPlayers }, 'Skipping game - insufficient players');
+        continue;
+      }
+
       // Create calcPressResult for this specific game's players
       const gameCalcPressResult = (startHole: number, endHole: number) => {
         if (gamePlayers.length !== 2) return { winnerId: null, loserId: null, margin: 0 };
@@ -667,6 +686,9 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
                 const totalWinnerNet = Object.entries(skinsByPlayer)
                   .filter(([_, v]) => v - perPlayerShare > 0)
                   .reduce((sum, [_, v]) => sum + (v - perPlayerShare), 0);
+
+                // Guard against division by zero
+                if (totalWinnerNet === 0) continue;
 
                 const proportion = winnerNet / totalWinnerNet;
                 const amount = Math.abs(net) * proportion;
@@ -1333,7 +1355,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         return {
           currentScore: p1Up,
           holesPlayed,
-          holesRemaining: endHole - lastHolePlayed,
+          holesRemaining: (endHole - startHole + 1) - holesPlayed,
           lastHolePlayed,
         };
       };
