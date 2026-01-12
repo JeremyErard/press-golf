@@ -181,9 +181,9 @@ export default function DashboardPage() {
       if (results.nassau?.overall) {
         const { overall } = results.nassau;
         // Use overall score for net position
-        if (overall.winnerId === currentPlayer.userId) {
+        if (overall?.winnerId === currentPlayer.userId) {
           userNet = overall.margin;
-        } else if (overall.winnerId) {
+        } else if (overall?.winnerId) {
           userNet = -overall.margin;
         }
       } else if (results.matchPlay?.standings) {
