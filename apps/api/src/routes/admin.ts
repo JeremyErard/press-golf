@@ -944,3 +944,4 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 };
+
