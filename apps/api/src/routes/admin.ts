@@ -584,8 +584,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
               courseId: course.id,
               holeNumber: i + 1,
               par: pars[i],
-              handicapIndex: ((i * 2 + 1) % 18) + 1,
-              yardages: { create: { teeId: course.tees[0].id, yardage: 350 + i * 20 } },
+              handicapRank: ((i * 7) % 18) + 1,
             },
           });
         }
