@@ -171,6 +171,8 @@ export default function RoundDetailPage() {
   const [betAmount, setBetAmount] = useState("5");
   const [isAutoPress, setIsAutoPress] = useState(false);
   const [isAddingGame, setIsAddingGame] = useState(false);
+  const [gameParticipantIds, setGameParticipantIds] = useState<string[]>([]);
+  const [gameName, setGameName] = useState("");
 
   // Add Players sheet state
   const [showAddPlayers, setShowAddPlayers] = useState(false);
@@ -267,6 +269,8 @@ export default function RoundDetailPage() {
         type: selectedGameType,
         betAmount: parseFloat(betAmount) || 5,
         isAutoPress: selectedGameType === "NASSAU" ? isAutoPress : false,
+        participantIds: gameParticipantIds.length > 0 ? gameParticipantIds : undefined,
+        name: gameName.trim() || undefined,
       });
 
       // Update local state
@@ -280,6 +284,8 @@ export default function RoundDetailPage() {
       setSelectedGameType(null);
       setBetAmount("5");
       setIsAutoPress(false);
+      setGameParticipantIds([]);
+      setGameName("");
     } catch (error) {
       console.error("Failed to add game:", error);
     } finally {
@@ -551,7 +557,7 @@ export default function RoundDetailPage() {
               <CardContent className="p-lg space-y-md">
                 <div className="flex items-center justify-between">
                   <p className="text-body font-medium">Invite Players</p>
-                  <Badge variant="brand" title="Maximum 4 players per foursome">{round.players.length}/4</Badge>
+                  <Badge variant="brand" title="Maximum 16 players per round">{round.players.length}/16</Badge>
                 </div>
 
                 {/* Share Button - Primary Action */}
@@ -893,6 +899,75 @@ export default function RoundDetailPage() {
                   </label>
                 )}
 
+                {/* Player Selection - only show if more than 4 players in round */}
+                {round && round.players.length > 4 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-white">
+                        Players in this Game
+                      </label>
+                      <span className="text-xs text-muted">
+                        {gameParticipantIds.length === 0
+                          ? "All players"
+                          : `${gameParticipantIds.length} selected`}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted">
+                      {selectedGameType === "NASSAU" || selectedGameType === "MATCH_PLAY"
+                        ? "Select exactly 2 players, or leave empty for all"
+                        : selectedGameType === "VEGAS"
+                        ? "Select exactly 4 players for teams"
+                        : selectedGameType === "WOLF" || selectedGameType === "NINES"
+                        ? "Select 3-4 players, or leave empty for all"
+                        : "Select players or leave empty for all"}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                      {round.players.map((player) => (
+                        <label
+                          key={player.userId}
+                          className={cn(
+                            "flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all",
+                            gameParticipantIds.includes(player.userId)
+                              ? "bg-brand/20 border-brand"
+                              : "bg-surface border-border hover:bg-elevated"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={gameParticipantIds.includes(player.userId)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setGameParticipantIds([...gameParticipantIds, player.userId]);
+                              } else {
+                                setGameParticipantIds(gameParticipantIds.filter(id => id !== player.userId));
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-border text-brand focus:ring-brand"
+                          />
+                          <span className="text-sm text-white truncate">
+                            {player.user.displayName || player.user.firstName || "Player"}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Optional Game Name - useful for multiple games of same type */}
+                {round && round.players.length > 4 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-white">
+                      Game Name <span className="text-muted">(optional)</span>
+                    </label>
+                    <Input
+                      value={gameName}
+                      onChange={(e) => setGameName(e.target.value)}
+                      placeholder={`e.g., "Foursome A ${gameTypeLabels[selectedGameType]}"`}
+                      className="text-sm"
+                    />
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
                   <Button
@@ -902,6 +977,8 @@ export default function RoundDetailPage() {
                       setSelectedGameType(null);
                       setBetAmount("5");
                       setIsAutoPress(false);
+                      setGameParticipantIds([]);
+                      setGameName("");
                     }}
                   >
                     Back

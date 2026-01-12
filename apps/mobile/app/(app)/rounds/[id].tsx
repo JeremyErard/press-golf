@@ -242,7 +242,7 @@ export default function RoundDetailScreen() {
         {/* Players */}
         <View style={styles.playersCard}>
           <Text style={styles.playersTitle}>
-            Players ({round.players?.length || 0}/4)
+            Players ({round.players?.length || 0}/16)
           </Text>
 
           {round.players?.map((player, index) => (

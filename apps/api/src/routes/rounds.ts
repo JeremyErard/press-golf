@@ -267,9 +267,9 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
       return badRequest(reply, 'You have already joined this round');
     }
 
-    // Check max players (4 for most rounds)
-    if (round.players.length >= 4) {
-      return badRequest(reply, 'This round is full');
+    // Check max players (16 for large outings)
+    if (round.players.length >= 16) {
+      return badRequest(reply, 'This round is full (max 16 players)');
     }
 
     // Calculate course handicap
@@ -917,8 +917,8 @@ Confidence should be: high, medium, or low`,
     }
 
     // Check max players
-    if (round.players.length >= 4) {
-      return badRequest(reply, 'Round is full (max 4 players)');
+    if (round.players.length >= 16) {
+      return badRequest(reply, 'Round is full (max 16 players)');
     }
 
     // Check if buddy is already in round

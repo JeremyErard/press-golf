@@ -564,6 +564,8 @@ export interface Game {
   type: GameType;
   betAmount: number;
   isAutoPress: boolean;
+  participantIds?: string[];
+  name?: string;
 }
 
 export type GameType =
@@ -740,6 +742,8 @@ export interface AddGameInput {
   type: GameType;
   betAmount: number;
   isAutoPress?: boolean;
+  participantIds?: string[];
+  name?: string;
 }
 
 export interface UpdateScoreInput {
