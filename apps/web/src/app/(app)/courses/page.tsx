@@ -322,9 +322,7 @@ export default function CoursesPage() {
                   <div>
                     <p className="text-sm font-medium text-foreground">Enable location for nearby courses</p>
                     <p className="text-xs text-muted mt-1">
-                      {locationStatus === "loading"
-                        ? "Requesting location..."
-                        : locationStatus === "denied"
+                      {locationStatus === "denied"
                         ? "Tap to enable location access and see courses near you."
                         : "Location services are not available on this device."}
                     </p>
