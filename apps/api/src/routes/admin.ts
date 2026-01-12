@@ -766,4 +766,92 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
       };
     }
   });
+
+  // Add test players to an existing round
+  app.get('/admin/add-test-players/:roundId', async (request, reply) => {
+    const { roundId } = request.params as { roundId: string };
+    const results: string[] = [];
+    const log = (msg: string) => results.push(msg);
+
+    try {
+      log(`🎯 Adding Test Players to Round: ${roundId}`);
+
+      // Get the round
+      const round = await prisma.round.findUnique({
+        where: { id: roundId },
+        include: { players: true, course: { include: { tees: true } } },
+      });
+
+      if (!round) {
+        return reply.status(404).send({ success: false, error: 'Round not found' });
+      }
+
+      log(`   Found round at ${round.course?.name || 'Unknown course'}`);
+      log(`   Current players: ${round.players.length}`);
+
+      // Get or create test users
+      const users = await Promise.all(
+        TEST_USERS.slice(0, 15).map(async (userData) => {
+          const existing = await prisma.user.findUnique({ where: { email: userData.email } });
+          if (existing) return existing;
+          return prisma.user.create({
+            data: {
+              ...userData,
+              handicapIndex: new Decimal(userData.handicapIndex),
+              subscriptionStatus: 'ACTIVE',
+              isFoundingMember: true,
+            },
+          });
+        })
+      );
+
+      // Get existing player user IDs
+      const existingPlayerIds = round.players.map(p => p.userId);
+
+      // Add test users who aren't already in the round
+      const slopeRating = round.course?.tees?.[0]?.slopeRating || 113;
+      let addedCount = 0;
+
+      for (const user of users) {
+        if (existingPlayerIds.includes(user.id)) {
+          log(`   ⏭ ${user.displayName} already in round`);
+          continue;
+        }
+
+        if (round.players.length + addedCount >= 16) {
+          log(`   ⚠ Round full (16 players max)`);
+          break;
+        }
+
+        const courseHandicap = Math.round(Number(user.handicapIndex) * (slopeRating / 113));
+        await prisma.roundPlayer.create({
+          data: {
+            roundId: round.id,
+            userId: user.id,
+            position: round.players.length + addedCount + 1,
+            courseHandicap,
+          },
+        });
+        log(`   ✓ Added ${user.displayName} (handicap: ${courseHandicap})`);
+        addedCount++;
+      }
+
+      log(`\n✅ Added ${addedCount} test players`);
+      log(`📍 Total players now: ${round.players.length + addedCount}`);
+
+      return {
+        success: true,
+        roundId,
+        playersAdded: addedCount,
+        totalPlayers: round.players.length + addedCount,
+        log: results,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: String(error),
+        log: results,
+      };
+    }
+  });
 };
