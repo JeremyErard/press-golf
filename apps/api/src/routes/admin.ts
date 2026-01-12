@@ -1011,5 +1011,134 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
       };
     }
   });
+
+  // Create a proper 2-player Nassau test round with scores
+  app.get('/admin/create-nassau-test', async (request, reply) => {
+    const results: string[] = [];
+    const log = (msg: string) => results.push(msg);
+
+    try {
+      log('🎯 Creating 2-Player Nassau Test Round');
+
+      // Get course
+      const course = await prisma.course.findFirst({
+        include: { tees: true, holes: true },
+      });
+
+      if (!course) {
+        return reply.status(400).send({ success: false, error: 'No course found' });
+      }
+
+      // Get or create 2 test users
+      const testUsers = [
+        { clerkId: 'test_player1', email: 'player1@test.golf', firstName: 'Player', lastName: 'One', displayName: 'Player One', handicapIndex: 10.0 },
+        { clerkId: 'test_player2', email: 'player2@test.golf', firstName: 'Player', lastName: 'Two', displayName: 'Player Two', handicapIndex: 15.0 },
+      ];
+
+      const users = await Promise.all(
+        testUsers.map(async (userData) => {
+          const existing = await prisma.user.findUnique({ where: { email: userData.email } });
+          if (existing) return existing;
+          return prisma.user.create({
+            data: {
+              ...userData,
+              handicapIndex: new Decimal(userData.handicapIndex),
+              subscriptionStatus: 'ACTIVE',
+              isFoundingMember: true,
+            },
+          });
+        })
+      );
+
+      log(`   ✓ Users: ${users.map(u => u.displayName).join(' vs ')}`);
+
+      // Create round
+      const tee = course.tees[0];
+      const round = await prisma.round.create({
+        data: {
+          courseId: course.id,
+          teeId: tee?.id || null,
+          createdById: users[0].id,
+          date: new Date(),
+          status: 'ACTIVE',
+        },
+      });
+
+      // Add players
+      const slopeRating = tee?.slopeRating || 113;
+      for (let i = 0; i < users.length; i++) {
+        const courseHandicap = Math.round((users[i].handicapIndex?.toNumber() || 0) * (slopeRating / 113));
+        await prisma.roundPlayer.create({
+          data: {
+            roundId: round.id,
+            userId: users[i].id,
+            courseHandicap,
+            position: i + 1,
+          },
+        });
+      }
+
+      log(`   ✓ Round created with 2 players`);
+
+      // Create Nassau game with exactly 2 participants
+      const nassau = await prisma.game.create({
+        data: {
+          roundId: round.id,
+          type: 'NASSAU',
+          betAmount: new Decimal(5),
+          isAutoPress: false,
+          participantIds: users.map(u => u.id),
+          createdById: users[0].id,
+          name: 'Test Nassau',
+        },
+      });
+
+      log(`   ✓ Nassau game created: ${users[0].displayName} vs ${users[1].displayName}`);
+
+      // Get round players for score entry
+      const roundPlayers = await prisma.roundPlayer.findMany({
+        where: { roundId: round.id },
+        include: { user: true },
+      });
+
+      // Add scores for front 9
+      const holes = course.holes.filter(h => h.holeNumber <= 9).sort((a, b) => a.holeNumber - b.holeNumber);
+
+      for (const hole of holes) {
+        for (const rp of roundPlayers) {
+          const variation = Math.floor(Math.random() * 4) - 1; // -1 to +2
+          const strokes = hole.par + variation;
+          await prisma.holeScore.create({
+            data: {
+              roundPlayerId: rp.id,
+              holeNumber: hole.holeNumber,
+              strokes,
+              putts: Math.floor(Math.random() * 2) + 1,
+            },
+          });
+        }
+      }
+
+      log(`   ✓ Added scores for holes 1-9`);
+      log(`\n✅ Test round ready!`);
+      log(`📍 Round ID: ${round.id}`);
+      log(`📍 View at: https://www.pressbet.golf/rounds/${round.id}/scorecard`);
+
+      return {
+        success: true,
+        roundId: round.id,
+        roundUrl: `https://www.pressbet.golf/rounds/${round.id}/scorecard`,
+        players: users.map(u => u.displayName),
+        log: results,
+      };
+    } catch (error) {
+      log(`\n❌ Error: ${String(error)}`);
+      return {
+        success: false,
+        error: String(error),
+        log: results,
+      };
+    }
+  });
 };
 
