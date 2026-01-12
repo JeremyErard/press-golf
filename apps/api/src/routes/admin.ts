@@ -1012,6 +1012,87 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     }
   });
 
+  // Test game validation rules
+  app.get('/admin/test-game-validation', async (request, reply) => {
+    const results: { test: string; playerCount: number; gameType: string; expected: string; result: string; passed: boolean }[] = [];
+
+    // Game validation rules (same as in games.ts)
+    const GAME_PLAYER_RULES: Record<string, { min: number; max: number; exact?: number }> = {
+      'NASSAU': { min: 2, max: 2, exact: 2 },
+      'MATCH_PLAY': { min: 2, max: 2, exact: 2 },
+      'VEGAS': { min: 4, max: 4, exact: 4 },
+      'WOLF': { min: 4, max: 4, exact: 4 },
+      'NINES': { min: 3, max: 4 },
+      'SKINS': { min: 2, max: 16 },
+      'STABLEFORD': { min: 1, max: 16 },
+    };
+
+    const validatePlayerCount = (gameType: string, playerCount: number): boolean => {
+      const rules = GAME_PLAYER_RULES[gameType];
+      if (!rules) return true;
+      if (rules.exact && playerCount !== rules.exact) return false;
+      if (playerCount < rules.min || playerCount > rules.max) return false;
+      return true;
+    };
+
+    // Test cases
+    const testCases = [
+      // Nassau tests (exact 2)
+      { gameType: 'NASSAU', playerCount: 1, shouldPass: false },
+      { gameType: 'NASSAU', playerCount: 2, shouldPass: true },
+      { gameType: 'NASSAU', playerCount: 3, shouldPass: false },
+      { gameType: 'NASSAU', playerCount: 4, shouldPass: false },
+      { gameType: 'NASSAU', playerCount: 16, shouldPass: false },
+
+      // Wolf tests (exact 4)
+      { gameType: 'WOLF', playerCount: 2, shouldPass: false },
+      { gameType: 'WOLF', playerCount: 3, shouldPass: false },
+      { gameType: 'WOLF', playerCount: 4, shouldPass: true },
+      { gameType: 'WOLF', playerCount: 5, shouldPass: false },
+
+      // Skins tests (2-16)
+      { gameType: 'SKINS', playerCount: 1, shouldPass: false },
+      { gameType: 'SKINS', playerCount: 2, shouldPass: true },
+      { gameType: 'SKINS', playerCount: 8, shouldPass: true },
+      { gameType: 'SKINS', playerCount: 16, shouldPass: true },
+      { gameType: 'SKINS', playerCount: 17, shouldPass: false },
+
+      // Nines tests (3-4)
+      { gameType: 'NINES', playerCount: 2, shouldPass: false },
+      { gameType: 'NINES', playerCount: 3, shouldPass: true },
+      { gameType: 'NINES', playerCount: 4, shouldPass: true },
+      { gameType: 'NINES', playerCount: 5, shouldPass: false },
+    ];
+
+    let passedCount = 0;
+    let failedCount = 0;
+
+    for (const tc of testCases) {
+      const isValid = validatePlayerCount(tc.gameType, tc.playerCount);
+      const passed = isValid === tc.shouldPass;
+
+      results.push({
+        test: `${tc.gameType} with ${tc.playerCount} players`,
+        playerCount: tc.playerCount,
+        gameType: tc.gameType,
+        expected: tc.shouldPass ? 'ALLOW' : 'REJECT',
+        result: isValid ? 'ALLOWED' : 'REJECTED',
+        passed,
+      });
+
+      if (passed) passedCount++;
+      else failedCount++;
+    }
+
+    return {
+      success: failedCount === 0,
+      summary: `${passedCount}/${testCases.length} tests passed`,
+      passedCount,
+      failedCount,
+      results,
+    };
+  });
+
   // Create a proper 2-player Nassau test round with scores
   app.get('/admin/create-nassau-test', async (request, reply) => {
     const results: string[] = [];
