@@ -77,31 +77,42 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
     // Get the round player userIds
     const roundPlayerIds = round.players.map(p => p.userId);
 
-    // Validate participantIds if provided
-    const gameParticipantIds = participantIds && participantIds.length > 0 ? participantIds : [];
+    // Determine game participants - if not specified, default to all round players
+    const gameParticipantIds = participantIds && participantIds.length > 0
+      ? participantIds
+      : roundPlayerIds;
 
-    if (gameParticipantIds.length > 0) {
-      // Verify all participantIds are in the round
-      const invalidParticipants = gameParticipantIds.filter(id => !roundPlayerIds.includes(id));
-      if (invalidParticipants.length > 0) {
-        return badRequest(reply, `Invalid participants: ${invalidParticipants.join(', ')}. All participants must be in the round.`);
-      }
+    // Verify all participantIds are in the round
+    const invalidParticipants = gameParticipantIds.filter(id => !roundPlayerIds.includes(id));
+    if (invalidParticipants.length > 0) {
+      return badRequest(reply, `Invalid participants: ${invalidParticipants.join(', ')}. All participants must be in the round.`);
+    }
 
-      // Verify the creator is a participant (if participants are specified)
-      if (!gameParticipantIds.includes(user.id as string)) {
-        return badRequest(reply, 'You must include yourself as a participant in the game');
-      }
+    // Verify the creator is a participant
+    if (!gameParticipantIds.includes(user.id as string)) {
+      return badRequest(reply, 'You must include yourself as a participant in the game');
+    }
 
-      // Validate player count for game type
-      const playerCount = gameParticipantIds.length;
-      if ((type === 'NASSAU' || type === 'MATCH_PLAY') && playerCount !== 2) {
-        return badRequest(reply, `${type} requires exactly 2 players`);
+    // Game type player requirements
+    const GAME_PLAYER_RULES: Record<string, { min: number; max: number; exact?: number; message: string }> = {
+      'NASSAU': { min: 2, max: 2, exact: 2, message: 'Nassau requires exactly 2 players (head-to-head match play)' },
+      'MATCH_PLAY': { min: 2, max: 2, exact: 2, message: 'Match Play requires exactly 2 players' },
+      'VEGAS': { min: 4, max: 4, exact: 4, message: 'Vegas requires exactly 4 players (2 teams of 2)' },
+      'WOLF': { min: 4, max: 4, exact: 4, message: 'Wolf requires exactly 4 players' },
+      'NINES': { min: 3, max: 4, message: 'Nines requires 3-4 players' },
+      'SKINS': { min: 2, max: 16, message: 'Skins requires 2-16 players' },
+      'STABLEFORD': { min: 1, max: 16, message: 'Stableford requires 1-16 players' },
+    };
+
+    const playerCount = gameParticipantIds.length;
+    const rules = GAME_PLAYER_RULES[type];
+
+    if (rules) {
+      if (rules.exact && playerCount !== rules.exact) {
+        return badRequest(reply, rules.message);
       }
-      if (type === 'VEGAS' && playerCount !== 4) {
-        return badRequest(reply, 'Vegas requires exactly 4 players');
-      }
-      if ((type === 'WOLF' || type === 'NINES') && (playerCount < 3 || playerCount > 4)) {
-        return badRequest(reply, `${type} works best with 3-4 players`);
+      if (playerCount < rules.min || playerCount > rules.max) {
+        return badRequest(reply, rules.message);
       }
     }
 

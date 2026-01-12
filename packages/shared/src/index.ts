@@ -114,3 +114,79 @@ export const ErrorCodes = {
 } as const;
 
 export type ErrorCode = typeof ErrorCodes[keyof typeof ErrorCodes];
+
+// ===================
+// Game Types & Rules
+// ===================
+
+export type GameType = 'NASSAU' | 'MATCH_PLAY' | 'SKINS' | 'WOLF' | 'VEGAS' | 'NINES' | 'STABLEFORD';
+
+export interface GamePlayerRules {
+  min: number;
+  max: number;
+  exact?: number;
+  message: string;
+  description: string;
+}
+
+export const GAME_PLAYER_RULES: Record<GameType, GamePlayerRules> = {
+  NASSAU: {
+    min: 2,
+    max: 2,
+    exact: 2,
+    message: 'Nassau requires exactly 2 players (head-to-head match play)',
+    description: 'Head-to-head match play with 3 bets: front 9, back 9, and overall 18',
+  },
+  MATCH_PLAY: {
+    min: 2,
+    max: 2,
+    exact: 2,
+    message: 'Match Play requires exactly 2 players',
+    description: 'Head-to-head competition where the player who wins the most holes wins',
+  },
+  VEGAS: {
+    min: 4,
+    max: 4,
+    exact: 4,
+    message: 'Vegas requires exactly 4 players (2 teams of 2)',
+    description: 'Team game where scores are combined to form a 2-digit number',
+  },
+  WOLF: {
+    min: 4,
+    max: 4,
+    exact: 4,
+    message: 'Wolf requires exactly 4 players',
+    description: 'Rotating "wolf" picks partner or goes alone against the pack',
+  },
+  NINES: {
+    min: 3,
+    max: 4,
+    message: 'Nines requires 3-4 players',
+    description: '9 points per hole split among players based on scores',
+  },
+  SKINS: {
+    min: 2,
+    max: 16,
+    message: 'Skins requires 2-16 players',
+    description: 'Win the hole outright to claim the skin; ties carry over',
+  },
+  STABLEFORD: {
+    min: 1,
+    max: 16,
+    message: 'Stableford requires 1-16 players',
+    description: 'Points awarded based on score relative to par',
+  },
+};
+
+export function validateGamePlayerCount(gameType: GameType, playerCount: number): string | null {
+  const rules = GAME_PLAYER_RULES[gameType];
+  if (!rules) return null;
+
+  if (rules.exact && playerCount !== rules.exact) {
+    return rules.message;
+  }
+  if (playerCount < rules.min || playerCount > rules.max) {
+    return rules.message;
+  }
+  return null;
+}
