@@ -854,4 +854,93 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
       };
     }
   });
+
+  // Add random test scores for all players on specified holes
+  app.get('/admin/add-test-scores/:roundId', async (request, reply) => {
+    const { roundId } = request.params as { roundId: string };
+    const { holes = '1' } = request.query as { holes?: string };
+    const holeNumbers = holes.split(',').map(h => parseInt(h.trim(), 10)).filter(h => h >= 1 && h <= 18);
+
+    const results: string[] = [];
+    const log = (msg: string) => results.push(msg);
+
+    try {
+      log(`🎯 Adding Test Scores to Round: ${roundId}`);
+      log(`   Holes: ${holeNumbers.join(', ')}`);
+
+      // Get the round with players and course
+      const round = await prisma.round.findUnique({
+        where: { id: roundId },
+        include: {
+          players: { include: { user: true } },
+          course: { include: { holes: true } },
+        },
+      });
+
+      if (!round) {
+        return reply.status(404).send({ success: false, error: 'Round not found' });
+      }
+
+      if (round.players.length === 0) {
+        return reply.status(400).send({ success: false, error: 'No players in round' });
+      }
+
+      log(`   Found ${round.players.length} players`);
+
+      const courseHoles = round.course?.holes || [];
+      let scoresAdded = 0;
+
+      for (const holeNumber of holeNumbers) {
+        const hole = courseHoles.find(h => h.holeNumber === holeNumber);
+        const par = hole?.par || 4;
+
+        log(`\n📊 Hole ${holeNumber} (Par ${par}):`);
+
+        for (const player of round.players) {
+          // Generate varied but realistic score: -1 to +3 relative to par
+          const variation = Math.floor(Math.random() * 5) - 1; // -1 to +3
+          const strokes = par + variation;
+          const putts = Math.floor(Math.random() * 3) + 1; // 1-3 putts
+
+          await prisma.holeScore.upsert({
+            where: {
+              roundPlayerId_holeNumber: {
+                roundPlayerId: player.id,
+                holeNumber,
+              },
+            },
+            update: { strokes, putts },
+            create: {
+              roundPlayerId: player.id,
+              holeNumber,
+              strokes,
+              putts,
+            },
+          });
+
+          const scoreLabel = strokes < par ? '🟢' : strokes === par ? '⚪' : strokes === par + 1 ? '🟠' : '🔴';
+          log(`   ${scoreLabel} ${player.user?.displayName || 'Unknown'}: ${strokes}`);
+          scoresAdded++;
+        }
+      }
+
+      log(`\n✅ Added ${scoresAdded} scores`);
+      log(`📍 View at: https://www.pressbet.golf/rounds/${roundId}/scorecard`);
+
+      return {
+        success: true,
+        roundId,
+        holesScored: holeNumbers,
+        scoresAdded,
+        log: results,
+      };
+    } catch (error) {
+      log(`\n❌ Error: ${String(error)}`);
+      return {
+        success: false,
+        error: String(error),
+        log: results,
+      };
+    }
+  });
 };
