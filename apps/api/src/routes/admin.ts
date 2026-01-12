@@ -943,5 +943,73 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
       };
     }
   });
+
+  // Get game status for a round (admin, no auth required)
+  app.get('/admin/game-status/:roundId', async (request, reply) => {
+    const { roundId } = request.params as { roundId: string };
+
+    try {
+      const round = await prisma.round.findUnique({
+        where: { id: roundId },
+        include: {
+          players: {
+            include: {
+              user: true,
+              scores: true,
+            },
+          },
+          games: true,
+          course: { include: { holes: true } },
+        },
+      });
+
+      if (!round) {
+        return reply.status(404).send({ success: false, error: 'Round not found' });
+      }
+
+      // Calculate scores summary
+      const playerSummaries = round.players.map(player => {
+        const scores = player.scores || [];
+        const frontNine = scores.filter(s => s.holeNumber <= 9);
+        const backNine = scores.filter(s => s.holeNumber > 9);
+
+        return {
+          name: player.user?.displayName || 'Unknown',
+          handicap: player.courseHandicap,
+          frontNineScores: frontNine.length,
+          frontNineTotal: frontNine.reduce((sum, s) => sum + (s.strokes || 0), 0),
+          backNineScores: backNine.length,
+          backNineTotal: backNine.reduce((sum, s) => sum + (s.strokes || 0), 0),
+        };
+      });
+
+      // Calculate holes with complete scores
+      const holesWithAllScores: number[] = [];
+      for (let h = 1; h <= 18; h++) {
+        const playersWithScore = round.players.filter(p =>
+          p.scores?.some(s => s.holeNumber === h && s.strokes !== null)
+        );
+        if (playersWithScore.length === round.players.length) {
+          holesWithAllScores.push(h);
+        }
+      }
+
+      return {
+        success: true,
+        roundId,
+        totalPlayers: round.players.length,
+        games: round.games.map(g => ({ type: g.type, betAmount: g.betAmount, name: g.name })),
+        holesWithAllScores,
+        frontNineComplete: holesWithAllScores.filter(h => h <= 9).length,
+        backNineComplete: holesWithAllScores.filter(h => h > 9).length,
+        playerSummaries,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: String(error),
+      };
+    }
+  });
 };
 
