@@ -8,6 +8,18 @@ const TEST_USERS = [
   { clerkId: 'test_bob_002', email: 'test.bob@press.golf', firstName: 'Bob', lastName: 'Test', displayName: 'Bob T', handicapIndex: 18.2 },
   { clerkId: 'test_charlie_003', email: 'test.charlie@press.golf', firstName: 'Charlie', lastName: 'Test', displayName: 'Charlie T', handicapIndex: 8.0 },
   { clerkId: 'test_dave_004', email: 'test.dave@press.golf', firstName: 'Dave', lastName: 'Test', displayName: 'Dave T', handicapIndex: 24.5 },
+  { clerkId: 'test_emma_005', email: 'test.emma@press.golf', firstName: 'Emma', lastName: 'Test', displayName: 'Emma T', handicapIndex: 15.3 },
+  { clerkId: 'test_frank_006', email: 'test.frank@press.golf', firstName: 'Frank', lastName: 'Test', displayName: 'Frank T', handicapIndex: 9.7 },
+  { clerkId: 'test_grace_007', email: 'test.grace@press.golf', firstName: 'Grace', lastName: 'Test', displayName: 'Grace T', handicapIndex: 21.1 },
+  { clerkId: 'test_henry_008', email: 'test.henry@press.golf', firstName: 'Henry', lastName: 'Test', displayName: 'Henry T', handicapIndex: 6.4 },
+  { clerkId: 'test_ivy_009', email: 'test.ivy@press.golf', firstName: 'Ivy', lastName: 'Test', displayName: 'Ivy T', handicapIndex: 17.8 },
+  { clerkId: 'test_jack_010', email: 'test.jack@press.golf', firstName: 'Jack', lastName: 'Test', displayName: 'Jack T', handicapIndex: 11.2 },
+  { clerkId: 'test_kate_011', email: 'test.kate@press.golf', firstName: 'Kate', lastName: 'Test', displayName: 'Kate T', handicapIndex: 22.9 },
+  { clerkId: 'test_leo_012', email: 'test.leo@press.golf', firstName: 'Leo', lastName: 'Test', displayName: 'Leo T', handicapIndex: 4.5 },
+  { clerkId: 'test_mia_013', email: 'test.mia@press.golf', firstName: 'Mia', lastName: 'Test', displayName: 'Mia T', handicapIndex: 19.6 },
+  { clerkId: 'test_noah_014', email: 'test.noah@press.golf', firstName: 'Noah', lastName: 'Test', displayName: 'Noah T', handicapIndex: 13.8 },
+  { clerkId: 'test_olivia_015', email: 'test.olivia@press.golf', firstName: 'Olivia', lastName: 'Test', displayName: 'Olivia T', handicapIndex: 26.2 },
+  { clerkId: 'test_paul_016', email: 'test.paul@press.golf', firstName: 'Paul', lastName: 'Test', displayName: 'Paul T', handicapIndex: 7.9 },
 ];
 
 function randomScore(par: number): number {
@@ -504,6 +516,254 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
       return {
         success: false,
         error: String(error),
+      };
+    }
+  });
+
+  // Create a 16-player test round with multiple games between different player subsets
+  app.get('/admin/create-16-player-round', async (request, reply) => {
+    const results: string[] = [];
+    const log = (msg: string) => results.push(msg);
+
+    try {
+      log('🎯 Creating 16-Player Test Round');
+      log('='.repeat(50));
+
+      // 1. Create or get all 16 test users
+      log('\n📝 Creating 16 test users...');
+      const users = await Promise.all(
+        TEST_USERS.map(async (userData) => {
+          const existing = await prisma.user.findUnique({ where: { email: userData.email } });
+          if (existing) {
+            log(`   ✓ Found existing: ${userData.displayName}`);
+            return existing;
+          }
+          const user = await prisma.user.create({
+            data: {
+              ...userData,
+              handicapIndex: new Decimal(userData.handicapIndex),
+              subscriptionStatus: 'ACTIVE',
+              isFoundingMember: true,
+            },
+          });
+          log(`   ✓ Created: ${userData.displayName}`);
+          return user;
+        })
+      );
+
+      // 2. Find or create a test course
+      log('\n🏌️ Setting up test course...');
+      let course = await prisma.course.findFirst({
+        where: { name: { contains: '16-Player Test Course' } },
+        include: { holes: true, tees: true },
+      });
+
+      if (!course) {
+        course = await prisma.course.create({
+          data: {
+            name: '16-Player Test Course',
+            city: 'Test City',
+            state: 'MI',
+            createdById: users[0].id,
+            tees: {
+              create: {
+                name: 'Blue',
+                color: '#0000FF',
+                slopeRating: 130,
+                courseRating: new Decimal(72.5),
+              },
+            },
+          },
+          include: { holes: true, tees: true },
+        });
+
+        const pars = [4, 5, 3, 4, 4, 4, 3, 5, 4, 4, 4, 3, 5, 4, 4, 3, 4, 5];
+        for (let i = 0; i < 18; i++) {
+          await prisma.hole.create({
+            data: {
+              courseId: course.id,
+              holeNumber: i + 1,
+              par: pars[i],
+              handicapIndex: ((i * 2 + 1) % 18) + 1,
+              yardages: { create: { teeId: course.tees[0].id, yardage: 350 + i * 20 } },
+            },
+          });
+        }
+        course = await prisma.course.findUnique({
+          where: { id: course.id },
+          include: { holes: true, tees: true },
+        });
+        log(`   ✓ Created course with 18 holes`);
+      } else {
+        log(`   ✓ Found existing test course`);
+      }
+
+      // 3. Create round with all 16 players
+      log('\n🎲 Creating round with 16 players...');
+      const round = await prisma.round.create({
+        data: {
+          courseId: course!.id,
+          teeId: course!.tees[0].id,
+          status: 'SETUP',
+          createdById: users[0].id,
+          players: {
+            create: users.map((user, index) => ({
+              userId: user.id,
+              position: index + 1,
+              courseHandicap: Math.round(Number(user.handicapIndex) * (course!.tees[0].slopeRating / 113)),
+            })),
+          },
+        },
+        include: {
+          players: { include: { user: true } },
+          course: true,
+        },
+      });
+      log(`   ✓ Created round with ${round.players.length} players`);
+
+      // 4. Create multiple games with different player subsets
+      log('\n🎮 Creating games with player subsets...');
+
+      // Foursome A (players 1-4): Nassau + Wolf
+      const foursomeA = users.slice(0, 4).map(u => u.id);
+      const nassauA = await prisma.game.create({
+        data: {
+          roundId: round.id,
+          type: 'NASSAU',
+          betAmount: new Decimal(5),
+          participantIds: foursomeA,
+          name: 'Foursome A Nassau',
+          createdById: users[0].id,
+        },
+      });
+      log(`   ✓ Nassau A: ${users.slice(0, 4).map(u => u.displayName).join(', ')}`);
+
+      const wolfA = await prisma.game.create({
+        data: {
+          roundId: round.id,
+          type: 'WOLF',
+          betAmount: new Decimal(2),
+          participantIds: foursomeA,
+          name: 'Foursome A Wolf',
+          createdById: users[0].id,
+        },
+      });
+      log(`   ✓ Wolf A: ${users.slice(0, 4).map(u => u.displayName).join(', ')}`);
+
+      // Foursome B (players 5-8): Nassau + Skins
+      const foursomeB = users.slice(4, 8).map(u => u.id);
+      const nassauB = await prisma.game.create({
+        data: {
+          roundId: round.id,
+          type: 'NASSAU',
+          betAmount: new Decimal(10),
+          participantIds: foursomeB,
+          name: 'Foursome B Nassau',
+          createdById: users[4].id,
+        },
+      });
+      log(`   ✓ Nassau B: ${users.slice(4, 8).map(u => u.displayName).join(', ')}`);
+
+      const skinsB = await prisma.game.create({
+        data: {
+          roundId: round.id,
+          type: 'SKINS',
+          betAmount: new Decimal(5),
+          participantIds: foursomeB,
+          name: 'Foursome B Skins',
+          createdById: users[4].id,
+        },
+      });
+      log(`   ✓ Skins B: ${users.slice(4, 8).map(u => u.displayName).join(', ')}`);
+
+      // Foursome C (players 9-12): Skins + Nines
+      const foursomeC = users.slice(8, 12).map(u => u.id);
+      const skinsC = await prisma.game.create({
+        data: {
+          roundId: round.id,
+          type: 'SKINS',
+          betAmount: new Decimal(10),
+          participantIds: foursomeC,
+          name: 'Foursome C Skins',
+          createdById: users[8].id,
+        },
+      });
+      log(`   ✓ Skins C: ${users.slice(8, 12).map(u => u.displayName).join(', ')}`);
+
+      const ninesC = await prisma.game.create({
+        data: {
+          roundId: round.id,
+          type: 'NINES',
+          betAmount: new Decimal(1),
+          participantIds: foursomeC,
+          name: 'Foursome C Nines',
+          createdById: users[8].id,
+        },
+      });
+      log(`   ✓ Nines C: ${users.slice(8, 12).map(u => u.displayName).join(', ')}`);
+
+      // Foursome D (players 13-16): Nassau + Wolf
+      const foursomeD = users.slice(12, 16).map(u => u.id);
+      const nassauD = await prisma.game.create({
+        data: {
+          roundId: round.id,
+          type: 'NASSAU',
+          betAmount: new Decimal(20),
+          participantIds: foursomeD,
+          name: 'Foursome D Nassau',
+          createdById: users[12].id,
+        },
+      });
+      log(`   ✓ Nassau D: ${users.slice(12, 16).map(u => u.displayName).join(', ')}`);
+
+      const wolfD = await prisma.game.create({
+        data: {
+          roundId: round.id,
+          type: 'WOLF',
+          betAmount: new Decimal(5),
+          participantIds: foursomeD,
+          name: 'Foursome D Wolf',
+          createdById: users[12].id,
+        },
+      });
+      log(`   ✓ Wolf D: ${users.slice(12, 16).map(u => u.displayName).join(', ')}`);
+
+      // Cross-foursome game: All 16 players in one big Skins game
+      const allPlayerSkins = await prisma.game.create({
+        data: {
+          roundId: round.id,
+          type: 'SKINS',
+          betAmount: new Decimal(2),
+          participantIds: users.map(u => u.id),
+          name: 'All-Player Skins',
+          createdById: users[0].id,
+        },
+      });
+      log(`   ✓ All-Player Skins: 16 players`);
+
+      log('\n✅ 16-Player Round Created Successfully!');
+      log(`\n📍 Round ID: ${round.id}`);
+      log(`📍 View at: https://www.pressbet.golf/rounds/${round.id}`);
+      log(`\n📊 Summary:`);
+      log(`   - 16 Players across 4 foursomes`);
+      log(`   - 9 Games total:`);
+      log(`     - 3 Nassau games (Foursomes A, B, D)`);
+      log(`     - 2 Wolf games (Foursomes A, D)`);
+      log(`     - 3 Skins games (Foursomes B, C, All-Players)`);
+      log(`     - 1 Nines game (Foursome C)`);
+
+      return {
+        success: true,
+        roundId: round.id,
+        roundUrl: `https://www.pressbet.golf/rounds/${round.id}`,
+        log: results,
+      };
+    } catch (error) {
+      log(`\n❌ Error: ${String(error)}`);
+      return {
+        success: false,
+        error: String(error),
+        log: results,
       };
     }
   });
