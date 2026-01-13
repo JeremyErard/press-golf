@@ -76,19 +76,47 @@ const gameTypeLabels: Record<GameType, string> = {
   BANKER: "Banker",
 };
 
-// Minimum players required for each game type
+// Game player validation rules
+const GAME_PLAYER_RULES: Record<GameType, { min: number; max: number; exact?: number; message: string }> = {
+  NASSAU: { min: 2, max: 2, exact: 2, message: 'Nassau requires exactly 2 players (head-to-head match play)' },
+  MATCH_PLAY: { min: 2, max: 2, exact: 2, message: 'Match Play requires exactly 2 players' },
+  VEGAS: { min: 4, max: 4, exact: 4, message: 'Vegas requires exactly 4 players (2 teams of 2)' },
+  WOLF: { min: 4, max: 4, exact: 4, message: 'Wolf requires exactly 4 players' },
+  NINES: { min: 3, max: 4, message: 'Nines requires 3-4 players' },
+  SKINS: { min: 2, max: 16, message: 'Skins requires 2-16 players' },
+  STABLEFORD: { min: 1, max: 16, message: 'Stableford requires 1-16 players' },
+  BINGO_BANGO_BONGO: { min: 3, max: 16, message: 'Bingo Bango Bongo requires 3-16 players' },
+  SNAKE: { min: 2, max: 16, message: 'Snake requires 2-16 players' },
+  BANKER: { min: 3, max: 16, message: 'Banker requires 3-16 players' },
+};
+
+// Minimum players required for each game type (for start round validation)
 const gameTypeMinPlayers: Record<GameType, number> = {
   NASSAU: 2,
   SKINS: 2,
   MATCH_PLAY: 2,
   WOLF: 4,
-  NINES: 2,
+  NINES: 3,
   STABLEFORD: 1,
   BINGO_BANGO_BONGO: 3,
   VEGAS: 4,
   SNAKE: 2,
   BANKER: 3,
 };
+
+// Validate game player count
+function validateGamePlayerCount(gameType: GameType, playerCount: number): string | null {
+  const rules = GAME_PLAYER_RULES[gameType];
+  if (!rules) return null;
+
+  if (rules.exact && playerCount !== rules.exact) {
+    return rules.message;
+  }
+  if (playerCount < rules.min || playerCount > rules.max) {
+    return rules.message;
+  }
+  return null;
+}
 
 const gameTypeDescriptions: Record<GameType, string> = {
   NASSAU: "Front 9, Back 9, Overall - classic 3-bet format",
@@ -173,6 +201,7 @@ export default function RoundDetailPage() {
   const [isAddingGame, setIsAddingGame] = useState(false);
   const [gameParticipantIds, setGameParticipantIds] = useState<string[]>([]);
   const [gameName, setGameName] = useState("");
+  const [gameError, setGameError] = useState<string | null>(null);
 
   // Add Players sheet state
   const [showAddPlayers, setShowAddPlayers] = useState(false);
@@ -260,6 +289,21 @@ export default function RoundDetailPage() {
   const handleAddGame = async () => {
     if (!selectedGameType || !round) return;
 
+    // Clear previous error
+    setGameError(null);
+
+    // Determine participant count - if no specific participants selected, defaults to all players
+    const participantCount = gameParticipantIds.length > 0
+      ? gameParticipantIds.length
+      : round.players.length;
+
+    // Validate player count for this game type
+    const validationError = validateGamePlayerCount(selectedGameType, participantCount);
+    if (validationError) {
+      setGameError(validationError);
+      return;
+    }
+
     setIsAddingGame(true);
     try {
       const token = await getToken();
@@ -286,8 +330,12 @@ export default function RoundDetailPage() {
       setIsAutoPress(false);
       setGameParticipantIds([]);
       setGameName("");
-    } catch (error) {
+      setGameError(null);
+    } catch (error: unknown) {
       console.error("Failed to add game:", error);
+      // Try to extract error message from API response
+      const apiError = error as { message?: string };
+      setGameError(apiError?.message || "Failed to add game. Please try again.");
     } finally {
       setIsAddingGame(false);
     }
@@ -786,7 +834,10 @@ export default function RoundDetailPage() {
       </div>
 
       {/* Add Game Sheet */}
-      <Sheet open={showAddGame} onOpenChange={setShowAddGame}>
+      <Sheet open={showAddGame} onOpenChange={(open) => {
+        setShowAddGame(open);
+        if (!open) setGameError(null);
+      }}>
         <SheetContent className="overflow-y-auto">
           <SheetHeader className="pb-2">
             <SheetTitle>Add a Game</SheetTitle>
@@ -841,6 +892,12 @@ export default function RoundDetailPage() {
                       </p>
                       <p className="text-sm text-white/70 mt-1">
                         {gameTypeDescriptions[selectedGameType]}
+                      </p>
+                      <p className="text-xs text-white/50 mt-1">
+                        {GAME_PLAYER_RULES[selectedGameType]?.exact
+                          ? `Requires ${GAME_PLAYER_RULES[selectedGameType].exact} players`
+                          : `${GAME_PLAYER_RULES[selectedGameType]?.min}-${GAME_PLAYER_RULES[selectedGameType]?.max} players`}
+                        {round && ` • You have ${round.players.length}`}
                       </p>
                     </div>
                   </div>
@@ -968,6 +1025,13 @@ export default function RoundDetailPage() {
                   </div>
                 )}
 
+                {/* Error Message */}
+                {gameError && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                    <p className="text-sm text-red-400">{gameError}</p>
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
                   <Button
@@ -979,6 +1043,7 @@ export default function RoundDetailPage() {
                       setIsAutoPress(false);
                       setGameParticipantIds([]);
                       setGameName("");
+                      setGameError(null);
                     }}
                   >
                     Back
