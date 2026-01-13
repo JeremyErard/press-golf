@@ -238,7 +238,7 @@ export default function DashboardPage() {
   const timeOfDay = getTimeOfDay();
 
   return (
-    <div className="min-h-screen pb-28">
+    <div className="min-h-screen pb-24">
       {/* Logo Header */}
       <div className="px-5 pt-6 pb-2">
         <div className="flex items-center justify-between">

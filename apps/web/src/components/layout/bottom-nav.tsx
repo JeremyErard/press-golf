@@ -28,6 +28,7 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              aria-label={item.label}
               className={cn(
                 "flex flex-col items-center justify-center flex-1 py-2 min-h-[56px] transition-all active:scale-95",
                 isActive
@@ -39,10 +40,14 @@ export function BottomNav() {
                 "p-2.5 rounded-xl transition-all",
                 isActive && "bg-brand/10"
               )}>
-                <Icon className={cn(
-                  "h-5 w-5 transition-transform",
-                  isActive && "scale-110"
-                )} strokeWidth={isActive ? 2.5 : 2} />
+                <Icon
+                  aria-hidden="true"
+                  className={cn(
+                    "h-5 w-5 transition-transform",
+                    isActive && "scale-110"
+                  )}
+                  strokeWidth={isActive ? 2.5 : 2}
+                />
               </div>
               <span className={cn(
                 "text-[11px] font-medium mt-1 transition-colors",
