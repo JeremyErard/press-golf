@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Calendar,
   Copy,
@@ -562,10 +563,13 @@ export default function RoundDetailPage() {
           {/* Hero Image Background */}
           <div className="absolute inset-0">
             {round.course.heroImageUrl ? (
-              <img
+              <Image
                 src={round.course.heroImageUrl}
                 alt={round.course.name}
-                className="absolute inset-0 w-full h-full object-cover"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
+                unoptimized
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />

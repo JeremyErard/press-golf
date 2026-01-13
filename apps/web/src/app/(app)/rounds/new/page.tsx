@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
+import Image from "next/image";
 import { ChevronRight, ChevronDown, Check, Crown } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Skeleton, Input } from "@/components/ui";
@@ -219,10 +220,13 @@ export default function NewRoundPage() {
                 <Card className="relative overflow-hidden rounded-xl mb-lg">
                   <div className="absolute inset-0">
                     {course.heroImageUrl ? (
-                      <img
+                      <Image
                         src={course.heroImageUrl}
                         alt={course.name}
-                        className="absolute inset-0 w-full h-full object-cover"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        unoptimized
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
@@ -338,10 +342,13 @@ export default function NewRoundPage() {
                 <Card className="relative overflow-hidden rounded-xl">
                   <div className="absolute inset-0">
                     {course.heroImageUrl ? (
-                      <img
+                      <Image
                         src={course.heroImageUrl}
                         alt={course.name}
-                        className="absolute inset-0 w-full h-full object-cover"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        unoptimized
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />

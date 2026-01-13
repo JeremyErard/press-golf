@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import Image from "next/image";
 import { ChevronRight, Play, UserPlus, Flag } from "lucide-react";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton, SectionHeader } from "@/components/ui";
 import { PendingApprovals } from "@/components/handicap/pending-approvals";
@@ -269,10 +270,13 @@ export default function DashboardPage() {
         <div className="relative overflow-hidden rounded-2xl">
           {/* Time-based background image */}
           <div className="absolute inset-0">
-            <img
+            <Image
               src={timeOfDay.image}
               alt={`Golf course ${timeOfDay.period}`}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 50vw"
+              priority
             />
             <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/30" />
           </div>
@@ -297,13 +301,15 @@ export default function DashboardPage() {
         <div className={`relative overflow-hidden rounded-2xl shadow-xl ${careerEarnings >= 0 ? "shadow-green-900/20" : "shadow-red-900/20"}`}>
           {/* Conditional Background Image */}
           <div className="absolute inset-0">
-            <img
+            <Image
               src={careerEarnings >= 0
                 ? "/images/golf-trophy.jpg"
                 : "https://i0.wp.com/efe.com/wp-content/uploads/2024/04/rss-efe6d24dff7e3f5149dfef214769b347848fdc6af6fw.jpg?fit=1920%2C1346&ssl=1"
               }
               alt={careerEarnings >= 0 ? "Winning golfer" : "Disappointed golfer"}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 50vw"
             />
             {/* Gradient overlay for text readability */}
             <div className={`absolute inset-0 ${careerEarnings >= 0
@@ -337,10 +343,13 @@ export default function DashboardPage() {
               {/* Course Hero Image Background */}
               <div className="absolute inset-0">
                 {activeRoundDetail?.course?.heroImageUrl ? (
-                  <img
+                  <Image
                     src={activeRoundDetail.course.heroImageUrl}
                     alt={activeRoundDetail.course.name}
-                    className="absolute inset-0 w-full h-full object-cover"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    unoptimized
                   />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950" />
