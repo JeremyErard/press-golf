@@ -1793,5 +1793,164 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
       return { success: false, error: String(error) };
     }
   });
+
+  // Create a Nassau round with Mike and a test player
+  app.get('/admin/create-nassau-with-mike', async (request, reply) => {
+    const results: string[] = [];
+    const log = (msg: string) => results.push(msg);
+
+    try {
+      log('🎯 Creating Nassau Round with Mike');
+
+      // Find Mike by looking for a real user (not test user)
+      const mike = await prisma.user.findFirst({
+        where: {
+          email: { not: { contains: '@test.golf' } },
+          NOT: { email: { contains: '@press.golf' } },
+        },
+      });
+
+      if (!mike) {
+        return reply.status(400).send({ success: false, error: 'Could not find Mike' });
+      }
+
+      log(`   ✓ Found Mike: ${mike.displayName || mike.firstName || mike.email}`);
+
+      // Get or create opponent
+      const opponentData = {
+        clerkId: 'nassau_opponent_001',
+        email: 'nassau.opponent@test.golf',
+        firstName: 'Nassau',
+        lastName: 'Opponent',
+        displayName: 'Nassau Opponent',
+        handicapIndex: 15.0,
+      };
+
+      let opponent = await prisma.user.findUnique({ where: { email: opponentData.email } });
+      if (!opponent) {
+        opponent = await prisma.user.create({
+          data: {
+            ...opponentData,
+            handicapIndex: new Decimal(opponentData.handicapIndex),
+            subscriptionStatus: 'ACTIVE',
+            isFoundingMember: true,
+          },
+        });
+      }
+
+      log(`   ✓ Opponent: ${opponent.displayName}`);
+
+      // Get course
+      const course = await prisma.course.findFirst({
+        include: { tees: true, holes: true },
+      });
+
+      if (!course) {
+        return reply.status(400).send({ success: false, error: 'No course found' });
+      }
+
+      // Create round
+      const tee = course.tees[0];
+      const round = await prisma.round.create({
+        data: {
+          courseId: course.id,
+          teeId: tee?.id || null,
+          createdById: mike.id,
+          date: new Date(),
+          status: 'ACTIVE',
+        },
+      });
+
+      // Add players
+      const slopeRating = tee?.slopeRating || 113;
+      const mikeHandicap = Math.round((mike.handicapIndex?.toNumber() || 10) * (slopeRating / 113));
+      const oppHandicap = Math.round((opponent.handicapIndex?.toNumber() || 15) * (slopeRating / 113));
+
+      await prisma.roundPlayer.create({
+        data: {
+          roundId: round.id,
+          userId: mike.id,
+          courseHandicap: mikeHandicap,
+          position: 1,
+        },
+      });
+
+      await prisma.roundPlayer.create({
+        data: {
+          roundId: round.id,
+          userId: opponent.id,
+          courseHandicap: oppHandicap,
+          position: 2,
+        },
+      });
+
+      log(`   ✓ Round created with Mike vs ${opponent.displayName}`);
+
+      // Create Nassau game
+      await prisma.game.create({
+        data: {
+          roundId: round.id,
+          type: 'NASSAU',
+          betAmount: new Decimal(10),
+          isAutoPress: false,
+          participantIds: [mike.id, opponent.id],
+          createdById: mike.id,
+          name: 'Mike vs Opponent Nassau',
+        },
+      });
+
+      log(`   ✓ Nassau game created ($10/segment)`);
+
+      // Get round players for score entry
+      const roundPlayers = await prisma.roundPlayer.findMany({
+        where: { roundId: round.id },
+        include: { user: true },
+        orderBy: { position: 'asc' },
+      });
+
+      // Add scores for front 9 - make it competitive
+      const holes = course.holes.filter(h => h.holeNumber <= 9).sort((a, b) => a.holeNumber - b.holeNumber);
+
+      // Scores that create an interesting match: Mike wins some, Opponent wins some
+      const mikeScores = [4, 5, 3, 4, 4, 5, 3, 5, 4]; // 37 total
+      const oppScores =  [5, 4, 4, 4, 5, 4, 4, 6, 4]; // 40 total
+
+      for (let i = 0; i < holes.length; i++) {
+        const hole = holes[i];
+        for (const rp of roundPlayers) {
+          const isMike = rp.userId === mike.id;
+          const strokes = isMike ? mikeScores[i] : oppScores[i];
+          await prisma.holeScore.create({
+            data: {
+              roundPlayerId: rp.id,
+              holeNumber: hole.holeNumber,
+              strokes,
+              putts: Math.floor(Math.random() * 2) + 1,
+            },
+          });
+        }
+      }
+
+      log(`   ✓ Added front 9 scores`);
+      log(`\n✅ Nassau round ready!`);
+      log(`📍 Round ID: ${round.id}`);
+      log(`📍 View at: https://www.pressbet.golf/rounds/${round.id}/scorecard`);
+
+      return {
+        success: true,
+        roundId: round.id,
+        roundUrl: `https://www.pressbet.golf/rounds/${round.id}/scorecard`,
+        players: [mike.displayName || mike.firstName, opponent.displayName],
+        log: results,
+      };
+    } catch (error) {
+      log(`\n❌ Error: ${String(error)}`);
+      return {
+        success: false,
+        error: String(error),
+        log: results,
+      };
+    }
+  });
 };
 
