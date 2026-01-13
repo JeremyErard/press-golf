@@ -107,8 +107,8 @@ export function ScoreEntryModal({
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="max-h-[85vh]">
-        <SheetHeader className="text-center pb-2">
+      <SheetContent className="flex flex-col max-h-[70vh] overflow-hidden">
+        <SheetHeader className="text-center pb-1 flex-shrink-0">
           <SheetTitle className="flex items-center justify-center gap-2">
             <span>Hole {holeNumber}</span>
             <span className="text-muted font-normal">Par {par}</span>
@@ -128,11 +128,11 @@ export function ScoreEntryModal({
           <p className="text-sm text-muted">{playerName}</p>
         </SheetHeader>
 
-        <div className="px-4 pb-24 space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 space-y-3">
           {/* Score display */}
-          <div className="text-center py-4">
+          <div className="text-center py-2">
             <div className="relative">
-              <span className="text-6xl font-bold tabular-nums">
+              <span className="text-5xl font-bold tabular-nums">
                 {score || "-"}
               </span>
               {numericScore > 0 && (
@@ -179,54 +179,54 @@ export function ScoreEntryModal({
           </div>
 
           {/* Number pad */}
-          <div className="grid grid-cols-3 gap-3 max-w-[280px] mx-auto">
+          <div className="grid grid-cols-3 gap-2 max-w-[260px] mx-auto">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
               <button
                 key={num}
                 onClick={() => handleNumberPress(num)}
-                className="h-14 rounded-xl bg-surface text-xl font-semibold hover:bg-elevated active:scale-95 transition-all"
+                className="h-11 rounded-xl bg-surface text-lg font-semibold hover:bg-elevated active:scale-95 transition-all"
               >
                 {num}
               </button>
             ))}
             <button
               onClick={handleClear}
-              className="h-14 rounded-xl bg-surface text-muted hover:bg-elevated active:scale-95 transition-all flex items-center justify-center"
+              className="h-11 rounded-xl bg-surface text-muted hover:bg-elevated active:scale-95 transition-all flex items-center justify-center"
             >
-              <X className="h-6 w-6" />
+              <X className="h-5 w-5" />
             </button>
             <button
               onClick={() => handleNumberPress(0)}
-              className="h-14 rounded-xl bg-surface text-xl font-semibold hover:bg-elevated active:scale-95 transition-all"
+              className="h-11 rounded-xl bg-surface text-lg font-semibold hover:bg-elevated active:scale-95 transition-all"
             >
               0
             </button>
             <button
               onClick={handleBackspace}
-              className="h-14 rounded-xl bg-surface text-muted hover:bg-elevated active:scale-95 transition-all flex items-center justify-center"
+              className="h-11 rounded-xl bg-surface text-muted hover:bg-elevated active:scale-95 transition-all flex items-center justify-center"
             >
-              <Delete className="h-6 w-6" />
+              <Delete className="h-5 w-5" />
             </button>
           </div>
+        </div>
 
-          {/* Action buttons */}
-          <div className="flex gap-3 pt-2">
-            <Button
-              variant="secondary"
-              onClick={onClose}
-              className="flex-1"
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              className="flex-1"
-              disabled={!isValidScore || isSaving}
-            >
-              {isSaving ? "Saving..." : "Save"}
-            </Button>
-          </div>
+        {/* Action buttons - fixed at bottom */}
+        <div className="flex gap-3 px-4 py-3 border-t border-border flex-shrink-0">
+          <Button
+            variant="secondary"
+            onClick={onClose}
+            className="flex-1"
+            disabled={isSaving}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSave}
+            className="flex-1"
+            disabled={!isValidScore || isSaving}
+          >
+            {isSaving ? "Saving..." : "Save"}
+          </Button>
         </div>
       </SheetContent>
     </Sheet>

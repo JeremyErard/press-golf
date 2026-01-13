@@ -47,12 +47,12 @@ export function SheetContent({ children, className }: SheetContentProps) {
   return (
     <div
       className={cn(
-        "bg-surface border-t border-border rounded-t-3xl max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-300",
+        "bg-surface border-t border-border rounded-t-3xl max-h-[90vh] animate-in slide-in-from-bottom duration-300",
         className
       )}
     >
-      {/* Handle bar - larger touch area for grabbing */}
-      <div className="sticky top-0 flex justify-center py-4 bg-surface z-10">
+      {/* Handle bar - centered at top */}
+      <div className="flex justify-center py-3 flex-shrink-0">
         <div className="w-12 h-1.5 rounded-full bg-white/20" />
       </div>
       {children}
