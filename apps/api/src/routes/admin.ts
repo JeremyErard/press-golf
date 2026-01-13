@@ -1350,5 +1350,448 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
       };
     }
   });
+
+  // Create a 4-player Wolf test round with scores
+  app.get('/admin/create-wolf-test', async (request, reply) => {
+    const results: string[] = [];
+    const log = (msg: string) => results.push(msg);
+
+    try {
+      log('🐺 Creating 4-Player Wolf Test Round');
+
+      // Get course
+      const course = await prisma.course.findFirst({
+        include: { tees: true, holes: true },
+      });
+
+      if (!course) {
+        return reply.status(400).send({ success: false, error: 'No course found' });
+      }
+
+      // Get or create 4 test users
+      const testUsers = [
+        { clerkId: 'wolf_player1', email: 'wolf1@test.golf', firstName: 'Wolf', lastName: 'One', displayName: 'Wolf Player 1', handicapIndex: 8.0 },
+        { clerkId: 'wolf_player2', email: 'wolf2@test.golf', firstName: 'Wolf', lastName: 'Two', displayName: 'Wolf Player 2', handicapIndex: 12.0 },
+        { clerkId: 'wolf_player3', email: 'wolf3@test.golf', firstName: 'Wolf', lastName: 'Three', displayName: 'Wolf Player 3', handicapIndex: 16.0 },
+        { clerkId: 'wolf_player4', email: 'wolf4@test.golf', firstName: 'Wolf', lastName: 'Four', displayName: 'Wolf Player 4', handicapIndex: 20.0 },
+      ];
+
+      const users = await Promise.all(
+        testUsers.map(async (userData) => {
+          const existing = await prisma.user.findUnique({ where: { email: userData.email } });
+          if (existing) return existing;
+          return prisma.user.create({
+            data: {
+              ...userData,
+              handicapIndex: new Decimal(userData.handicapIndex),
+              subscriptionStatus: 'ACTIVE',
+              isFoundingMember: true,
+            },
+          });
+        })
+      );
+
+      log(`   ✓ Users: ${users.map(u => u.displayName).join(', ')}`);
+
+      // Create round
+      const tee = course.tees[0];
+      const round = await prisma.round.create({
+        data: {
+          courseId: course.id,
+          teeId: tee?.id || null,
+          createdById: users[0].id,
+          date: new Date(),
+          status: 'ACTIVE',
+        },
+      });
+
+      // Add players
+      const slopeRating = tee?.slopeRating || 113;
+      for (let i = 0; i < users.length; i++) {
+        const courseHandicap = Math.round((users[i].handicapIndex?.toNumber() || 0) * (slopeRating / 113));
+        await prisma.roundPlayer.create({
+          data: {
+            roundId: round.id,
+            userId: users[i].id,
+            courseHandicap,
+            position: i + 1,
+          },
+        });
+      }
+
+      log(`   ✓ Round created with 4 players`);
+
+      // Create Wolf game
+      const wolf = await prisma.game.create({
+        data: {
+          roundId: round.id,
+          type: 'WOLF',
+          betAmount: new Decimal(2),
+          isAutoPress: false,
+          participantIds: users.map(u => u.id),
+          createdById: users[0].id,
+          name: 'Test Wolf',
+        },
+      });
+
+      log(`   ✓ Wolf game created ($2/point)`);
+
+      // Get round players for score entry
+      const roundPlayers = await prisma.roundPlayer.findMany({
+        where: { roundId: round.id },
+        include: { user: true },
+        orderBy: { position: 'asc' },
+      });
+
+      // Add scores for first 6 holes and create wolf decisions
+      const holes = course.holes.filter(h => h.holeNumber <= 6).sort((a, b) => a.holeNumber - b.holeNumber);
+
+      for (const hole of holes) {
+        // Wolf rotates: hole 1 = player 1, hole 2 = player 2, etc.
+        const wolfIndex = (hole.holeNumber - 1) % 4;
+        const isLoneWolf = Math.random() > 0.7; // 30% chance of going lone wolf
+        const partnerOptions = [0, 1, 2, 3].filter(i => i !== wolfIndex);
+        const partnerIndex = isLoneWolf ? null : partnerOptions[Math.floor(Math.random() * 3)];
+
+        await prisma.wolfDecision.create({
+          data: {
+            gameId: wolf.id,
+            holeNumber: hole.holeNumber,
+            wolfUserId: users[wolfIndex].id,
+            partnerUserId: partnerIndex !== null ? users[partnerIndex].id : null,
+            isLoneWolf,
+            isBlind: false,
+          },
+        });
+
+        for (const rp of roundPlayers) {
+          const variation = Math.floor(Math.random() * 4) - 1; // -1 to +2
+          const strokes = hole.par + variation;
+          await prisma.holeScore.create({
+            data: {
+              roundPlayerId: rp.id,
+              holeNumber: hole.holeNumber,
+              strokes,
+              putts: Math.floor(Math.random() * 2) + 1,
+            },
+          });
+        }
+      }
+
+      log(`   ✓ Added scores and Wolf decisions for holes 1-6`);
+      log(`\n✅ Wolf test round ready!`);
+      log(`📍 Round ID: ${round.id}`);
+      log(`📍 View at: https://www.pressbet.golf/rounds/${round.id}/scorecard`);
+
+      return {
+        success: true,
+        roundId: round.id,
+        roundUrl: `https://www.pressbet.golf/rounds/${round.id}/scorecard`,
+        players: users.map(u => u.displayName),
+        log: results,
+      };
+    } catch (error) {
+      log(`\n❌ Error: ${String(error)}`);
+      return {
+        success: false,
+        error: String(error),
+        log: results,
+      };
+    }
+  });
+
+  // Create a Skins test round
+  app.get('/admin/create-skins-test', async (request, reply) => {
+    const results: string[] = [];
+    const log = (msg: string) => results.push(msg);
+
+    try {
+      log('🎰 Creating 4-Player Skins Test Round');
+
+      // Get course
+      const course = await prisma.course.findFirst({
+        include: { tees: true, holes: true },
+      });
+
+      if (!course) {
+        return reply.status(400).send({ success: false, error: 'No course found' });
+      }
+
+      // Get or create 4 test users
+      const testUsers = [
+        { clerkId: 'skins_player1', email: 'skins1@test.golf', firstName: 'Skins', lastName: 'One', displayName: 'Skins Player 1', handicapIndex: 5.0 },
+        { clerkId: 'skins_player2', email: 'skins2@test.golf', firstName: 'Skins', lastName: 'Two', displayName: 'Skins Player 2', handicapIndex: 10.0 },
+        { clerkId: 'skins_player3', email: 'skins3@test.golf', firstName: 'Skins', lastName: 'Three', displayName: 'Skins Player 3', handicapIndex: 15.0 },
+        { clerkId: 'skins_player4', email: 'skins4@test.golf', firstName: 'Skins', lastName: 'Four', displayName: 'Skins Player 4', handicapIndex: 18.0 },
+      ];
+
+      const users = await Promise.all(
+        testUsers.map(async (userData) => {
+          const existing = await prisma.user.findUnique({ where: { email: userData.email } });
+          if (existing) return existing;
+          return prisma.user.create({
+            data: {
+              ...userData,
+              handicapIndex: new Decimal(userData.handicapIndex),
+              subscriptionStatus: 'ACTIVE',
+              isFoundingMember: true,
+            },
+          });
+        })
+      );
+
+      log(`   ✓ Users: ${users.map(u => u.displayName).join(', ')}`);
+
+      // Create round
+      const tee = course.tees[0];
+      const round = await prisma.round.create({
+        data: {
+          courseId: course.id,
+          teeId: tee?.id || null,
+          createdById: users[0].id,
+          date: new Date(),
+          status: 'ACTIVE',
+        },
+      });
+
+      // Add players
+      const slopeRating = tee?.slopeRating || 113;
+      for (let i = 0; i < users.length; i++) {
+        const courseHandicap = Math.round((users[i].handicapIndex?.toNumber() || 0) * (slopeRating / 113));
+        await prisma.roundPlayer.create({
+          data: {
+            roundId: round.id,
+            userId: users[i].id,
+            courseHandicap,
+            position: i + 1,
+          },
+        });
+      }
+
+      log(`   ✓ Round created with 4 players`);
+
+      // Create Skins game
+      await prisma.game.create({
+        data: {
+          roundId: round.id,
+          type: 'SKINS',
+          betAmount: new Decimal(5),
+          isAutoPress: false,
+          participantIds: users.map(u => u.id),
+          createdById: users[0].id,
+          name: 'Test Skins',
+        },
+      });
+
+      log(`   ✓ Skins game created ($5/skin)`);
+
+      // Get round players for score entry
+      const roundPlayers = await prisma.roundPlayer.findMany({
+        where: { roundId: round.id },
+        include: { user: true },
+        orderBy: { position: 'asc' },
+      });
+
+      // Add scores for 9 holes with some ties (carryovers) and some wins
+      const holes = course.holes.filter(h => h.holeNumber <= 9).sort((a, b) => a.holeNumber - b.holeNumber);
+
+      // Create specific scenarios: some wins, some ties
+      const scorePatterns = [
+        [4, 5, 5, 5],  // Hole 1: Player 1 wins
+        [4, 4, 5, 5],  // Hole 2: Tie (carryover)
+        [5, 5, 5, 3],  // Hole 3: Player 4 wins (with carryover)
+        [4, 4, 4, 4],  // Hole 4: Tie (carryover)
+        [4, 4, 4, 4],  // Hole 5: Tie (2 carryovers)
+        [3, 5, 5, 5],  // Hole 6: Player 1 wins (with 2 carryovers - big pot!)
+        [5, 4, 5, 5],  // Hole 7: Player 2 wins
+        [5, 5, 4, 5],  // Hole 8: Player 3 wins
+        [4, 5, 5, 4],  // Hole 9: Tie (carryover for back 9)
+      ];
+
+      for (let i = 0; i < holes.length; i++) {
+        const hole = holes[i];
+        for (let p = 0; p < roundPlayers.length; p++) {
+          const rp = roundPlayers[p];
+          const strokes = scorePatterns[i][p];
+          await prisma.holeScore.create({
+            data: {
+              roundPlayerId: rp.id,
+              holeNumber: hole.holeNumber,
+              strokes,
+              putts: Math.floor(Math.random() * 2) + 1,
+            },
+          });
+        }
+      }
+
+      log(`   ✓ Added scores for holes 1-9 with preset patterns`);
+      log(`   Expected results:`);
+      log(`     - Hole 1: Player 1 wins $5`);
+      log(`     - Hole 2: Tie (carryover)`);
+      log(`     - Hole 3: Player 4 wins $10 (with carryover)`);
+      log(`     - Hole 4-5: Double tie (2 carryovers)`);
+      log(`     - Hole 6: Player 1 wins $15 (with 2 carryovers)`);
+      log(`     - Hole 7: Player 2 wins $5`);
+      log(`     - Hole 8: Player 3 wins $5`);
+      log(`     - Hole 9: Tie (carryover)`);
+
+      log(`\n✅ Skins test round ready!`);
+      log(`📍 Round ID: ${round.id}`);
+      log(`📍 View at: https://www.pressbet.golf/rounds/${round.id}/scorecard`);
+
+      return {
+        success: true,
+        roundId: round.id,
+        roundUrl: `https://www.pressbet.golf/rounds/${round.id}/scorecard`,
+        players: users.map(u => u.displayName),
+        log: results,
+      };
+    } catch (error) {
+      log(`\n❌ Error: ${String(error)}`);
+      return {
+        success: false,
+        error: String(error),
+        log: results,
+      };
+    }
+  });
+
+  // Get Skins calculations for a round (no auth)
+  app.get('/admin/skins-status/:roundId', async (request, reply) => {
+    const { roundId } = request.params as { roundId: string };
+
+    try {
+      const round = await prisma.round.findUnique({
+        where: { id: roundId },
+        include: {
+          course: { include: { holes: { orderBy: { holeNumber: 'asc' } } } },
+          players: {
+            include: {
+              user: { select: { id: true, displayName: true } },
+              scores: { orderBy: { holeNumber: 'asc' } },
+            },
+          },
+          games: {
+            where: { type: 'SKINS' },
+          },
+        },
+      });
+
+      if (!round) {
+        return reply.status(404).send({ success: false, error: 'Round not found' });
+      }
+
+      const skinsGame = round.games[0];
+      if (!skinsGame) {
+        return { success: false, error: 'No Skins game found' };
+      }
+
+      const betAmount = Number(skinsGame.betAmount);
+      const holes = round.course?.holes || [];
+
+      // Calculate skins results
+      const skinResults: Array<{
+        hole: number;
+        scores: Array<{ playerId: string; playerName: string; gross: number; net: number }>;
+        winner: string | null;
+        winnerName: string | null;
+        value: number;
+        isCarryover: boolean;
+      }> = [];
+
+      // Calculate min handicap for net scoring
+      const minHandicap = Math.min(...round.players.map(p => p.courseHandicap || 0));
+
+      let carryover = 0;
+      const playerWinnings: Record<string, number> = {};
+      round.players.forEach(p => playerWinnings[p.userId] = 0);
+
+      for (let h = 1; h <= 18; h++) {
+        const hole = holes.find(ho => ho.holeNumber === h);
+        const holeScores: Array<{ playerId: string; playerName: string; gross: number; net: number }> = [];
+
+        for (const player of round.players) {
+          const score = player.scores.find(s => s.holeNumber === h);
+          if (!score?.strokes) continue;
+
+          // Calculate net score
+          const handicapStrokes = hole && hole.handicapRank <= ((player.courseHandicap || 0) - minHandicap) ? 1 : 0;
+          const netScore = score.strokes - handicapStrokes;
+
+          holeScores.push({
+            playerId: player.userId,
+            playerName: player.user?.displayName || 'Unknown',
+            gross: score.strokes,
+            net: netScore,
+          });
+        }
+
+        // Need all players to have scores for this hole
+        if (holeScores.length !== round.players.length) break;
+
+        // Find winner (lowest net score, must be unique)
+        const sortedScores = [...holeScores].sort((a, b) => a.net - b.net);
+        const lowestNet = sortedScores[0].net;
+        const winners = sortedScores.filter(s => s.net === lowestNet);
+
+        let winner: string | null = null;
+        let winnerName: string | null = null;
+        let isCarryover = false;
+
+        if (winners.length === 1) {
+          winner = winners[0].playerId;
+          winnerName = winners[0].playerName;
+          const skinValue = betAmount + carryover;
+          playerWinnings[winner] += skinValue;
+          skinResults.push({
+            hole: h,
+            scores: holeScores,
+            winner,
+            winnerName,
+            value: skinValue,
+            isCarryover: carryover > 0,
+          });
+          carryover = 0;
+        } else {
+          isCarryover = true;
+          carryover += betAmount;
+          skinResults.push({
+            hole: h,
+            scores: holeScores,
+            winner: null,
+            winnerName: null,
+            value: 0,
+            isCarryover: true,
+          });
+        }
+      }
+
+      // Calculate net amounts (winnings - share of total pot)
+      const totalHolesScored = skinResults.length;
+      const totalPot = totalHolesScored * betAmount;
+      const perPlayerShare = totalPot / round.players.length;
+
+      const standings = round.players.map(p => ({
+        userId: p.userId,
+        name: p.user?.displayName || 'Unknown',
+        skinsWon: skinResults.filter(r => r.winner === p.userId).length,
+        grossWinnings: playerWinnings[p.userId],
+        netAmount: playerWinnings[p.userId] - perPlayerShare,
+      })).sort((a, b) => b.netAmount - a.netAmount);
+
+      return {
+        success: true,
+        roundId,
+        gameId: skinsGame.id,
+        betAmount,
+        totalHolesScored,
+        carryoverRemaining: carryover,
+        skinResults,
+        standings,
+      };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  });
 };
 
