@@ -170,18 +170,18 @@ const gameTypeIconColors: Record<GameType, string> = {
   BANKER: "text-cyan-400",
 };
 
-// Hero background images from Unsplash (free for commercial use)
+// Hero background images - golf-themed (free for commercial use)
 const gameTypeImages: Record<GameType, string> = {
-  NASSAU: "https://images.unsplash.com/photo-1567427018141-0584cfcbf1b8?w=300&h=200&fit=crop", // Trophy
-  SKINS: "https://images.unsplash.com/photo-1533750516457-a7f992034fec?w=300&h=200&fit=crop", // Target/dart
-  MATCH_PLAY: "https://images.unsplash.com/photo-1595590424283-b8f17842773f?w=300&h=200&fit=crop", // Swords/battle
-  WOLF: "https://images.unsplash.com/photo-1561731216-c3a4d99437d5?w=300&h=200&fit=crop", // Wolf
-  NINES: "https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=300&h=200&fit=crop", // Abstract grid
-  STABLEFORD: "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=300&h=200&fit=crop", // Stars
-  BINGO_BANGO_BONGO: "https://images.unsplash.com/photo-1461511669078-d46bf351cd6e?w=300&h=200&fit=crop", // Lightning
-  VEGAS: "https://images.unsplash.com/photo-1581351721010-8cf859cb14a4?w=300&h=200&fit=crop", // Vegas neon
-  SNAKE: "https://images.unsplash.com/photo-1531386151447-fd76ad50012f?w=300&h=200&fit=crop", // Snake
-  BANKER: "https://images.unsplash.com/photo-1561414927-6d86591d0c4f?w=300&h=200&fit=crop", // Money
+  NASSAU: "https://images.unsplash.com/photo-1707909424824-16662ef461df?w=300&h=200&fit=crop", // Elegant golf course with water hazard
+  SKINS: "https://images.pexels.com/photos/54123/pexels-photo-54123.jpeg?w=300&h=200&fit=crop", // Golf ball near hole - winning moment
+  MATCH_PLAY: "https://images.pexels.com/photos/6256827/pexels-photo-6256827.jpeg?w=300&h=200&fit=crop", // Two golfers competing
+  WOLF: "https://images.pexels.com/photos/6256834/pexels-photo-6256834.jpeg?w=300&h=200&fit=crop", // Lone golfer at sunset
+  NINES: "https://images.unsplash.com/photo-1605144884374-ecbb643615f6?w=300&h=200&fit=crop", // Aerial golf course view
+  STABLEFORD: "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=300&h=200&fit=crop", // Golf swing action shot
+  BINGO_BANGO_BONGO: "https://images.unsplash.com/photo-1600183952451-e459d75ae0ac?w=300&h=200&fit=crop", // Dynamic golf action
+  VEGAS: "https://images.pexels.com/photos/9207299/pexels-photo-9207299.jpeg?w=300&h=200&fit=crop", // Group of golfers - team format
+  SNAKE: "https://images.unsplash.com/photo-1500932334442-8761ee4810a7?w=300&h=200&fit=crop", // Ball near hole on putting green
+  BANKER: "https://images.pexels.com/photos/6256829/pexels-photo-6256829.jpeg?w=300&h=200&fit=crop", // Confident golfer stance
 };
 
 const ALL_GAME_TYPES: GameType[] = [
