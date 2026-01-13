@@ -1093,6 +1093,135 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
+  // Get detailed Nassau calculations for a round (no auth)
+  app.get('/admin/nassau-status/:roundId', async (request, reply) => {
+    const { roundId } = request.params as { roundId: string };
+
+    try {
+      const round = await prisma.round.findUnique({
+        where: { id: roundId },
+        include: {
+          course: { include: { holes: { orderBy: { holeNumber: 'asc' } } } },
+          players: {
+            include: {
+              user: { select: { id: true, displayName: true } },
+              scores: { orderBy: { holeNumber: 'asc' } },
+            },
+          },
+          games: {
+            where: { type: 'NASSAU' },
+            include: { presses: { where: { status: 'ACTIVE' } } },
+          },
+        },
+      });
+
+      if (!round) {
+        return reply.status(404).send({ success: false, error: 'Round not found' });
+      }
+
+      if (round.players.length !== 2) {
+        return {
+          success: false,
+          error: `Nassau requires exactly 2 players, found ${round.players.length}`,
+          playerCount: round.players.length,
+        };
+      }
+
+      const nassauGame = round.games[0];
+      if (!nassauGame) {
+        return { success: false, error: 'No Nassau game found' };
+      }
+
+      const [p1, p2] = round.players;
+      const holes = round.course?.holes || [];
+
+      // Calculate match status for a segment
+      const calcMatchStatus = (startHole: number, endHole: number) => {
+        let p1Up = 0;
+        let holesPlayed = 0;
+        const holeResults: Array<{ hole: number; p1Net: number; p2Net: number; result: string }> = [];
+
+        const minHandicap = Math.min(p1.courseHandicap || 0, p2.courseHandicap || 0);
+
+        for (let h = startHole; h <= endHole; h++) {
+          const p1Score = p1.scores.find(s => s.holeNumber === h);
+          const p2Score = p2.scores.find(s => s.holeNumber === h);
+
+          if (!p1Score?.strokes || !p2Score?.strokes) continue;
+
+          const hole = holes.find(ho => ho.holeNumber === h);
+
+          // Calculate net scores (higher handicap gets strokes)
+          const p1Strokes = p1Score.strokes - (hole && hole.handicapRank <= ((p1.courseHandicap || 0) - minHandicap) ? 1 : 0);
+          const p2Strokes = p2Score.strokes - (hole && hole.handicapRank <= ((p2.courseHandicap || 0) - minHandicap) ? 1 : 0);
+
+          holesPlayed++;
+
+          let result = 'TIE';
+          if (p1Strokes < p2Strokes) {
+            p1Up++;
+            result = `${p1.user?.displayName} wins`;
+          } else if (p2Strokes < p1Strokes) {
+            p1Up--;
+            result = `${p2.user?.displayName} wins`;
+          }
+
+          holeResults.push({
+            hole: h,
+            p1Net: p1Strokes,
+            p2Net: p2Strokes,
+            result,
+          });
+        }
+
+        const winner = p1Up > 0 ? p1.user?.displayName : p1Up < 0 ? p2.user?.displayName : 'TIE';
+        const margin = Math.abs(p1Up);
+
+        return {
+          score: p1Up,
+          holesPlayed,
+          holesRemaining: (endHole - startHole + 1) - holesPlayed,
+          winner,
+          margin,
+          displayLabel: p1Up === 0 ? 'AS' : `${winner} ${margin} UP`,
+          holeResults,
+        };
+      };
+
+      const front = calcMatchStatus(1, 9);
+      const back = calcMatchStatus(10, 18);
+      const overall = calcMatchStatus(1, 18);
+
+      return {
+        success: true,
+        roundId,
+        gameId: nassauGame.id,
+        betAmount: Number(nassauGame.betAmount),
+        players: {
+          player1: { id: p1.userId, name: p1.user?.displayName, courseHandicap: p1.courseHandicap },
+          player2: { id: p2.userId, name: p2.user?.displayName, courseHandicap: p2.courseHandicap },
+        },
+        segments: {
+          front: {
+            label: `Front 9 (${front.holesPlayed}/9)`,
+            ...front,
+          },
+          back: {
+            label: `Back 9 (${back.holesPlayed}/9)`,
+            ...back,
+          },
+          overall: {
+            label: `Overall (${overall.holesPlayed}/18)`,
+            ...overall,
+          },
+        },
+        activePresses: nassauGame.presses.length,
+      };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  });
+
   // Create a proper 2-player Nassau test round with scores
   app.get('/admin/create-nassau-test', async (request, reply) => {
     const results: string[] = [];
