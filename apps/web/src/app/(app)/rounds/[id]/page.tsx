@@ -170,6 +170,20 @@ const gameTypeIconColors: Record<GameType, string> = {
   BANKER: "text-cyan-400",
 };
 
+// Hero background images from Unsplash (free for commercial use)
+const gameTypeImages: Record<GameType, string> = {
+  NASSAU: "https://images.unsplash.com/photo-1567427018141-0584cfcbf1b8?w=300&h=200&fit=crop", // Trophy
+  SKINS: "https://images.unsplash.com/photo-1533750516457-a7f992034fec?w=300&h=200&fit=crop", // Target/dart
+  MATCH_PLAY: "https://images.unsplash.com/photo-1595590424283-b8f17842773f?w=300&h=200&fit=crop", // Swords/battle
+  WOLF: "https://images.unsplash.com/photo-1561731216-c3a4d99437d5?w=300&h=200&fit=crop", // Wolf
+  NINES: "https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=300&h=200&fit=crop", // Abstract grid
+  STABLEFORD: "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=300&h=200&fit=crop", // Stars
+  BINGO_BANGO_BONGO: "https://images.unsplash.com/photo-1461511669078-d46bf351cd6e?w=300&h=200&fit=crop", // Lightning
+  VEGAS: "https://images.unsplash.com/photo-1581351721010-8cf859cb14a4?w=300&h=200&fit=crop", // Vegas neon
+  SNAKE: "https://images.unsplash.com/photo-1531386151447-fd76ad50012f?w=300&h=200&fit=crop", // Snake
+  BANKER: "https://images.unsplash.com/photo-1561414927-6d86591d0c4f?w=300&h=200&fit=crop", // Money
+};
+
 const ALL_GAME_TYPES: GameType[] = [
   "NASSAU",
   "SKINS",
@@ -850,7 +864,7 @@ export default function RoundDetailPage() {
 
           <div className="px-5 pb-28">
             {!selectedGameType ? (
-              /* Game Type Selection - 3 column compact grid with descriptions */
+              /* Game Type Selection - 3 column compact grid with descriptions and hero images */
               <div className="grid grid-cols-3 gap-2">
                 {availableGameTypes.map((type) => {
                   const rules = GAME_PLAYER_RULES[type];
@@ -863,24 +877,33 @@ export default function RoundDetailPage() {
                       key={type}
                       onClick={() => setSelectedGameType(type)}
                       className={cn(
-                        "relative p-2 rounded-xl border text-center transition-all",
-                        "bg-gradient-to-br",
-                        gameTypeColors[type],
+                        "relative p-2 rounded-xl border text-center transition-all overflow-hidden",
+                        gameTypeColors[type].split(' ').filter(c => c.includes('border')).join(' '),
                         "hover:scale-[1.02] active:scale-[0.98]"
                       )}
                     >
-                      <div className={cn("mb-1 flex justify-center", gameTypeIconColors[type])}>
-                        {gameTypeIcons[type]}
+                      {/* Background image with dark overlay */}
+                      <div
+                        className="absolute inset-0 bg-cover bg-center opacity-30"
+                        style={{ backgroundImage: `url(${gameTypeImages[type]})` }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/40 to-black/70" />
+
+                      {/* Content */}
+                      <div className="relative z-10">
+                        <div className={cn("mb-1 flex justify-center", gameTypeIconColors[type])}>
+                          {gameTypeIcons[type]}
+                        </div>
+                        <p className="font-semibold text-white text-xs leading-tight drop-shadow-md">
+                          {gameTypeLabels[type]}
+                        </p>
+                        <p className="text-[9px] text-white/70 mt-0.5 line-clamp-2 leading-tight min-h-[24px] drop-shadow">
+                          {gameTypeDescriptions[type]}
+                        </p>
+                        <p className="text-[9px] text-white/50 mt-0.5 drop-shadow">
+                          {playerText}
+                        </p>
                       </div>
-                      <p className="font-semibold text-white text-xs leading-tight">
-                        {gameTypeLabels[type]}
-                      </p>
-                      <p className="text-[9px] text-white/60 mt-0.5 line-clamp-2 leading-tight min-h-[24px]">
-                        {gameTypeDescriptions[type]}
-                      </p>
-                      <p className="text-[9px] text-white/40 mt-0.5">
-                        {playerText}
-                      </p>
                     </button>
                   );
                 })}
