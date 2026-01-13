@@ -850,27 +850,44 @@ export default function RoundDetailPage() {
 
           <div className="px-5 pb-28">
             {!selectedGameType ? (
-              /* Game Type Selection - 3 column grid */
-              <div className="grid grid-cols-3 gap-2">
-                {availableGameTypes.map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setSelectedGameType(type)}
-                    className={cn(
-                      "relative p-3 rounded-xl border text-center transition-all",
-                      "bg-gradient-to-br",
-                      gameTypeColors[type],
-                      "hover:scale-[1.02] active:scale-[0.98]"
-                    )}
-                  >
-                    <div className={cn("mb-1.5 flex justify-center", gameTypeIconColors[type])}>
-                      {gameTypeIcons[type]}
-                    </div>
-                    <p className="font-semibold text-white text-xs">
-                      {gameTypeLabels[type]}
-                    </p>
-                  </button>
-                ))}
+              /* Game Type Selection - 2 column grid with descriptions */
+              <div className="grid grid-cols-2 gap-3">
+                {availableGameTypes.map((type) => {
+                  const rules = GAME_PLAYER_RULES[type];
+                  const playerText = rules?.exact
+                    ? `${rules.exact} players`
+                    : `${rules?.min}-${rules?.max} players`;
+
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => setSelectedGameType(type)}
+                      className={cn(
+                        "relative p-3 rounded-xl border text-left transition-all",
+                        "bg-gradient-to-br",
+                        gameTypeColors[type],
+                        "hover:scale-[1.02] active:scale-[0.98]"
+                      )}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className={cn("p-1.5 rounded-lg bg-black/20 shrink-0", gameTypeIconColors[type])}>
+                          {gameTypeIcons[type]}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-white text-sm">
+                            {gameTypeLabels[type]}
+                          </p>
+                          <p className="text-[10px] text-white/60 mt-0.5 line-clamp-2">
+                            {gameTypeDescriptions[type]}
+                          </p>
+                          <p className="text-[10px] text-white/40 mt-1">
+                            {playerText}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             ) : (
               /* Bet Configuration */
