@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useReducer, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { Check, ChevronLeft } from "lucide-react";
@@ -14,11 +14,96 @@ import { useRealtimeScores, type RealtimeScoreUpdate, type RealtimePlayerJoined 
 import { toast } from "@/components/ui/sonner";
 import Link from "next/link";
 
+// ----- Types -----
+
 interface HoleData {
   holeNumber: number;
   par: number;
   handicapRank: number;
   yardage?: number;
+}
+
+interface SelectedScore {
+  playerId: string;
+  holeNumber: number;
+  currentScore: number;
+}
+
+interface ScorecardState {
+  round: RoundDetail | null;
+  isLoading: boolean;
+  savingScore: string | null;
+  pressStatus: PressStatus[];
+  gameLiveStatus: GameLiveStatus[];
+  isPressing: boolean;
+  isFinishing: boolean;
+  scoreModalOpen: boolean;
+  selectedScore: SelectedScore | null;
+  localScores: Record<string, Record<number, number>>;
+}
+
+type ScorecardAction =
+  | { type: "SET_ROUND"; payload: RoundDetail }
+  | { type: "SET_LOADING"; payload: boolean }
+  | { type: "SET_SAVING_SCORE"; payload: string | null }
+  | { type: "SET_GAME_STATUS"; payload: { pressStatus: PressStatus[]; gameLiveStatus: GameLiveStatus[] } }
+  | { type: "SET_PRESSING"; payload: boolean }
+  | { type: "SET_FINISHING"; payload: boolean }
+  | { type: "OPEN_SCORE_MODAL"; payload: SelectedScore }
+  | { type: "CLOSE_SCORE_MODAL" }
+  | { type: "INIT_LOCAL_SCORES"; payload: Record<string, Record<number, number>> }
+  | { type: "UPDATE_LOCAL_SCORE"; payload: { playerId: string; holeNumber: number; score: number } }
+  | { type: "CLEAR_SELECTED_SCORE" };
+
+const initialState: ScorecardState = {
+  round: null,
+  isLoading: true,
+  savingScore: null,
+  pressStatus: [],
+  gameLiveStatus: [],
+  isPressing: false,
+  isFinishing: false,
+  scoreModalOpen: false,
+  selectedScore: null,
+  localScores: {},
+};
+
+function scorecardReducer(state: ScorecardState, action: ScorecardAction): ScorecardState {
+  switch (action.type) {
+    case "SET_ROUND":
+      return { ...state, round: action.payload };
+    case "SET_LOADING":
+      return { ...state, isLoading: action.payload };
+    case "SET_SAVING_SCORE":
+      return { ...state, savingScore: action.payload };
+    case "SET_GAME_STATUS":
+      return { ...state, pressStatus: action.payload.pressStatus, gameLiveStatus: action.payload.gameLiveStatus };
+    case "SET_PRESSING":
+      return { ...state, isPressing: action.payload };
+    case "SET_FINISHING":
+      return { ...state, isFinishing: action.payload };
+    case "OPEN_SCORE_MODAL":
+      return { ...state, scoreModalOpen: true, selectedScore: action.payload };
+    case "CLOSE_SCORE_MODAL":
+      return { ...state, scoreModalOpen: false, selectedScore: null };
+    case "INIT_LOCAL_SCORES":
+      return { ...state, localScores: action.payload };
+    case "UPDATE_LOCAL_SCORE":
+      return {
+        ...state,
+        localScores: {
+          ...state.localScores,
+          [action.payload.playerId]: {
+            ...state.localScores[action.payload.playerId],
+            [action.payload.holeNumber]: action.payload.score,
+          },
+        },
+      };
+    case "CLEAR_SELECTED_SCORE":
+      return { ...state, selectedScore: null };
+    default:
+      return state;
+  }
 }
 
 export default function ScorecardPage() {
@@ -27,24 +112,20 @@ export default function ScorecardPage() {
   const { getToken, userId } = useAuth();
   const roundId = params.id as string;
 
-  const [round, setRound] = useState<RoundDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [savingScore, setSavingScore] = useState<string | null>(null);
-  const [pressStatus, setPressStatus] = useState<PressStatus[]>([]);
-  const [gameLiveStatus, setGameLiveStatus] = useState<GameLiveStatus[]>([]);
-  const [isPressing, setIsPressing] = useState(false);
-  const [isFinishing, setIsFinishing] = useState(false);
-
-  // Score entry modal state
-  const [scoreModalOpen, setScoreModalOpen] = useState(false);
-  const [selectedScore, setSelectedScore] = useState<{
-    playerId: string;
-    holeNumber: number;
-    currentScore: number;
-  } | null>(null);
-
-  // Local scores state for optimistic updates
-  const [localScores, setLocalScores] = useState<Record<string, Record<number, number>>>({});
+  // Consolidated state with useReducer
+  const [state, dispatch] = useReducer(scorecardReducer, initialState);
+  const {
+    round,
+    isLoading,
+    savingScore,
+    pressStatus,
+    gameLiveStatus,
+    isPressing,
+    isFinishing,
+    scoreModalOpen,
+    selectedScore,
+    localScores,
+  } = state;
 
   // Fetch press status and game live status
   const fetchGameStatus = useCallback(async () => {
@@ -58,8 +139,7 @@ export default function ScorecardPage() {
         api.getGameLiveStatus(token, roundId).catch(() => []),
       ]);
 
-      setPressStatus(pressData);
-      setGameLiveStatus(liveData);
+      dispatch({ type: "SET_GAME_STATUS", payload: { pressStatus: pressData, gameLiveStatus: liveData } });
     } catch (error) {
       console.error("Failed to fetch game status:", error);
     }
@@ -70,22 +150,17 @@ export default function ScorecardPage() {
     const player = round?.players.find(p => p.userId === update.userId);
     if (!player) return;
 
-    setLocalScores((prev) => {
-      const currentScore = prev[player.id]?.[update.holeNumber];
-      if (currentScore === update.strokes) return prev;
-
-      return {
-        ...prev,
-        [player.id]: {
-          ...prev[player.id],
-          [update.holeNumber]: update.strokes ?? 0,
-        },
-      };
-    });
+    // Only update if score changed
+    if (localScores[player.id]?.[update.holeNumber] !== update.strokes) {
+      dispatch({
+        type: "UPDATE_LOCAL_SCORE",
+        payload: { playerId: player.id, holeNumber: update.holeNumber, score: update.strokes ?? 0 },
+      });
+    }
 
     // Refresh game status when scores change
     fetchGameStatus();
-  }, [round, fetchGameStatus]);
+  }, [round, localScores, fetchGameStatus]);
 
   // Handle player joined events
   const handlePlayerJoined = useCallback((player: RealtimePlayerJoined) => {
@@ -94,27 +169,26 @@ export default function ScorecardPage() {
         const token = await getToken();
         if (!token) return;
         const data = await api.getRound(token, roundId);
-        setRound(data);
+        dispatch({ type: "SET_ROUND", payload: data });
 
-        setLocalScores((prev) => {
-          const newScores = { ...prev };
-          const newPlayer = data.players.find(p => p.userId === player.userId);
-          if (newPlayer) {
-            newScores[newPlayer.id] = {};
-            newPlayer.scores?.forEach((score) => {
-              if (score.strokes !== null && score.strokes !== undefined) {
-                newScores[newPlayer.id][score.holeNumber] = score.strokes;
-              }
-            });
-          }
-          return newScores;
-        });
+        // Rebuild local scores including new player
+        const newScores: Record<string, Record<number, number>> = { ...localScores };
+        const newPlayer = data.players.find(p => p.userId === player.userId);
+        if (newPlayer) {
+          newScores[newPlayer.id] = {};
+          newPlayer.scores?.forEach((score) => {
+            if (score.strokes !== null && score.strokes !== undefined) {
+              newScores[newPlayer.id][score.holeNumber] = score.strokes;
+            }
+          });
+        }
+        dispatch({ type: "INIT_LOCAL_SCORES", payload: newScores });
       } catch (error) {
         console.error("Failed to refresh round after player joined:", error);
       }
     }
     refresh();
-  }, [getToken, roundId]);
+  }, [getToken, roundId, localScores]);
 
   // Handle round completed event
   const handleRoundCompleted = useCallback(() => {
@@ -136,7 +210,7 @@ export default function ScorecardPage() {
         const token = await getToken();
         if (!token) return;
         const data = await api.getRound(token, roundId);
-        setRound(data);
+        dispatch({ type: "SET_ROUND", payload: data });
 
         // Initialize local scores from fetched data
         const scores: Record<string, Record<number, number>> = {};
@@ -148,14 +222,14 @@ export default function ScorecardPage() {
             }
           });
         });
-        setLocalScores(scores);
+        dispatch({ type: "INIT_LOCAL_SCORES", payload: scores });
 
         // Fetch game status
         fetchGameStatus();
       } catch (error) {
         console.error("Failed to fetch round:", error);
       } finally {
-        setIsLoading(false);
+        dispatch({ type: "SET_LOADING", payload: false });
       }
     }
 
@@ -164,8 +238,7 @@ export default function ScorecardPage() {
 
   const handleScoreClick = useCallback(
     (playerId: string, holeNumber: number, currentScore: number) => {
-      setSelectedScore({ playerId, holeNumber, currentScore });
-      setScoreModalOpen(true);
+      dispatch({ type: "OPEN_SCORE_MODAL", payload: { playerId, holeNumber, currentScore } });
     },
     []
   );
@@ -177,16 +250,9 @@ export default function ScorecardPage() {
       const { playerId, holeNumber, currentScore } = selectedScore;
 
       // Optimistic update
-      setLocalScores((prev) => ({
-        ...prev,
-        [playerId]: {
-          ...prev[playerId],
-          [holeNumber]: newScore,
-        },
-      }));
-
-      setScoreModalOpen(false);
-      setSavingScore(`${playerId}-${holeNumber}`);
+      dispatch({ type: "UPDATE_LOCAL_SCORE", payload: { playerId, holeNumber, score: newScore } });
+      dispatch({ type: "CLOSE_SCORE_MODAL" });
+      dispatch({ type: "SET_SAVING_SCORE", payload: `${playerId}-${holeNumber}` });
 
       try {
         const token = await getToken();
@@ -204,16 +270,9 @@ export default function ScorecardPage() {
         console.error("Failed to save score:", error);
         toast.error("Failed to save score");
         // Revert on error
-        setLocalScores((prev) => ({
-          ...prev,
-          [playerId]: {
-            ...prev[playerId],
-            [holeNumber]: currentScore,
-          },
-        }));
+        dispatch({ type: "UPDATE_LOCAL_SCORE", payload: { playerId, holeNumber, score: currentScore } });
       } finally {
-        setSavingScore(null);
-        setSelectedScore(null);
+        dispatch({ type: "SET_SAVING_SCORE", payload: null });
       }
     },
     [getToken, roundId, selectedScore, fetchGameStatus]
@@ -221,7 +280,7 @@ export default function ScorecardPage() {
 
   const handlePress = useCallback(
     async (gameId: string, segment: PressSegment, startHole: number, parentPressId?: string) => {
-      setIsPressing(true);
+      dispatch({ type: "SET_PRESSING", payload: true });
       try {
         const token = await getToken();
         if (!token) return;
@@ -238,14 +297,14 @@ export default function ScorecardPage() {
         console.error("Failed to create press:", error);
         toast.error("Failed to create press");
       } finally {
-        setIsPressing(false);
+        dispatch({ type: "SET_PRESSING", payload: false });
       }
     },
     [getToken, fetchGameStatus]
   );
 
   const handleFinishRound = useCallback(async () => {
-    setIsFinishing(true);
+    dispatch({ type: "SET_FINISHING", payload: true });
     try {
       const token = await getToken();
       if (!token) return;
@@ -256,7 +315,7 @@ export default function ScorecardPage() {
     } catch (error) {
       console.error("Failed to finish round:", error);
       toast.error("Failed to finish round");
-      setIsFinishing(false);
+      dispatch({ type: "SET_FINISHING", payload: false });
     }
   }, [getToken, roundId, router]);
 
@@ -456,10 +515,7 @@ export default function ScorecardPage() {
       {selectedHoleData && (
         <ScoreEntryModal
           open={scoreModalOpen}
-          onClose={() => {
-            setScoreModalOpen(false);
-            setSelectedScore(null);
-          }}
+          onClose={() => dispatch({ type: "CLOSE_SCORE_MODAL" })}
           onSave={handleScoreSave}
           playerName={selectedHoleData.playerName}
           holeNumber={selectedHoleData.holeNumber}
