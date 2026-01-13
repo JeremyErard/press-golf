@@ -30,8 +30,8 @@ export function Sheet({ open, onOpenChange, children }: SheetProps) {
         className="fixed inset-0 bg-black/60 backdrop-blur-sm"
         onClick={() => onOpenChange(false)}
       />
-      {/* Sheet content */}
-      <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col">
+      {/* Sheet content - positioned above bottom nav */}
+      <div className="fixed inset-x-0 bottom-16 z-50 flex flex-col">
         {children}
       </div>
     </div>

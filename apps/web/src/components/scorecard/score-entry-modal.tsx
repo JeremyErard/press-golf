@@ -107,7 +107,7 @@ export function ScoreEntryModal({
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="flex flex-col max-h-[70vh] overflow-hidden">
+      <SheetContent className="flex flex-col max-h-[80vh] overflow-hidden">
         <SheetHeader className="text-center pb-1 flex-shrink-0">
           <SheetTitle className="flex items-center justify-center gap-2">
             <span>Hole {holeNumber}</span>
