@@ -172,13 +172,13 @@ const gameTypeIconColors: Record<GameType, string> = {
 
 // Hero background images - golf-themed (free for commercial use)
 const gameTypeImages: Record<GameType, string> = {
-  NASSAU: "https://images.unsplash.com/photo-1707909424824-16662ef461df?w=300&h=200&fit=crop", // Elegant golf course with water hazard
+  NASSAU: "https://images.pexels.com/photos/914682/pexels-photo-914682.jpeg?w=300&h=200&fit=crop", // Elegant golf course with water hazard
   SKINS: "https://images.pexels.com/photos/54123/pexels-photo-54123.jpeg?w=300&h=200&fit=crop", // Golf ball near hole - winning moment
   MATCH_PLAY: "https://images.pexels.com/photos/6256827/pexels-photo-6256827.jpeg?w=300&h=200&fit=crop", // Two golfers competing
   WOLF: "https://images.pexels.com/photos/6256834/pexels-photo-6256834.jpeg?w=300&h=200&fit=crop", // Lone golfer at sunset
   NINES: "https://images.unsplash.com/photo-1605144884374-ecbb643615f6?w=300&h=200&fit=crop", // Aerial golf course view
   STABLEFORD: "https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=300&h=200&fit=crop", // Golf swing action shot
-  BINGO_BANGO_BONGO: "https://images.unsplash.com/photo-1600183952451-e459d75ae0ac?w=300&h=200&fit=crop", // Dynamic golf action
+  BINGO_BANGO_BONGO: "https://images.pexels.com/photos/1637731/pexels-photo-1637731.jpeg?w=300&h=200&fit=crop", // Golfer mid-swing action shot
   VEGAS: "https://images.pexels.com/photos/9207299/pexels-photo-9207299.jpeg?w=300&h=200&fit=crop", // Group of golfers - team format
   SNAKE: "https://images.unsplash.com/photo-1500932334442-8761ee4810a7?w=300&h=200&fit=crop", // Ball near hole on putting green
   BANKER: "https://images.pexels.com/photos/6256829/pexels-photo-6256829.jpeg?w=300&h=200&fit=crop", // Confident golfer stance
