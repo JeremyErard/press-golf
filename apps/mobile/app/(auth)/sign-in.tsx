@@ -42,7 +42,7 @@ export default function SignIn() {
 
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
-        router.replace('/(app)/');
+        router.replace('/(app)');
       } else if (result.status === 'needs_second_factor') {
         // User has 2FA enabled - prepare the second factor
         await signIn.prepareSecondFactor({
@@ -75,7 +75,7 @@ export default function SignIn() {
 
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
-        router.replace('/(app)/');
+        router.replace('/(app)');
       } else {
         console.log('2FA verification needs more steps:', result);
       }

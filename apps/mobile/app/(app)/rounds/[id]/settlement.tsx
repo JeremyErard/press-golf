@@ -170,7 +170,7 @@ export default function SettlementScreen() {
           text: 'Finalize',
           onPress: async () => {
             setProcessing(true);
-            const result = await api.post(`/games/${id}/finalize`);
+            const result = await api.post(`/games/${id}/finalize`, {});
             setProcessing(false);
 
             if (result.success) {
@@ -236,7 +236,7 @@ export default function SettlementScreen() {
   };
 
   const handleMarkPaid = async (settlementId: string) => {
-    const result = await api.patch(`/games/settlements/${settlementId}/paid`);
+    const result = await api.patch(`/games/settlements/${settlementId}/paid`, {});
     if (result.success) {
       loadData();
     } else {

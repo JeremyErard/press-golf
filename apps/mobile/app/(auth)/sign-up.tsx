@@ -49,7 +49,7 @@ export default function SignUp() {
 
       if (result.status === 'complete' && result.createdSessionId) {
         await setActive({ session: result.createdSessionId });
-        router.replace('/(app)/');
+        router.replace('/(app)');
       } else {
         // This shouldn't happen with verification disabled
         console.log('Sign up incomplete:', result);

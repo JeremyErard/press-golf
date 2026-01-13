@@ -164,7 +164,7 @@ export default function AddCourseScreen() {
         courseRating: t.courseRating ? parseFloat(t.courseRating) : undefined,
         totalYardage: t.totalYardage ? parseInt(t.totalYardage) : undefined,
       })),
-      holes: holes.length > 0 ? holes : undefined,
+      holes: holes && holes.length > 0 ? holes : undefined,
     };
 
     const result = await api.post('/courses', courseData);
@@ -281,7 +281,7 @@ export default function AddCourseScreen() {
           </View>
 
           {/* Show extracted holes count */}
-          {holes.length > 0 && (
+          {holes && holes.length > 0 && (
             <View style={styles.extractedInfo}>
               <Text style={styles.extractedInfoText}>
                 {holes.length} holes extracted from website

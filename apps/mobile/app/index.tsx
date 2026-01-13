@@ -6,7 +6,7 @@ export default function Index() {
 
   // Redirect based on auth state
   if (isSignedIn) {
-    return <Redirect href="/(app)/" />;
+    return <Redirect href="/(app)" />;
   }
 
   return <Redirect href="/(auth)/sign-in" />;
