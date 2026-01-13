@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { Check, ChevronLeft } from "lucide-react";
@@ -261,17 +261,19 @@ export default function ScorecardPage() {
   }, [getToken, roundId, router]);
 
   // Check if all players have scores for all 18 holes
-  const allScoresComplete = round?.players.every(player => {
-    for (let hole = 1; hole <= 18; hole++) {
-      if (!localScores[player.id]?.[hole]) {
-        return false;
+  const allScoresComplete = useMemo(() => {
+    return round?.players.every(player => {
+      for (let hole = 1; hole <= 18; hole++) {
+        if (!localScores[player.id]?.[hole]) {
+          return false;
+        }
       }
-    }
-    return true;
-  }) ?? false;
+      return true;
+    }) ?? false;
+  }, [round?.players, localScores]);
 
-  // Get hole data from round
-  const getHoles = (): HoleData[] => {
+  // Get hole data from round (memoized to prevent re-renders)
+  const holes = useMemo((): HoleData[] => {
     if (!round?.course?.holes) {
       return Array.from({ length: 18 }, (_, i) => ({
         holeNumber: i + 1,
@@ -286,10 +288,10 @@ export default function ScorecardPage() {
       handicapRank: hole.handicapRank,
       yardage: (hole as { yardages?: Array<{ tee?: { id: string }; yardage: number }> }).yardages?.find((y) => y.tee?.id === round.teeId)?.yardage,
     }));
-  };
+  }, [round?.course?.holes, round?.teeId]);
 
-  // Get player data for grid
-  const getPlayers = () => {
+  // Get player data for grid (memoized to prevent re-renders)
+  const players = useMemo(() => {
     if (!round) return [];
 
     return round.players.map((player) => ({
@@ -298,15 +300,14 @@ export default function ScorecardPage() {
       handicapIndex: player.user.handicapIndex,
       courseHandicap: player.courseHandicap ?? undefined,
     }));
-  };
+  }, [round]);
 
   // Find current player
   const currentPlayer = round?.players.find(p => p.userId === userId);
 
-  // Get selected hole data for modal
-  const getSelectedHoleData = () => {
+  // Get selected hole data for modal (memoized)
+  const selectedHoleData = useMemo(() => {
     if (!selectedScore) return null;
-    const holes = getHoles();
     const hole = holes.find(h => h.holeNumber === selectedScore.holeNumber);
     const player = round?.players.find(p => p.id === selectedScore.playerId);
 
@@ -324,7 +325,7 @@ export default function ScorecardPage() {
       playerName: player.user.displayName || player.user.firstName || "Player",
       strokesGiven,
     };
-  };
+  }, [selectedScore, holes, round?.players]);
 
   if (isLoading) {
     return (
@@ -347,10 +348,6 @@ export default function ScorecardPage() {
       </div>
     );
   }
-
-  const holes = getHoles();
-  const players = getPlayers();
-  const selectedHoleData = getSelectedHoleData();
 
   // Connection status color
   const connectionColor = {
