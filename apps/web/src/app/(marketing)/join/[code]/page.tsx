@@ -112,6 +112,9 @@ export default function InviteLandingPage() {
     fetchInvite();
   }, [code, router]);
 
+  // Determine if this is a buddy-only invite (no round)
+  const isBuddyInvite = invite && !invite.round;
+
   const handleJoinRound = useCallback(async () => {
     if (!invite?.round?.id) return;
 
@@ -147,18 +150,60 @@ export default function InviteLandingPage() {
     }
   }, [code, getToken, invite?.round?.id, router]);
 
+  const handleAcceptBuddyInvite = useCallback(async () => {
+    setIsJoining(true);
+    try {
+      const token = await getToken();
+      if (!token) {
+        // User not signed in, redirect to sign up
+        router.push(`/sign-up?redirect=/join/${code}`);
+        return;
+      }
+
+      // Check subscription status
+      const status = await api.getBillingStatus(token);
+      const subscribed = status?.status === "ACTIVE" || status?.isFoundingMember;
+
+      if (!subscribed) {
+        setBillingStatus(status);
+        setShowSubscriptionPrompt(true);
+        setIsJoining(false);
+        return;
+      }
+
+      // Accept the buddy invite
+      await api.acceptInvite(token, code);
+
+      // Redirect to home/rounds page
+      router.push("/rounds");
+    } catch (err) {
+      console.error("Failed to accept invite:", err);
+      setError("Failed to accept the invite. Please try again.");
+      setIsJoining(false);
+    }
+  }, [code, getToken, router]);
+
   // Auto-join if user is signed in, subscribed, and PWA is installed (returning after sign-up/subscription)
   useEffect(() => {
-    if (isSignedIn && isPWAInstalled && invite?.round?.id && !isJoining && !error && !showSubscriptionPrompt) {
-      handleJoinRound();
+    if (isSignedIn && isPWAInstalled && !isJoining && !error && !showSubscriptionPrompt && invite) {
+      if (invite.round?.id) {
+        handleJoinRound();
+      } else {
+        // Buddy invite - auto-accept
+        handleAcceptBuddyInvite();
+      }
     }
-  }, [isSignedIn, isPWAInstalled, invite?.round?.id, isJoining, error, showSubscriptionPrompt, handleJoinRound]);
+  }, [isSignedIn, isPWAInstalled, invite, isJoining, error, showSubscriptionPrompt, handleJoinRound, handleAcceptBuddyInvite]);
 
   const handleGetStarted = async () => {
     // If PWA is installed, go to sign up/sign in
     if (isPWAInstalled) {
       if (isSignedIn) {
-        await handleJoinRound();
+        if (isBuddyInvite) {
+          await handleAcceptBuddyInvite();
+        } else {
+          await handleJoinRound();
+        }
       } else {
         router.push(`/sign-up?redirect=/join/${code}`);
       }
@@ -288,7 +333,7 @@ export default function InviteLandingPage() {
               onClick={() => router.push(`/profile/subscription?redirect=/join/${code}`)}
             >
               <Crown className="h-4 w-4 mr-2" />
-              Join the Round for $2.49/month
+              {isBuddyInvite ? "Get Started for $2.49/month" : "Join the Round for $2.49/month"}
             </Button>
             <p className="text-[10px] text-white/40 mt-2 text-center">Cancel anytime</p>
           </div>
@@ -344,7 +389,9 @@ export default function InviteLandingPage() {
           <p className="text-white/50 text-[10px] uppercase tracking-[0.2em] font-medium mt-1">
             Your Side Games Managed For You
           </p>
-          <p className="text-base text-white/90 mt-4 font-medium">You've been invited to play</p>
+          <p className="text-base text-white/90 mt-4 font-medium">
+            {isBuddyInvite ? "You've been invited to join Press" : "You've been invited to play"}
+          </p>
         </div>
 
         {/* Invite Card */}
@@ -366,7 +413,14 @@ export default function InviteLandingPage() {
             </div>
           </div>
 
-          {invite.round && (
+          {isBuddyInvite ? (
+            <CardContent className="p-4">
+              <p className="text-sm text-white/70 text-center">
+                {invite.inviter.displayName} wants to add you as a golf buddy on Press.
+                Sign up to track your bets and scores together!
+              </p>
+            </CardContent>
+          ) : invite.round && (
             <CardContent className="p-4 space-y-3">
               {/* Course */}
               <div className="flex items-center gap-3">
@@ -435,21 +489,21 @@ export default function InviteLandingPage() {
             {isJoining ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Joining...
+                {isBuddyInvite ? "Accepting..." : "Joining..."}
               </>
             ) : isPWAInstalled ? (
               isSignedIn ? (
-                "Join Round"
+                isBuddyInvite ? "Accept Invite" : "Join Round"
               ) : (
                 <>
                   <Crown className="h-4 w-4 mr-2" />
-                  Join the Round for $2.49/month
+                  {isBuddyInvite ? "Get Started for $2.49/month" : "Join the Round for $2.49/month"}
                 </>
               )
             ) : (
               <>
                 <Crown className="h-4 w-4 mr-2" />
-                Join the Round for $2.49/month
+                {isBuddyInvite ? "Get Started for $2.49/month" : "Join the Round for $2.49/month"}
               </>
             )}
           </Button>
