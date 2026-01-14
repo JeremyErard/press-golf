@@ -75,6 +75,17 @@ export default function OnboardingPage() {
         // If already subscribed or founding member, skip to profile
         if (status.status === "ACTIVE" || status.status === "FOUNDING" || status.isFoundingMember) {
           if (pollInterval) clearInterval(pollInterval);
+
+          // Check if there's a stored redirect from invite flow
+          if (checkoutSuccess) {
+            const storedRedirect = sessionStorage.getItem("subscriptionRedirect");
+            if (storedRedirect) {
+              sessionStorage.removeItem("subscriptionRedirect");
+              router.replace(storedRedirect);
+              return;
+            }
+          }
+
           setCurrentStep(2);
           // Pre-fill from Clerk
           setFirstName(clerkUser?.firstName || "");

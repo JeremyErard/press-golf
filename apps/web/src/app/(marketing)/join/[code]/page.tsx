@@ -78,12 +78,18 @@ export default function InviteLandingPage() {
         if (!token) return;
         const status = await api.getBillingStatus(token);
         setBillingStatus(status);
+
+        // If user is now subscribed and was showing subscription prompt, clear it
+        const isNowSubscribed = status?.status === "ACTIVE" || status?.isFoundingMember;
+        if (isNowSubscribed && showSubscriptionPrompt) {
+          setShowSubscriptionPrompt(false);
+        }
       } catch (error) {
         console.error("Failed to check subscription:", error);
       }
     }
     checkSubscription();
-  }, [isSignedIn, getToken]);
+  }, [isSignedIn, getToken, showSubscriptionPrompt]);
 
   useEffect(() => {
     async function fetchInvite() {
