@@ -6,6 +6,7 @@ import { requireAuth, getUser } from '../lib/auth.js';
 import { badRequest, notFound, forbidden, sendError, ErrorCodes } from '../lib/errors.js';
 import { emitScoreUpdate, emitPlayerJoined } from './realtime.js';
 import { uploadScorecardPhoto, validateImage } from '../lib/blob.js';
+import { notifyScoreUpdate } from '../lib/notifications.js';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -558,6 +559,24 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
     // Emit real-time score update for SSE subscribers
     emitScoreUpdate(round.id, targetPlayer.userId, holeNumber, strokes);
 
+    // Notify other players about the score (don't notify the scorer)
+    const otherPlayerIds = round.players
+      .filter(p => p.userId !== targetPlayer.userId)
+      .map(p => p.userId);
+
+    if (otherPlayerIds.length > 0) {
+      // Get scorer's display name
+      const scorer = await prisma.user.findUnique({
+        where: { id: targetPlayer.userId },
+        select: { displayName: true, firstName: true, lastName: true },
+      });
+      const scorerName = scorer?.displayName ||
+        [scorer?.firstName, scorer?.lastName].filter(Boolean).join(" ") ||
+        "A player";
+
+      notifyScoreUpdate(otherPlayerIds, scorerName, holeNumber, round.id);
+    }
+
     return {
       success: true,
       data: score,
@@ -899,6 +918,26 @@ Confidence should be: high, medium, or low`,
     // Emit real-time updates for each score
     for (const score of scores) {
       emitScoreUpdate(roundId, currentPlayer.userId, score.holeNumber, score.strokes);
+    }
+
+    // Notify other players about the scorecard submission
+    const otherPlayerIds = round.players
+      .filter(p => p.userId !== currentPlayer.userId)
+      .map(p => p.userId);
+
+    if (otherPlayerIds.length > 0 && scores.length > 0) {
+      // Get scorer's display name
+      const scorer = await prisma.user.findUnique({
+        where: { id: currentPlayer.userId },
+        select: { displayName: true, firstName: true, lastName: true },
+      });
+      const scorerName = scorer?.displayName ||
+        [scorer?.firstName, scorer?.lastName].filter(Boolean).join(" ") ||
+        "A player";
+
+      // Notify about the last hole scored
+      const lastHole = Math.max(...scores.map(s => s.holeNumber));
+      notifyScoreUpdate(otherPlayerIds, scorerName, lastHole, roundId);
     }
 
     return reply.send({

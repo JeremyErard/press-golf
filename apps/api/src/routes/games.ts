@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireAuth, getUser } from '../lib/auth.js';
 import { badRequest, notFound, forbidden, sendError, ErrorCodes } from '../lib/errors.js';
 import { Decimal } from '@prisma/client/runtime/library';
+import { notifyGameInvite, notifySettlementUpdate } from '../lib/notifications.js';
 
 interface CreateGameBody {
   roundId: string;
@@ -137,6 +138,24 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
           { gameId: game.id, teamNumber: 2, player1Id: team2[0], player2Id: team2[1] },
         ],
       });
+    }
+
+    // Notify other players about the new game (don't notify the creator)
+    const otherPlayerIds = gameParticipantIds.filter(id => id !== (user.id as string));
+    if (otherPlayerIds.length > 0) {
+      // Get creator's display name
+      const creator = await prisma.user.findUnique({
+        where: { id: user.id as string },
+        select: { displayName: true, firstName: true, lastName: true },
+      });
+      const creatorName = creator?.displayName ||
+        [creator?.firstName, creator?.lastName].filter(Boolean).join(" ") ||
+        "A player";
+
+      // Format game type for display
+      const gameTypeDisplay = type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+
+      notifyGameInvite(otherPlayerIds, creatorName, gameTypeDisplay, roundId, game.id);
     }
 
     return {
@@ -825,6 +844,47 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         settlementCount: createdSettlements.length,
         totalAmount: createdSettlements.reduce((sum, s) => sum + Number(s.amount), 0),
       }, 'Round finalized successfully');
+
+      // Notify all players about their settlements
+      const userNameCache = new Map<string, string>();
+      const getUserName = async (userId: string): Promise<string> => {
+        if (userNameCache.has(userId)) {
+          return userNameCache.get(userId)!;
+        }
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { displayName: true, firstName: true, lastName: true },
+        });
+        const name = user?.displayName ||
+          [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+          "A player";
+        userNameCache.set(userId, name);
+        return name;
+      };
+
+      // Send notifications for each settlement
+      for (const settlement of createdSettlements) {
+        const fromUserName = await getUserName(settlement.fromUserId);
+        const toUserName = await getUserName(settlement.toUserId);
+
+        // Notify the person who owes money
+        notifySettlementUpdate(
+          settlement.fromUserId,
+          toUserName,
+          Number(settlement.amount),
+          true, // isOwed = true (they owe money)
+          roundId
+        );
+
+        // Notify the person who is owed money
+        notifySettlementUpdate(
+          settlement.toUserId,
+          fromUserName,
+          Number(settlement.amount),
+          false, // isOwed = false (they are owed money)
+          roundId
+        );
+      }
 
       return {
         success: true,

@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { requireAuth, getUser } from "../lib/auth.js";
+import { notifyPlayerJoinedRound } from "../lib/notifications.js";
 
 const createInviteSchema = z.object({
   roundId: z.string().optional(),
@@ -20,6 +21,45 @@ async function hasActiveSubscription(userId: string): Promise<boolean> {
     select: { subscriptionStatus: true, isFoundingMember: true },
   });
   return user?.isFoundingMember === true || user?.subscriptionStatus === 'ACTIVE';
+}
+
+// Helper to notify round creator when a player joins
+async function notifyRoundCreatorOfNewPlayer(
+  roundId: string,
+  joinerUserId: string,
+  creatorUserId: string
+): Promise<void> {
+  // Don't notify if the joiner is the creator
+  if (joinerUserId === creatorUserId) return;
+
+  try {
+    // Get joiner info and round info
+    const [joiner, round] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: joinerUserId },
+        select: { displayName: true, firstName: true, lastName: true },
+      }),
+      prisma.round.findUnique({
+        where: { id: roundId },
+        include: { course: { select: { name: true } } },
+      }),
+    ]);
+
+    if (!joiner || !round) return;
+
+    const joinerName = joiner.displayName ||
+      [joiner.firstName, joiner.lastName].filter(Boolean).join(" ") ||
+      "A golfer";
+
+    await notifyPlayerJoinedRound(
+      creatorUserId,
+      joinerName,
+      round.course.name,
+      roundId
+    );
+  } catch (error) {
+    console.error("[Invites] Failed to send join notification:", error);
+  }
 }
 
 export default async function inviteRoutes(fastify: FastifyInstance) {
@@ -457,6 +497,11 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
               }
             }
 
+            // Notify round creator that someone joined
+            if (creatorId) {
+              notifyRoundCreatorOfNewPlayer(roundById.id, userId, creatorId);
+            }
+
             return reply.send({
               success: true,
               data: {
@@ -554,6 +599,11 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
               },
             });
           }
+        }
+
+        // Notify round creator that someone joined
+        if (creatorId) {
+          notifyRoundCreatorOfNewPlayer(round.id, userId, creatorId);
         }
 
         return reply.send({
@@ -664,6 +714,9 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
               position: playerCount + 1,
             },
           });
+
+          // Notify round creator that someone joined
+          notifyRoundCreatorOfNewPlayer(invite.roundId, userId, invite.inviterId);
         }
 
         return reply.send({

@@ -240,3 +240,20 @@ export async function notifySettlementUpdate(
     },
   });
 }
+
+export async function notifyPlayerJoinedRound(
+  roundCreatorUserId: string,
+  joinerName: string,
+  courseName: string,
+  roundId: string
+): Promise<void> {
+  await sendNotificationToUser(roundCreatorUserId, {
+    type: "round_invite",
+    title: "Player Joined",
+    body: `${joinerName} joined your round at ${courseName}`,
+    data: {
+      url: `/rounds/${roundId}`,
+      roundId,
+    },
+  });
+}
