@@ -210,7 +210,7 @@ function formatMoney(amount: number): string {
 export default function RoundDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { getToken, userId: clerkUserId } = useAuth();
+  const { getToken } = useAuth();
   const roundId = params.id as string;
 
   const [round, setRound] = useState<RoundDetail | null>(null);

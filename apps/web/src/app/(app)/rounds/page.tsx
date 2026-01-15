@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { Plus, ChevronRight, Flag, TrendingUp, TrendingDown } from "lucide-react";
 import { Card, CardContent, Badge, Tabs, TabsList, TabsTrigger, Skeleton, EmptyState, FAB } from "@/components/ui";
 import { Header } from "@/components/layout/header";
-import { api, type Round, type RoundSummary } from "@/lib/api";
+import { api, type Round } from "@/lib/api";
 import { formatDate, formatCourseName } from "@/lib/utils";
 
 const statusBadgeVariant = {
@@ -54,7 +54,6 @@ function groupRoundsByMonth(rounds: RoundWithDetails[]): Map<string, RoundWithDe
 
 export default function RoundsPage() {
   const { getToken } = useAuth();
-  const { user } = useUser();
   const [rounds, setRounds] = useState<RoundWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "ACTIVE" | "COMPLETED">("all");
