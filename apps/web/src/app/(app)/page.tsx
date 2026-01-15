@@ -7,6 +7,10 @@ import Image from "next/image";
 import { ChevronRight, Play, UserPlus, Flag } from "lucide-react";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton, SectionHeader } from "@/components/ui";
 import { PendingApprovals } from "@/components/handicap/pending-approvals";
+import { FirstLaunchExplainer } from "@/components/onboarding/first-launch-explainer";
+import { TabHelpSheet } from "@/components/onboarding/tab-help-sheet";
+import { HelpButton } from "@/components/onboarding/help-button";
+import { useFirstLaunch } from "@/hooks/use-first-launch";
 import { api, type Round, type RoundDetail, type CalculateResultsResponse, type User as ApiUser } from "@/lib/api";
 import { formatDate, formatMoney, formatCourseName } from "@/lib/utils";
 
@@ -24,6 +28,8 @@ export default function DashboardPage() {
   const [activeRoundDetail, setActiveRoundDetail] = useState<RoundDetail | null>(null);
   const [activeRoundResults, setActiveRoundResults] = useState<CalculateResultsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showHelp, setShowHelp] = useState(false);
+  const { showExplainer, markExplainerSeen } = useFirstLaunch();
 
   useEffect(() => {
     async function fetchData() {
@@ -239,31 +245,40 @@ export default function DashboardPage() {
   const timeOfDay = getTimeOfDay();
 
   return (
-    <div className="min-h-screen pb-24">
-      {/* Logo Header */}
-      <div className="px-5 pt-6 pb-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight text-white drop-shadow-lg">
-              PRESS
-            </h1>
-            <p className="text-white/60 text-[10px] uppercase tracking-[0.2em] font-medium mt-0.5">
-              Your Side Games Managed For You
-            </p>
-          </div>
-          <Link href="/profile" className="group">
-            <div className="relative">
-              <Avatar
-                src={apiUser?.avatarUrl || clerkUser?.imageUrl}
-                name={apiUser?.firstName || clerkUser?.firstName || "G"}
-                size="lg"
-                className="ring-2 ring-brand/30 shadow-lg shadow-brand/20 group-hover:ring-brand/50 transition-all"
-              />
-              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-[#0d1117]" />
+    <>
+      {/* First Launch Explainer */}
+      {showExplainer && (
+        <FirstLaunchExplainer onComplete={markExplainerSeen} />
+      )}
+
+      <div className="min-h-screen pb-24">
+        {/* Logo Header */}
+        <div className="px-5 pt-6 pb-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-black tracking-tight text-white drop-shadow-lg">
+                PRESS
+              </h1>
+              <p className="text-white/60 text-[10px] uppercase tracking-[0.2em] font-medium mt-0.5">
+                Your Side Games Managed For You
+              </p>
             </div>
-          </Link>
+            <div className="flex items-center gap-2">
+              <HelpButton onClick={() => setShowHelp(true)} />
+              <Link href="/profile" className="group">
+                <div className="relative">
+                  <Avatar
+                    src={apiUser?.avatarUrl || clerkUser?.imageUrl}
+                    name={apiUser?.firstName || clerkUser?.firstName || "G"}
+                    size="lg"
+                    className="ring-2 ring-brand/30 shadow-lg shadow-brand/20 group-hover:ring-brand/50 transition-all"
+                  />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-[#0d1117]" />
+                </div>
+              </Link>
+            </div>
+          </div>
         </div>
-      </div>
 
       {/* Greeting Section with Time-Based Image */}
       <div className="px-5 pb-4">
@@ -557,6 +572,14 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Tab Help Sheet */}
+      <TabHelpSheet
+        tabKey="home"
+        open={showHelp}
+        onClose={() => setShowHelp(false)}
+      />
     </div>
+    </>
   );
 }

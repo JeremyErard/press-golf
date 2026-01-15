@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Plus, ChevronRight, Flag, TrendingUp, TrendingDown } from "lucide-react";
 import { Card, CardContent, Badge, Tabs, TabsList, TabsTrigger, Skeleton, EmptyState, FAB } from "@/components/ui";
 import { Header } from "@/components/layout/header";
+import { TabHelpSheet } from "@/components/onboarding/tab-help-sheet";
+import { HelpButton } from "@/components/onboarding/help-button";
 import { api, type Round } from "@/lib/api";
 import { formatDate, formatCourseName } from "@/lib/utils";
 
@@ -57,6 +59,7 @@ export default function RoundsPage() {
   const [rounds, setRounds] = useState<RoundWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "ACTIVE" | "COMPLETED">("all");
+  const [showHelp, setShowHelp] = useState(false);
 
   const fetchRounds = useCallback(async () => {
     try {
@@ -181,7 +184,7 @@ export default function RoundsPage() {
 
   return (
     <div className="pb-24">
-      <Header title="Rounds" />
+      <Header title="Rounds" rightAction={<HelpButton onClick={() => setShowHelp(true)} />} />
 
       <div className="p-lg space-y-lg">
         {/* Tabs */}
@@ -242,6 +245,12 @@ export default function RoundsPage() {
       </div>
 
       <FAB href="/rounds/new" label="Start a new round" />
+
+      <TabHelpSheet
+        tabKey="rounds"
+        open={showHelp}
+        onClose={() => setShowHelp(false)}
+      />
     </div>
   );
 }

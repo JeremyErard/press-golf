@@ -7,6 +7,8 @@ import { useSearchParams } from "next/navigation";
 import { Plus, Search, MapPin, ChevronRight, Check, Home, Star, Navigation } from "lucide-react";
 import { Card, CardContent, Skeleton, EmptyState, FAB } from "@/components/ui";
 import { Header } from "@/components/layout/header";
+import { TabHelpSheet } from "@/components/onboarding/tab-help-sheet";
+import { HelpButton } from "@/components/onboarding/help-button";
 import { CourseMapIllustration } from "@/components/illustrations";
 import { api, type Course, type CourseWithMeta, type DiscoverCoursesResponse } from "@/lib/api";
 import { formatCourseName } from "@/lib/utils";
@@ -20,6 +22,7 @@ export default function CoursesPage() {
   const { getToken } = useAuth();
   const searchParams = useSearchParams();
   const selectMode = searchParams.get("select"); // "round" when selecting for new round
+  const [showHelp, setShowHelp] = useState(false);
 
   const [discoverData, setDiscoverData] = useState<DiscoverCoursesResponse | null>(null);
   const [searchResults, setSearchResults] = useState<(Course & { roundCount?: number })[]>([]);
@@ -221,6 +224,7 @@ export default function CoursesPage() {
       <Header
         title={selectMode === "round" ? "Select Course" : "Courses"}
         showBack={selectMode === "round"}
+        rightAction={<HelpButton onClick={() => setShowHelp(true)} />}
       />
 
       <div className="p-lg space-y-lg">
@@ -363,6 +367,12 @@ export default function CoursesPage() {
       </div>
 
       <FAB href="/courses/add" label="Add a new course" show={!selectMode} />
+
+      <TabHelpSheet
+        tabKey="courses"
+        open={showHelp}
+        onClose={() => setShowHelp(false)}
+      />
     </div>
   );
 }

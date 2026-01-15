@@ -5,6 +5,8 @@ import { useAuth } from "@clerk/nextjs";
 import { Plus, Search, ChevronRight, UserPlus, Users, Swords } from "lucide-react";
 import { Card, CardContent, Skeleton, Avatar, EmptyState, FAB, Tabs, TabsList, TabsTrigger, TabsContent, Badge } from "@/components/ui";
 import { Header } from "@/components/layout/header";
+import { TabHelpSheet } from "@/components/onboarding/tab-help-sheet";
+import { HelpButton } from "@/components/onboarding/help-button";
 import { api, type Buddy, type Group, type ChallengesResponse } from "@/lib/api";
 import { BuddyDetailSheet } from "@/components/buddies/buddy-detail-sheet";
 import { AddBuddySheet } from "@/components/buddies/add-buddy-sheet";
@@ -17,6 +19,7 @@ import { CreateChallengeSheet } from "@/components/challenges/create-challenge-s
 export default function BuddiesPage() {
   const { getToken } = useAuth();
   const [activeTab, setActiveTab] = useState("buddies");
+  const [showHelp, setShowHelp] = useState(false);
 
   // Buddies state
   const [buddies, setBuddies] = useState<Buddy[]>([]);
@@ -118,7 +121,7 @@ export default function BuddiesPage() {
 
   return (
     <div className="pb-24">
-      <Header title="Buddies" />
+      <Header title="Buddies" rightAction={<HelpButton onClick={() => setShowHelp(true)} />} />
 
       <div className="p-lg space-y-lg">
         {/* Tabs */}
@@ -319,6 +322,12 @@ export default function BuddiesPage() {
         onClose={() => setShowCreateChallengeSheet(false)}
         onChallengeCreated={handleChallengeCreated}
         buddies={buddies}
+      />
+
+      <TabHelpSheet
+        tabKey="buddies"
+        open={showHelp}
+        onClose={() => setShowHelp(false)}
       />
     </div>
   );

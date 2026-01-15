@@ -17,6 +17,8 @@ import {
   BarChart3,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
+import { TabHelpSheet } from "@/components/onboarding/tab-help-sheet";
+import { HelpButton } from "@/components/onboarding/help-button";
 import { Card, CardContent, Button, Badge, ListItem, ListItemGroup, SectionHeader } from "@/components/ui";
 import { Toggle } from "@/components/ui/toggle";
 import { SubscriptionStatusCard } from "@/components/profile/subscription-status-card";
@@ -29,6 +31,7 @@ export default function ProfilePage() {
   const { signOut } = useClerk();
   const { getToken } = useAuth();
   const router = useRouter();
+  const [showHelp, setShowHelp] = useState(false);
 
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [apiUser, setApiUser] = useState<ApiUser | null>(null);
@@ -119,7 +122,7 @@ export default function ProfilePage() {
 
   return (
     <div className="pb-24">
-      <Header title="Profile" />
+      <Header title="Profile" rightAction={<HelpButton onClick={() => setShowHelp(true)} />} />
 
       <div className="p-lg space-y-xl">
         {/* Profile Card with Hero Backdrop */}
@@ -289,6 +292,12 @@ export default function ProfilePage() {
           </p>
         </div>
       </div>
+
+      <TabHelpSheet
+        tabKey="profile"
+        open={showHelp}
+        onClose={() => setShowHelp(false)}
+      />
     </div>
   );
 }
