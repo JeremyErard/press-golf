@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { ArrowLeft, Play, Plus, Settings, Trash2, UserMinus } from "lucide-react";
+import { ArrowLeft, Play, Plus, Trash2, UserMinus } from "lucide-react";
 import {
   Card,
   CardContent,

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { Check, X } from "lucide-react";
+import { Check } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, Button, Avatar } from "@/components/ui";
 import { api, type Buddy } from "@/lib/api";
 import { toast } from "sonner";
