@@ -33,11 +33,12 @@ export async function notificationRoutes(fastify: FastifyInstance) {
 
       if (!publicKey) {
         return reply.status(503).send({
-          error: "Push notifications not configured",
+          success: false,
+          error: { code: "NOT_CONFIGURED", message: "Push notifications not configured" },
         });
       }
 
-      return { publicKey };
+      return { success: true, data: { publicKey } };
     }
   );
 
@@ -51,16 +52,22 @@ export async function notificationRoutes(fastify: FastifyInstance) {
       const userId = (request as any).userId;
 
       if (!userId) {
-        return reply.status(401).send({ error: "Unauthorized" });
+        return reply.status(401).send({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "Unauthorized" },
+        });
       }
 
       const configured = isNotificationsConfigured();
 
       if (!configured) {
         return {
-          available: false,
-          subscribed: false,
-          subscriptionCount: 0,
+          success: true,
+          data: {
+            available: false,
+            subscribed: false,
+            subscriptionCount: 0,
+          },
         };
       }
 
@@ -69,9 +76,12 @@ export async function notificationRoutes(fastify: FastifyInstance) {
       });
 
       return {
-        available: true,
-        subscribed: subscriptionCount > 0,
-        subscriptionCount,
+        success: true,
+        data: {
+          available: true,
+          subscribed: subscriptionCount > 0,
+          subscriptionCount,
+        },
       };
     }
   );
@@ -86,14 +96,17 @@ export async function notificationRoutes(fastify: FastifyInstance) {
       const userId = (request as any).userId;
 
       if (!userId) {
-        return reply.status(401).send({ error: "Unauthorized" });
+        return reply.status(401).send({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "Unauthorized" },
+        });
       }
 
       const body = subscribeSchema.safeParse(request.body);
       if (!body.success) {
         return reply.status(400).send({
-          error: "Invalid request body",
-          details: body.error.flatten(),
+          success: false,
+          error: { code: "INVALID_REQUEST", message: "Invalid request body" },
         });
       }
 
@@ -115,7 +128,7 @@ export async function notificationRoutes(fastify: FastifyInstance) {
             userAgent,
           },
         });
-        return { subscription: updated, updated: true };
+        return { success: true, data: { subscription: updated, updated: true } };
       }
 
       // Create new subscription
@@ -136,7 +149,7 @@ export async function notificationRoutes(fastify: FastifyInstance) {
         update: {},
       });
 
-      return { subscription, updated: false };
+      return { success: true, data: { subscription, updated: false } };
     }
   );
 
@@ -150,14 +163,17 @@ export async function notificationRoutes(fastify: FastifyInstance) {
       const userId = (request as any).userId;
 
       if (!userId) {
-        return reply.status(401).send({ error: "Unauthorized" });
+        return reply.status(401).send({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "Unauthorized" },
+        });
       }
 
       const body = z.object({ endpoint: z.string().url() }).safeParse(request.body);
       if (!body.success) {
         return reply.status(400).send({
-          error: "Invalid request body",
-          details: body.error.flatten(),
+          success: false,
+          error: { code: "INVALID_REQUEST", message: "Invalid request body" },
         });
       }
 
@@ -172,10 +188,13 @@ export async function notificationRoutes(fastify: FastifyInstance) {
       });
 
       if (deleted.count === 0) {
-        return reply.status(404).send({ error: "Subscription not found" });
+        return reply.status(404).send({
+          success: false,
+          error: { code: "NOT_FOUND", message: "Subscription not found" },
+        });
       }
 
-      return { success: true };
+      return { success: true, data: { success: true } };
     }
   );
 
@@ -189,7 +208,10 @@ export async function notificationRoutes(fastify: FastifyInstance) {
       const userId = (request as any).userId;
 
       if (!userId) {
-        return reply.status(401).send({ error: "Unauthorized" });
+        return reply.status(401).send({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "Unauthorized" },
+        });
       }
 
       // Get or create preferences
@@ -204,11 +226,14 @@ export async function notificationRoutes(fastify: FastifyInstance) {
       }
 
       return {
-        roundInvites: prefs.roundInvites,
-        gameInvites: prefs.gameInvites,
-        scoreUpdates: prefs.scoreUpdates,
-        teeTimeReminders: prefs.teeTimeReminders,
-        settlementUpdates: prefs.settlementUpdates,
+        success: true,
+        data: {
+          roundInvites: prefs.roundInvites,
+          gameInvites: prefs.gameInvites,
+          scoreUpdates: prefs.scoreUpdates,
+          teeTimeReminders: prefs.teeTimeReminders,
+          settlementUpdates: prefs.settlementUpdates,
+        },
       };
     }
   );
@@ -223,14 +248,17 @@ export async function notificationRoutes(fastify: FastifyInstance) {
       const userId = (request as any).userId;
 
       if (!userId) {
-        return reply.status(401).send({ error: "Unauthorized" });
+        return reply.status(401).send({
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "Unauthorized" },
+        });
       }
 
       const body = preferencesSchema.safeParse(request.body);
       if (!body.success) {
         return reply.status(400).send({
-          error: "Invalid request body",
-          details: body.error.flatten(),
+          success: false,
+          error: { code: "INVALID_REQUEST", message: "Invalid request body" },
         });
       }
 
@@ -244,11 +272,14 @@ export async function notificationRoutes(fastify: FastifyInstance) {
       });
 
       return {
-        roundInvites: prefs.roundInvites,
-        gameInvites: prefs.gameInvites,
-        scoreUpdates: prefs.scoreUpdates,
-        teeTimeReminders: prefs.teeTimeReminders,
-        settlementUpdates: prefs.settlementUpdates,
+        success: true,
+        data: {
+          roundInvites: prefs.roundInvites,
+          gameInvites: prefs.gameInvites,
+          scoreUpdates: prefs.scoreUpdates,
+          teeTimeReminders: prefs.teeTimeReminders,
+          settlementUpdates: prefs.settlementUpdates,
+        },
       };
     }
   );
