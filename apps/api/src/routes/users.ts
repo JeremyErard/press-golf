@@ -460,6 +460,268 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
       data: { courseId, isHomeCourse: false },
     };
   });
+
+  // =====================
+  // GET /api/users/me/stats
+  // Get comprehensive player statistics
+  // =====================
+  app.get('/me/stats', async (request, reply) => {
+    const user = getUser(request);
+    const userId = user.id as string;
+
+    // Run queries in parallel for efficiency
+    const [
+      earningsReceived,
+      earningsOwed,
+      roundsPlayed,
+      gameResults,
+      bestWorstRounds,
+    ] = await Promise.all([
+      // Total earnings received
+      prisma.settlement.aggregate({
+        where: { toUserId: userId, status: 'PAID' },
+        _sum: { amount: true },
+      }),
+      // Total earnings paid out
+      prisma.settlement.aggregate({
+        where: { fromUserId: userId, status: 'PAID' },
+        _sum: { amount: true },
+      }),
+      // Rounds played (only COMPLETED)
+      prisma.roundPlayer.count({
+        where: {
+          userId,
+          round: { status: 'COMPLETED' },
+        },
+      }),
+      // All game results for this user
+      prisma.gameResult.findMany({
+        where: {
+          roundPlayer: { userId },
+        },
+        include: {
+          game: {
+            select: { type: true, roundId: true },
+          },
+        },
+      }),
+      // Get round earnings for best/worst
+      prisma.settlement.groupBy({
+        by: ['roundId'],
+        where: {
+          OR: [
+            { toUserId: userId },
+            { fromUserId: userId },
+          ],
+          status: 'PAID',
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    // Calculate career earnings
+    const received = Number(earningsReceived._sum.amount ?? 0);
+    const owed = Number(earningsOwed._sum.amount ?? 0);
+    const careerEarnings = received - owed;
+
+    // Calculate per-round net earnings
+    const roundEarnings = await Promise.all(
+      bestWorstRounds.map(async (r) => {
+        const [receivedInRound, owedInRound, roundInfo] = await Promise.all([
+          prisma.settlement.aggregate({
+            where: { roundId: r.roundId, toUserId: userId, status: 'PAID' },
+            _sum: { amount: true },
+          }),
+          prisma.settlement.aggregate({
+            where: { roundId: r.roundId, fromUserId: userId, status: 'PAID' },
+            _sum: { amount: true },
+          }),
+          prisma.round.findUnique({
+            where: { id: r.roundId },
+            include: { course: { select: { name: true } } },
+          }),
+        ]);
+        const net = Number(receivedInRound._sum.amount ?? 0) - Number(owedInRound._sum.amount ?? 0);
+        return {
+          roundId: r.roundId,
+          earnings: net,
+          date: roundInfo?.date,
+          courseName: roundInfo?.course?.name,
+        };
+      })
+    );
+
+    // Sort to find best and worst
+    const sortedRounds = roundEarnings.sort((a, b) => b.earnings - a.earnings);
+    const bestRound = sortedRounds.length > 0 ? sortedRounds[0] : null;
+    const worstRound = sortedRounds.length > 0 ? sortedRounds[sortedRounds.length - 1] : null;
+
+    // Aggregate game stats by type
+    const gameTypes = ['NASSAU', 'SKINS', 'MATCH_PLAY', 'WOLF', 'NINES', 'STABLEFORD', 'BINGO_BANGO_BONGO', 'VEGAS', 'SNAKE', 'BANKER'] as const;
+    const gamesByType: Record<string, { played: number; won: number; lost: number; net: number }> = {};
+
+    for (const gameType of gameTypes) {
+      const typeResults = gameResults.filter(r => r.game.type === gameType);
+      const net = typeResults.reduce((sum, r) => sum + Number(r.netAmount), 0);
+      const won = typeResults.filter(r => Number(r.netAmount) > 0).length;
+      const lost = typeResults.filter(r => Number(r.netAmount) < 0).length;
+
+      gamesByType[gameType] = {
+        played: typeResults.length,
+        won,
+        lost,
+        net: Math.round(net * 100) / 100,
+      };
+    }
+
+    // Calculate winning streak (consecutive rounds with positive earnings)
+    const recentRoundEarnings = roundEarnings
+      .filter(r => r.date)
+      .sort((a, b) => new Date(b.date!).getTime() - new Date(a.date!).getTime());
+
+    let currentStreak = 0;
+    for (const round of recentRoundEarnings) {
+      if (round.earnings > 0) {
+        currentStreak++;
+      } else {
+        break;
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        careerEarnings: Math.round(careerEarnings * 100) / 100,
+        roundsPlayed,
+        gamesPlayed: gameResults.length,
+        gamesByType,
+        bestRound: bestRound ? {
+          roundId: bestRound.roundId,
+          date: bestRound.date,
+          courseName: bestRound.courseName,
+          earnings: bestRound.earnings,
+        } : null,
+        worstRound: worstRound && worstRound.earnings < 0 ? {
+          roundId: worstRound.roundId,
+          date: worstRound.date,
+          courseName: worstRound.courseName,
+          earnings: worstRound.earnings,
+        } : null,
+        currentStreak,
+      },
+    };
+  });
+
+  // =====================
+  // GET /api/users/me/vs/:opponentId
+  // Get head-to-head record against a specific opponent
+  // =====================
+  app.get<{ Params: { opponentId: string } }>('/me/vs/:opponentId', async (request, reply) => {
+    const user = getUser(request);
+    const userId = user.id as string;
+    const { opponentId } = request.params;
+
+    // Get opponent info
+    const opponent = await prisma.user.findUnique({
+      where: { id: opponentId },
+      select: { id: true, displayName: true, firstName: true, lastName: true, avatarUrl: true },
+    });
+
+    if (!opponent) {
+      return notFound(reply, 'Opponent not found');
+    }
+
+    // Find rounds where both users played
+    const sharedRounds = await prisma.round.findMany({
+      where: {
+        status: 'COMPLETED',
+        players: {
+          every: {
+            userId: { in: [userId, opponentId] },
+          },
+        },
+        AND: [
+          { players: { some: { userId } } },
+          { players: { some: { userId: opponentId } } },
+        ],
+      },
+      select: { id: true, date: true, course: { select: { name: true } } },
+      orderBy: { date: 'desc' },
+    });
+
+    // Calculate earnings for each shared round
+    const roundResults = await Promise.all(
+      sharedRounds.map(async (round) => {
+        const [myReceived, myOwed, theirReceived, theirOwed] = await Promise.all([
+          prisma.settlement.aggregate({
+            where: { roundId: round.id, toUserId: userId, status: 'PAID' },
+            _sum: { amount: true },
+          }),
+          prisma.settlement.aggregate({
+            where: { roundId: round.id, fromUserId: userId, status: 'PAID' },
+            _sum: { amount: true },
+          }),
+          prisma.settlement.aggregate({
+            where: { roundId: round.id, toUserId: opponentId, status: 'PAID' },
+            _sum: { amount: true },
+          }),
+          prisma.settlement.aggregate({
+            where: { roundId: round.id, fromUserId: opponentId, status: 'PAID' },
+            _sum: { amount: true },
+          }),
+        ]);
+
+        const myEarnings = Number(myReceived._sum.amount ?? 0) - Number(myOwed._sum.amount ?? 0);
+        const theirEarnings = Number(theirReceived._sum.amount ?? 0) - Number(theirOwed._sum.amount ?? 0);
+
+        return {
+          roundId: round.id,
+          date: round.date,
+          courseName: round.course.name,
+          myEarnings,
+          theirEarnings,
+        };
+      })
+    );
+
+    // Calculate record (wins/losses based on who earned more)
+    let wins = 0;
+    let losses = 0;
+    let ties = 0;
+    let netEarnings = 0;
+
+    for (const result of roundResults) {
+      netEarnings += result.myEarnings;
+      if (result.myEarnings > result.theirEarnings) {
+        wins++;
+      } else if (result.myEarnings < result.theirEarnings) {
+        losses++;
+      } else {
+        ties++;
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        opponent: {
+          id: opponent.id,
+          displayName: opponent.displayName || `${opponent.firstName} ${opponent.lastName}`.trim(),
+          avatarUrl: opponent.avatarUrl,
+        },
+        roundsTogether: sharedRounds.length,
+        record: { wins, losses, ties },
+        netEarnings: Math.round(netEarnings * 100) / 100,
+        recentRounds: roundResults.slice(0, 5).map(r => ({
+          roundId: r.roundId,
+          date: r.date,
+          courseName: r.courseName,
+          myEarnings: Math.round(r.myEarnings * 100) / 100,
+          theirEarnings: Math.round(r.theirEarnings * 100) / 100,
+        })),
+      },
+    };
+  });
 };
 
 // =====================

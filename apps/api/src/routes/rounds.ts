@@ -1353,4 +1353,170 @@ Confidence should be: high, medium, or low`,
       data: { deleted: true },
     });
   });
+
+  // =====================
+  // GET /api/rounds/:id/summary
+  // Get comprehensive round summary with earnings and standings
+  // =====================
+  app.get<{ Params: { id: string } }>('/:id/summary', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { id } = request.params;
+
+    const round = await prisma.round.findUnique({
+      where: { id },
+      include: {
+        course: true,
+        tee: true,
+        players: {
+          include: {
+            user: {
+              select: { id: true, displayName: true, firstName: true, lastName: true, avatarUrl: true, handicapIndex: true },
+            },
+            scores: {
+              orderBy: { holeNumber: 'asc' },
+            },
+          },
+          orderBy: { position: 'asc' },
+        },
+        games: {
+          include: {
+            results: {
+              include: {
+                roundPlayer: {
+                  include: {
+                    user: {
+                      select: { id: true, displayName: true, firstName: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        settlements: {
+          include: {
+            fromUser: {
+              select: { id: true, displayName: true, firstName: true },
+            },
+            toUser: {
+              select: { id: true, displayName: true, firstName: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!round) {
+      return notFound(reply, 'Round not found');
+    }
+
+    // Check if user is in this round
+    const isPlayer = round.players.some(p => p.userId === (user.id as string));
+    if (!isPlayer) {
+      return forbidden(reply, 'You are not a player in this round');
+    }
+
+    // Calculate per-player earnings from settlements
+    const playerEarnings: Record<string, number> = {};
+    for (const player of round.players) {
+      playerEarnings[player.userId] = 0;
+    }
+
+    for (const settlement of round.settlements) {
+      if (settlement.status === 'PAID' || settlement.status === 'PENDING') {
+        playerEarnings[settlement.toUserId] = (playerEarnings[settlement.toUserId] || 0) + Number(settlement.amount);
+        playerEarnings[settlement.fromUserId] = (playerEarnings[settlement.fromUserId] || 0) - Number(settlement.amount);
+      }
+    }
+
+    // Build standings sorted by earnings
+    const standings = round.players.map(player => {
+      const earnings = playerEarnings[player.userId] || 0;
+      const displayName = player.user.displayName ||
+        [player.user.firstName, player.user.lastName].filter(Boolean).join(' ') ||
+        'Unknown';
+      return {
+        userId: player.userId,
+        displayName,
+        avatarUrl: player.user.avatarUrl,
+        earnings: Math.round(earnings * 100) / 100,
+        totalStrokes: player.scores.reduce((sum, s) => sum + (s.strokes || 0), 0),
+      };
+    }).sort((a, b) => b.earnings - a.earnings);
+
+    // Find winner (highest earnings)
+    const winner = standings.length > 0 && standings[0].earnings > 0
+      ? { userId: standings[0].userId, earnings: standings[0].earnings }
+      : null;
+
+    // Get current user's earnings
+    const myEarnings = playerEarnings[user.id as string] || 0;
+
+    // Format games with their results
+    const gamesWithResults = round.games.map(game => {
+      const gameResults = game.results.map(result => ({
+        userId: result.roundPlayer.userId,
+        displayName: result.roundPlayer.user.displayName || result.roundPlayer.user.firstName || 'Unknown',
+        netAmount: Number(result.netAmount),
+        segment: result.segment,
+      }));
+
+      return {
+        id: game.id,
+        type: game.type,
+        betAmount: Number(game.betAmount),
+        name: game.name,
+        isAutoPress: game.isAutoPress,
+        results: gameResults,
+      };
+    });
+
+    return reply.send({
+      success: true,
+      data: {
+        round: {
+          id: round.id,
+          date: round.date,
+          status: round.status,
+        },
+        course: {
+          id: round.course.id,
+          name: round.course.name,
+          city: round.course.city,
+          state: round.course.state,
+        },
+        tee: {
+          name: round.tee.name,
+          slopeRating: round.tee.slopeRating,
+          courseRating: round.tee.courseRating,
+        },
+        players: round.players.map(p => ({
+          userId: p.userId,
+          displayName: p.user.displayName || p.user.firstName || 'Unknown',
+          avatarUrl: p.user.avatarUrl,
+          courseHandicap: p.courseHandicap,
+          scores: p.scores.map(s => ({
+            holeNumber: s.holeNumber,
+            strokes: s.strokes,
+          })),
+        })),
+        games: gamesWithResults,
+        standings,
+        winner,
+        myEarnings: Math.round(myEarnings * 100) / 100,
+        settlements: round.settlements.map(s => ({
+          id: s.id,
+          fromUserId: s.fromUserId,
+          fromUserName: s.fromUser.displayName || s.fromUser.firstName || 'Unknown',
+          toUserId: s.toUserId,
+          toUserName: s.toUser.displayName || s.toUser.firstName || 'Unknown',
+          amount: Number(s.amount),
+          status: s.status,
+          paidAt: s.paidAt,
+        })),
+      },
+    });
+  });
 };

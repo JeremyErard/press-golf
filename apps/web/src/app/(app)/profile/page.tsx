@@ -14,6 +14,7 @@ import {
   Loader2,
   CheckCircle,
   AlertTriangle,
+  BarChart3,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, Button, Badge, ListItem, ListItemGroup, SectionHeader } from "@/components/ui";
@@ -185,6 +186,12 @@ export default function ProfilePage() {
         <div>
           <SectionHeader title="Account" />
           <ListItemGroup>
+            <ListItem
+              href="/stats"
+              icon={<BarChart3 className="h-5 w-5 text-muted" />}
+              title="Your Stats"
+              subtitle="Career earnings, game history"
+            />
             <ListItem
               href="/profile/edit"
               icon={<User className="h-5 w-5 text-muted" />}

@@ -191,17 +191,26 @@ Confidence should be: high, medium, or low`,
       select: { handicapProofUrl: true },
     });
 
-    // Update user with verified handicap and proof
-    const updatedUser = await prisma.user.update({
-      where: { id: user.id as string },
-      data: {
-        handicapIndex,
-        handicapSource: source as 'GHIN' | 'USGA' | 'CLUB' | 'OTHER',
-        handicapVerifiedAt: new Date(),
-        handicapPendingApproval: false,
-        handicapProofUrl: proofUrl || null,
-      },
-    });
+    // Update user with verified handicap and proof, and create history entry
+    const [updatedUser] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id as string },
+        data: {
+          handicapIndex,
+          handicapSource: source as 'GHIN' | 'USGA' | 'CLUB' | 'OTHER',
+          handicapVerifiedAt: new Date(),
+          handicapPendingApproval: false,
+          handicapProofUrl: proofUrl || null,
+        },
+      }),
+      prisma.handicapHistory.create({
+        data: {
+          userId: user.id as string,
+          handicapIndex,
+          source: source as 'GHIN' | 'USGA' | 'CLUB' | 'OTHER',
+        },
+      }),
+    ]);
 
     // Delete old proof image if exists and different from new one
     if (currentUser?.handicapProofUrl && currentUser.handicapProofUrl !== proofUrl) {
@@ -235,16 +244,25 @@ Confidence should be: high, medium, or low`,
       return badRequest(reply, 'Invalid handicap index. Must be between +9.9 and 54.0');
     }
 
-    // Update user with manual handicap (pending approval)
-    const updatedUser = await prisma.user.update({
-      where: { id: user.id as string },
-      data: {
-        handicapIndex,
-        handicapSource: 'MANUAL',
-        handicapVerifiedAt: new Date(),
-        handicapPendingApproval: true,
-      },
-    });
+    // Update user with manual handicap (pending approval) and create history entry
+    const [updatedUser] = await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id as string },
+        data: {
+          handicapIndex,
+          handicapSource: 'MANUAL',
+          handicapVerifiedAt: new Date(),
+          handicapPendingApproval: true,
+        },
+      }),
+      prisma.handicapHistory.create({
+        data: {
+          userId: user.id as string,
+          handicapIndex,
+          source: 'MANUAL',
+        },
+      }),
+    ]);
 
     return reply.send({
       success: true,
@@ -308,6 +326,30 @@ Confidence should be: high, medium, or low`,
           ? Math.max(0, 30 - Math.floor((Date.now() - new Date(fullUser.handicapVerifiedAt).getTime()) / (24 * 60 * 60 * 1000)))
           : null,
       },
+    });
+  });
+
+  // =====================
+  // GET /api/handicap/history
+  // Get handicap history for current user
+  // =====================
+  app.get('/history', async (request, reply) => {
+    const user = getUser(request);
+
+    const history = await prisma.handicapHistory.findMany({
+      where: { userId: user.id as string },
+      orderBy: { createdAt: 'desc' },
+      take: 50, // Limit to last 50 entries
+    });
+
+    return reply.send({
+      success: true,
+      data: history.map((entry) => ({
+        id: entry.id,
+        handicapIndex: Number(entry.handicapIndex),
+        source: entry.source,
+        createdAt: entry.createdAt,
+      })),
     });
   });
 

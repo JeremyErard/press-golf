@@ -67,6 +67,7 @@ model User {
   handicapApprovals    HandicapApproval[]
   pushSubscriptions    PushSubscription[]
   notificationPrefs    NotificationPreferences?
+  handicapHistory      HandicapHistory[]
 
   @@index([clerkId])
   @@index([email])
@@ -603,4 +604,21 @@ model NotificationPreferences {
   settlementUpdates   Boolean @default(true)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ===================
+// HANDICAP HISTORY
+// ===================
+
+model HandicapHistory {
+  id            String         @id @default(cuid())
+  userId        String
+  handicapIndex Decimal        @db.Decimal(3, 1)
+  source        HandicapSource
+  createdAt     DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, createdAt])
 }

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui";
 import { api, type Buddy } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
+import { HeadToHeadBadge } from "./head-to-head-badge";
 
 interface BuddyDetailSheetProps {
   buddy: Buddy | null;
@@ -123,6 +124,9 @@ export function BuddyDetailSheet({
         </SheetHeader>
 
         <div className="px-5 pb-24 space-y-6">
+          {/* Head-to-Head Record */}
+          <HeadToHeadBadge opponentId={buddy.user.id} />
+
           {/* Nickname input */}
           <div className="space-y-2">
             <label className="text-sm text-muted">Nickname (optional)</label>

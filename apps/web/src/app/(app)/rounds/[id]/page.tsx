@@ -30,6 +30,9 @@ import {
   Banknote,
   Trash2,
   Pencil,
+  TrendingUp,
+  TrendingDown,
+  Medal,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import {
@@ -46,7 +49,7 @@ import {
   SheetDescription,
   Input,
 } from "@/components/ui";
-import { api, type RoundDetail, type GameType, type Buddy } from "@/lib/api";
+import { api, type RoundDetail, type GameType, type Buddy, type RoundSummary } from "@/lib/api";
 import { formatDate, cn, getTeeColor, formatTeeDisplayName, formatCourseName } from "@/lib/utils";
 import { BettingIllustration } from "@/components/illustrations";
 
@@ -198,13 +201,27 @@ const ALL_GAME_TYPES: GameType[] = [
   "BANKER",
 ];
 
+function formatMoney(amount: number): string {
+  if (amount === 0) return "$0";
+  const sign = amount >= 0 ? "+" : "";
+  return `${sign}$${Math.abs(amount).toFixed(0)}`;
+}
+
+function getPositionSuffix(position: number): string {
+  if (position === 1) return "st";
+  if (position === 2) return "nd";
+  if (position === 3) return "rd";
+  return "th";
+}
+
 export default function RoundDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { getToken } = useAuth();
+  const { getToken, userId: clerkUserId } = useAuth();
   const roundId = params.id as string;
 
   const [round, setRound] = useState<RoundDetail | null>(null);
+  const [roundSummary, setRoundSummary] = useState<RoundSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
@@ -244,6 +261,16 @@ export default function RoundDetailPage() {
         if (!token) return;
         const data = await api.getRound(token, roundId);
         setRound(data);
+
+        // Fetch summary for completed rounds
+        if (data.status === "COMPLETED") {
+          try {
+            const summary = await api.getRoundSummary(token, roundId);
+            setRoundSummary(summary);
+          } catch (err) {
+            console.error("Failed to fetch round summary:", err);
+          }
+        }
       } catch (error) {
         console.error("Failed to fetch round:", error);
       } finally {
@@ -667,54 +694,163 @@ export default function RoundDetailPage() {
           </div>
         )}
 
-        {/* Players */}
-        <div>
-          <div className="flex items-center justify-between mb-md">
-            <h2 className="text-h3 font-semibold">Players</h2>
-            <div className="flex items-center gap-sm">
-              <span className="text-caption text-muted">
-                {round.players.length} player{round.players.length !== 1 ? "s" : ""}
-              </span>
-              {round.status === "SETUP" && (
-                <Button size="sm" variant="ghost" onClick={handleOpenAddPlayers}>
-                  <UserPlus className="h-4 w-4 mr-1" />
-                  Add
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <Card>
-            <CardContent className="p-0 divide-y divide-border">
-              {round.players.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center gap-md p-lg"
-                >
-                  <Avatar
-                    src={player.user.avatarUrl}
-                    name={player.user.displayName || player.user.firstName || "Player"}
-                    size="md"
-                  />
-                  <div className="flex-1">
-                    <p className="text-body font-medium">
-                      {player.user.displayName ||
-                        [player.user.firstName, player.user.lastName]
-                          .filter(Boolean)
-                          .join(" ") ||
-                        "Player"}
+        {/* Final Results for Completed Rounds */}
+        {round.status === "COMPLETED" && roundSummary && (
+          <>
+            {/* My Earnings Hero */}
+            <Card className={cn(
+              "relative overflow-hidden rounded-xl border",
+              roundSummary.myEarnings >= 0
+                ? "bg-gradient-to-br from-brand/20 to-emerald-900/30 border-brand/30"
+                : "bg-gradient-to-br from-red-900/30 to-red-800/20 border-red-500/30"
+            )}>
+              <CardContent className="p-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-white/70">Your Result</p>
+                    <p className={cn(
+                      "text-3xl font-bold",
+                      roundSummary.myEarnings > 0 ? "text-brand" :
+                      roundSummary.myEarnings < 0 ? "text-red-400" : "text-white"
+                    )}>
+                      {formatMoney(roundSummary.myEarnings)}
                     </p>
-                    {player.user.handicapIndex !== null && player.user.handicapIndex !== undefined && (
-                      <p className="text-caption text-muted">
-                        {player.user.handicapIndex} handicap
-                      </p>
+                  </div>
+                  <div className={cn(
+                    "w-14 h-14 rounded-full flex items-center justify-center",
+                    roundSummary.myEarnings >= 0 ? "bg-brand/20" : "bg-red-500/20"
+                  )}>
+                    {roundSummary.myEarnings >= 0 ? (
+                      <TrendingUp className="w-7 h-7 text-brand" />
+                    ) : (
+                      <TrendingDown className="w-7 h-7 text-red-400" />
                     )}
                   </div>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+
+            {/* Final Standings */}
+            <div>
+              <div className="flex items-center gap-2 mb-md">
+                <Medal className="h-5 w-5 text-amber-400" />
+                <h2 className="text-h3 font-semibold">Final Standings</h2>
+              </div>
+              <Card>
+                <CardContent className="p-0 divide-y divide-border">
+                  {roundSummary.standings.map((standing, index) => {
+                    const position = index + 1;
+                    const isWinner = position === 1 && standing.earnings > 0;
+                    // Identify current user by matching earnings (works in most cases)
+                    const isMe = standing.earnings === roundSummary.myEarnings;
+
+                    return (
+                      <div
+                        key={standing.userId}
+                        className={cn(
+                          "flex items-center gap-md p-lg transition-colors",
+                          isMe && "bg-brand/5"
+                        )}
+                      >
+                        {/* Position */}
+                        <div className={cn(
+                          "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
+                          position === 1 ? "bg-amber-500/20 text-amber-400" :
+                          position === 2 ? "bg-gray-400/20 text-gray-300" :
+                          position === 3 ? "bg-orange-600/20 text-orange-400" :
+                          "bg-surface text-muted"
+                        )}>
+                          {position}
+                        </div>
+
+                        {/* Player Info */}
+                        <Avatar
+                          src={standing.avatarUrl}
+                          name={standing.displayName}
+                          size="sm"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className={cn(
+                            "font-medium truncate",
+                            isMe && "text-brand"
+                          )}>
+                            {standing.displayName}
+                            {isMe && <span className="text-xs text-brand ml-1">(You)</span>}
+                          </p>
+                        </div>
+
+                        {/* Earnings */}
+                        <div className="flex items-center gap-2">
+                          {isWinner && (
+                            <Trophy className="w-4 h-4 text-amber-400" />
+                          )}
+                          <span className={cn(
+                            "font-semibold",
+                            standing.earnings > 0 ? "text-brand" :
+                            standing.earnings < 0 ? "text-red-400" : "text-muted"
+                          )}>
+                            {formatMoney(standing.earnings)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
+
+        {/* Players - hide for completed rounds since standings shows players */}
+        {round.status !== "COMPLETED" && (
+          <div>
+            <div className="flex items-center justify-between mb-md">
+              <h2 className="text-h3 font-semibold">Players</h2>
+              <div className="flex items-center gap-sm">
+                <span className="text-caption text-muted">
+                  {round.players.length} player{round.players.length !== 1 ? "s" : ""}
+                </span>
+                {round.status === "SETUP" && (
+                  <Button size="sm" variant="ghost" onClick={handleOpenAddPlayers}>
+                    <UserPlus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <Card>
+              <CardContent className="p-0 divide-y divide-border">
+                {round.players.map((player) => (
+                  <div
+                    key={player.id}
+                    className="flex items-center gap-md p-lg"
+                  >
+                    <Avatar
+                      src={player.user.avatarUrl}
+                      name={player.user.displayName || player.user.firstName || "Player"}
+                      size="md"
+                    />
+                    <div className="flex-1">
+                      <p className="text-body font-medium">
+                        {player.user.displayName ||
+                          [player.user.firstName, player.user.lastName]
+                            .filter(Boolean)
+                            .join(" ") ||
+                          "Player"}
+                      </p>
+                      {player.user.handicapIndex !== null && player.user.handicapIndex !== undefined && (
+                        <p className="text-caption text-muted">
+                          {player.user.handicapIndex} handicap
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Games */}
         <div>
@@ -742,6 +878,30 @@ export default function RoundDetailPage() {
                     .slice(0, 3);
                   const moreCount = participants.length - 3;
 
+                  // Get game result from summary for completed rounds
+                  const gameResult = roundSummary?.games.find(gr => gr.id === game.id);
+
+                  // Find current user's ID from standings (user with matching myEarnings)
+                  const myStanding = roundSummary?.standings.find(s => s.earnings === roundSummary.myEarnings);
+                  const myUserId = myStanding?.userId;
+
+                  // Find current user's earnings for this game
+                  const myGameResult = myUserId ? gameResult?.results.find(r => r.userId === myUserId) : null;
+                  const myGameEarnings = myGameResult?.netAmount;
+
+                  // Find the top earner for this game
+                  let topEarner: { name: string; earnings: number } | null = null;
+                  if (gameResult?.results && gameResult.results.length > 0) {
+                    const sorted = [...gameResult.results].sort((a, b) => b.netAmount - a.netAmount);
+                    const topResult = sorted[0];
+                    if (topResult.netAmount > 0) {
+                      topEarner = {
+                        name: topResult.displayName,
+                        earnings: topResult.netAmount,
+                      };
+                    }
+                  }
+
                   return (
                     <button
                       key={game.id}
@@ -764,21 +924,39 @@ export default function RoundDetailPage() {
                           <p className="text-body font-medium">
                             {game.name || gameTypeLabels[game.type]}
                           </p>
-                          <p className="text-caption text-muted">
-                            {participantNames.join(", ")}
-                            {moreCount > 0 && ` +${moreCount} more`}
-                          </p>
-                          {game.isAutoPress && (
+                          {round.status === "COMPLETED" && topEarner ? (
+                            <p className="text-caption text-muted">
+                              Winner: {topEarner.name} ({formatMoney(topEarner.earnings)})
+                            </p>
+                          ) : (
+                            <p className="text-caption text-muted">
+                              {participantNames.join(", ")}
+                              {moreCount > 0 && ` +${moreCount} more`}
+                            </p>
+                          )}
+                          {game.isAutoPress && round.status !== "COMPLETED" && (
                             <p className="text-caption text-brand">Auto-press</p>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant="accent">
-                          ${Number(game.betAmount)}
-                        </Badge>
-                        {round.status !== "COMPLETED" && (
-                          <Pencil className="h-4 w-4 text-muted" />
+                        {round.status === "COMPLETED" && myGameEarnings !== undefined ? (
+                          <span className={cn(
+                            "font-semibold",
+                            myGameEarnings > 0 ? "text-brand" :
+                            myGameEarnings < 0 ? "text-red-400" : "text-muted"
+                          )}>
+                            {formatMoney(myGameEarnings)}
+                          </span>
+                        ) : (
+                          <>
+                            <Badge variant="accent">
+                              ${Number(game.betAmount)}
+                            </Badge>
+                            {round.status !== "COMPLETED" && (
+                              <Pencil className="h-4 w-4 text-muted" />
+                            )}
+                          </>
                         )}
                       </div>
                     </button>
@@ -856,12 +1034,20 @@ export default function RoundDetailPage() {
           )}
 
           {round.status === "COMPLETED" && (
-            <Link href={`/rounds/${round.id}/settlement`} className="block">
-              <Button className="w-full h-14" size="lg">
-                <DollarSign className="h-5 w-5 mr-2" />
-                View Settlement
-              </Button>
-            </Link>
+            <>
+              <Link href={`/rounds/${round.id}/settlement`} className="block">
+                <Button className="w-full h-14" size="lg">
+                  <DollarSign className="h-5 w-5 mr-2" />
+                  View Settlement
+                </Button>
+              </Link>
+              <Link href={`/rounds/${round.id}/scorecard`} className="block">
+                <Button className="w-full h-12" size="lg" variant="secondary">
+                  <ClipboardList className="h-5 w-5 mr-2" />
+                  View Scorecard
+                </Button>
+              </Link>
+            </>
           )}
         </div>
       </div>

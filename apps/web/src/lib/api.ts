@@ -102,6 +102,8 @@ export const api = {
   getRounds: (token: string) => apiRequest<Round[]>("/rounds", {}, token),
   getRound: (token: string, id: string) =>
     apiRequest<RoundDetail>(`/rounds/${id}`, {}, token),
+  getRoundSummary: (token: string, id: string) =>
+    apiRequest<RoundSummary>(`/rounds/${id}/summary`, {}, token),
   createRound: (token: string, data: CreateRoundInput) =>
     apiRequest<Round>("/rounds", {
       method: "POST",
@@ -300,9 +302,17 @@ export const api = {
       body: JSON.stringify({}),
     }, token),
 
+  // Stats
+  getMyStats: (token: string) =>
+    apiRequest<PlayerStats>("/users/me/stats", {}, token),
+  getHeadToHead: (token: string, opponentId: string) =>
+    apiRequest<HeadToHeadRecord>(`/users/me/vs/${opponentId}`, {}, token),
+
   // Handicap
   getHandicapStatus: (token: string) =>
     apiRequest<HandicapStatusResponse>("/handicap/status", {}, token),
+  getHandicapHistory: (token: string) =>
+    apiRequest<HandicapHistoryEntry[]>("/handicap/history", {}, token),
 
   extractHandicap: async (token: string, file: File): Promise<ExtractedHandicap> => {
     const formData = new FormData();
@@ -998,4 +1008,125 @@ export interface NotificationPreferences {
   scoreUpdates: boolean;
   teeTimeReminders: boolean;
   settlementUpdates: boolean;
+}
+
+// Player Stats types
+export interface GameTypeStats {
+  played: number;
+  won: number;
+  lost: number;
+  net: number;
+}
+
+export interface RoundHighlight {
+  roundId: string;
+  date: string;
+  courseName: string;
+  earnings: number;
+}
+
+export interface PlayerStats {
+  careerEarnings: number;
+  roundsPlayed: number;
+  gamesPlayed: number;
+  gamesByType: Record<GameType, GameTypeStats>;
+  bestRound: RoundHighlight | null;
+  worstRound: RoundHighlight | null;
+  currentStreak: number;
+}
+
+// Head-to-Head types
+export interface HeadToHeadRecord {
+  opponent: {
+    id: string;
+    displayName: string;
+    avatarUrl?: string;
+  };
+  roundsTogether: number;
+  record: {
+    wins: number;
+    losses: number;
+    ties: number;
+  };
+  netEarnings: number;
+  recentRounds: {
+    roundId: string;
+    date: string;
+    courseName: string;
+    myEarnings: number;
+    theirEarnings: number;
+  }[];
+}
+
+// Handicap History types
+export interface HandicapHistoryEntry {
+  id: string;
+  handicapIndex: number;
+  source: HandicapSource;
+  createdAt: string;
+}
+
+// Round Summary types
+export interface RoundSummaryStanding {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+  earnings: number;
+  totalStrokes: number;
+}
+
+export interface RoundSummaryGame {
+  id: string;
+  type: GameType;
+  betAmount: number;
+  name?: string;
+  isAutoPress: boolean;
+  results: {
+    userId: string;
+    displayName: string;
+    netAmount: number;
+    segment?: string;
+  }[];
+}
+
+export interface RoundSummarySettlement {
+  id: string;
+  fromUserId: string;
+  fromUserName: string;
+  toUserId: string;
+  toUserName: string;
+  amount: number;
+  status: "PENDING" | "PAID" | "DISPUTED";
+  paidAt?: string;
+}
+
+export interface RoundSummary {
+  round: {
+    id: string;
+    date: string;
+    status: "SETUP" | "ACTIVE" | "COMPLETED";
+  };
+  course: {
+    id: string;
+    name: string;
+    city?: string;
+    state?: string;
+  };
+  tee: {
+    name: string;
+    slopeRating?: number;
+    courseRating?: number;
+  };
+  players: {
+    userId: string;
+    displayName: string;
+    avatarUrl?: string;
+    courseHandicap?: number;
+    scores: { holeNumber: number; strokes?: number }[];
+  }[];
+  games: RoundSummaryGame[];
+  standings: RoundSummaryStanding[];
+  winner: { userId: string; earnings: number } | null;
+  myEarnings: number;
+  settlements: RoundSummarySettlement[];
 }

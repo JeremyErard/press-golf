@@ -8,6 +8,7 @@ import { Header } from "@/components/layout/header";
 import { api, type Buddy } from "@/lib/api";
 import { BuddyDetailSheet } from "@/components/buddies/buddy-detail-sheet";
 import { AddBuddySheet } from "@/components/buddies/add-buddy-sheet";
+import { HeadToHeadBadge } from "@/components/buddies/head-to-head-badge";
 
 function getSourceLabel(sourceType: Buddy["sourceType"]): string {
   switch (sourceType) {
@@ -114,9 +115,7 @@ export default function BuddiesPage() {
                         {buddy.user.handicapIndex !== undefined && buddy.user.handicapIndex !== null && (
                           <span>HCP: {buddy.user.handicapIndex}</span>
                         )}
-                        <Badge variant="default" className="text-xs">
-                          {getSourceLabel(buddy.sourceType)}
-                        </Badge>
+                        <HeadToHeadBadge opponentId={buddy.user.id} compact />
                       </div>
                     </div>
                     <ChevronRight className="h-5 w-5 text-muted flex-shrink-0" />
