@@ -18,6 +18,20 @@ interface CreateRoundBody {
   date?: string;
 }
 
+interface TeeTimeGroupBody {
+  groupNumber: number;
+  teeTime: string; // ISO datetime string
+  playerIds?: string[]; // Optional: assign players to this group
+}
+
+interface UpdateTeeTimeGroupsBody {
+  groups: TeeTimeGroupBody[];
+}
+
+interface AssignPlayersToGroupBody {
+  playerIds: string[];
+}
+
 interface JoinRoundBody {
   inviteCode: string;
 }
@@ -350,10 +364,23 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
             scores: {
               orderBy: { holeNumber: 'asc' },
             },
+            teeTimeGroup: true,
           },
           orderBy: { position: 'asc' },
         },
         games: true,
+        teeTimeGroups: {
+          include: {
+            players: {
+              include: {
+                user: {
+                  select: { id: true, displayName: true, firstName: true, avatarUrl: true },
+                },
+              },
+            },
+          },
+          orderBy: { groupNumber: 'asc' },
+        },
       },
     });
 
@@ -965,6 +992,326 @@ Confidence should be: high, medium, or low`,
     return reply.send({
       success: true,
       data: roundPlayer,
+    });
+  });
+
+  // =====================
+  // PUT /api/rounds/:id/tee-time-groups
+  // Create or update tee time groups (up to 4 groups)
+  // =====================
+  app.put<{ Params: { id: string }; Body: UpdateTeeTimeGroupsBody }>('/:id/tee-time-groups', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { id: roundId } = request.params;
+    const { groups } = request.body;
+
+    // Validate input
+    if (!groups || !Array.isArray(groups) || groups.length === 0) {
+      return badRequest(reply, 'At least one tee time group is required');
+    }
+
+    if (groups.length > 4) {
+      return badRequest(reply, 'Maximum 4 tee time groups allowed');
+    }
+
+    // Validate group numbers are 1-4 and unique
+    const groupNumbers = groups.map(g => g.groupNumber);
+    if (groupNumbers.some(n => n < 1 || n > 4)) {
+      return badRequest(reply, 'Group numbers must be between 1 and 4');
+    }
+    if (new Set(groupNumbers).size !== groupNumbers.length) {
+      return badRequest(reply, 'Group numbers must be unique');
+    }
+
+    // Validate tee times
+    for (const group of groups) {
+      const teeTime = new Date(group.teeTime);
+      if (isNaN(teeTime.getTime())) {
+        return badRequest(reply, `Invalid tee time for group ${group.groupNumber}`);
+      }
+    }
+
+    // Get round
+    const round = await prisma.round.findUnique({
+      where: { id: roundId },
+      include: { players: true },
+    });
+
+    if (!round) {
+      return notFound(reply, 'Round not found');
+    }
+
+    // Only creator can manage tee time groups
+    if (round.createdById !== (user.id as string)) {
+      return forbidden(reply, 'Only the round creator can manage tee time groups');
+    }
+
+    if (round.status !== 'SETUP') {
+      return badRequest(reply, 'Cannot modify tee time groups after the round has started');
+    }
+
+    // Delete existing groups and create new ones in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Delete existing groups (cascade will remove player assignments)
+      await tx.teeTimeGroup.deleteMany({
+        where: { roundId },
+      });
+
+      // Clear player group assignments
+      await tx.roundPlayer.updateMany({
+        where: { roundId },
+        data: { teeTimeGroupId: null },
+      });
+
+      // Create new groups
+      const createdGroups = [];
+      for (const group of groups) {
+        const created = await tx.teeTimeGroup.create({
+          data: {
+            roundId,
+            groupNumber: group.groupNumber,
+            teeTime: new Date(group.teeTime),
+          },
+        });
+        createdGroups.push(created);
+
+        // Assign players if provided
+        if (group.playerIds && group.playerIds.length > 0) {
+          // Validate players are in round
+          const validPlayerIds = group.playerIds.filter(pid =>
+            round.players.some(p => p.userId === pid)
+          );
+
+          if (validPlayerIds.length > 4) {
+            throw new Error(`Group ${group.groupNumber} cannot have more than 4 players`);
+          }
+
+          await tx.roundPlayer.updateMany({
+            where: {
+              roundId,
+              userId: { in: validPlayerIds },
+            },
+            data: { teeTimeGroupId: created.id },
+          });
+        }
+      }
+
+      return createdGroups;
+    });
+
+    // Fetch updated round with groups
+    const updatedRound = await prisma.round.findUnique({
+      where: { id: roundId },
+      include: {
+        teeTimeGroups: {
+          include: {
+            players: {
+              include: {
+                user: {
+                  select: { id: true, displayName: true, firstName: true, avatarUrl: true },
+                },
+              },
+            },
+          },
+          orderBy: { groupNumber: 'asc' },
+        },
+        players: {
+          include: {
+            user: {
+              select: { id: true, displayName: true, firstName: true, avatarUrl: true },
+            },
+            teeTimeGroup: true,
+          },
+          orderBy: { position: 'asc' },
+        },
+      },
+    });
+
+    return reply.send({
+      success: true,
+      data: updatedRound,
+    });
+  });
+
+  // =====================
+  // POST /api/rounds/:id/tee-time-groups/:groupId/players
+  // Assign players to a specific tee time group
+  // =====================
+  app.post<{ Params: { id: string; groupId: string }; Body: AssignPlayersToGroupBody }>('/:id/tee-time-groups/:groupId/players', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { id: roundId, groupId } = request.params;
+    const { playerIds } = request.body;
+
+    if (!playerIds || !Array.isArray(playerIds) || playerIds.length === 0) {
+      return badRequest(reply, 'Player IDs are required');
+    }
+
+    if (playerIds.length > 4) {
+      return badRequest(reply, 'Maximum 4 players per group');
+    }
+
+    // Get round and group
+    const round = await prisma.round.findUnique({
+      where: { id: roundId },
+      include: { players: true, teeTimeGroups: true },
+    });
+
+    if (!round) {
+      return notFound(reply, 'Round not found');
+    }
+
+    if (round.createdById !== (user.id as string)) {
+      return forbidden(reply, 'Only the round creator can assign players to groups');
+    }
+
+    if (round.status !== 'SETUP') {
+      return badRequest(reply, 'Cannot modify groups after the round has started');
+    }
+
+    const group = round.teeTimeGroups.find(g => g.id === groupId);
+    if (!group) {
+      return notFound(reply, 'Tee time group not found');
+    }
+
+    // Validate all players are in the round
+    const validPlayerIds = playerIds.filter(pid =>
+      round.players.some(p => p.userId === pid)
+    );
+
+    if (validPlayerIds.length !== playerIds.length) {
+      return badRequest(reply, 'Some players are not in this round');
+    }
+
+    // Update player assignments
+    await prisma.$transaction(async (tx) => {
+      // Remove these players from any other groups
+      await tx.roundPlayer.updateMany({
+        where: {
+          roundId,
+          userId: { in: validPlayerIds },
+        },
+        data: { teeTimeGroupId: null },
+      });
+
+      // Assign to this group
+      await tx.roundPlayer.updateMany({
+        where: {
+          roundId,
+          userId: { in: validPlayerIds },
+        },
+        data: { teeTimeGroupId: groupId },
+      });
+    });
+
+    // Fetch updated group
+    const updatedGroup = await prisma.teeTimeGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        players: {
+          include: {
+            user: {
+              select: { id: true, displayName: true, firstName: true, avatarUrl: true },
+            },
+          },
+        },
+      },
+    });
+
+    return reply.send({
+      success: true,
+      data: updatedGroup,
+    });
+  });
+
+  // =====================
+  // GET /api/rounds/:id/tee-time-groups
+  // Get all tee time groups for a round
+  // =====================
+  app.get<{ Params: { id: string } }>('/:id/tee-time-groups', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { id: roundId } = request.params;
+
+    const round = await prisma.round.findUnique({
+      where: { id: roundId },
+      include: { players: true },
+    });
+
+    if (!round) {
+      return notFound(reply, 'Round not found');
+    }
+
+    // Verify user is in round
+    if (!round.players.some(p => p.userId === (user.id as string))) {
+      return forbidden(reply, 'You are not a player in this round');
+    }
+
+    const groups = await prisma.teeTimeGroup.findMany({
+      where: { roundId },
+      include: {
+        players: {
+          include: {
+            user: {
+              select: { id: true, displayName: true, firstName: true, avatarUrl: true },
+            },
+          },
+          orderBy: { position: 'asc' },
+        },
+      },
+      orderBy: { groupNumber: 'asc' },
+    });
+
+    return reply.send({
+      success: true,
+      data: groups,
+    });
+  });
+
+  // =====================
+  // DELETE /api/rounds/:id/tee-time-groups
+  // Remove all tee time groups (for single-group rounds)
+  // =====================
+  app.delete<{ Params: { id: string } }>('/:id/tee-time-groups', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { id: roundId } = request.params;
+
+    const round = await prisma.round.findUnique({
+      where: { id: roundId },
+    });
+
+    if (!round) {
+      return notFound(reply, 'Round not found');
+    }
+
+    if (round.createdById !== (user.id as string)) {
+      return forbidden(reply, 'Only the round creator can delete tee time groups');
+    }
+
+    if (round.status !== 'SETUP') {
+      return badRequest(reply, 'Cannot modify tee time groups after the round has started');
+    }
+
+    // Clear player assignments and delete groups
+    await prisma.$transaction(async (tx) => {
+      await tx.roundPlayer.updateMany({
+        where: { roundId },
+        data: { teeTimeGroupId: null },
+      });
+
+      await tx.teeTimeGroup.deleteMany({
+        where: { roundId },
+      });
+    });
+
+    return reply.send({
+      success: true,
+      data: { deleted: true },
     });
   });
 };
