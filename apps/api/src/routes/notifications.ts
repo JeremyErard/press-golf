@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { getVapidPublicKey, isNotificationsConfigured } from "../lib/notifications.js";
+import { requireAuth, getUser } from "../lib/auth.js";
 
 // Schemas
 const subscribeSchema = z.object({
@@ -48,15 +49,10 @@ export async function notificationRoutes(fastify: FastifyInstance) {
   // ============================================================================
   fastify.get(
     "/api/notifications/status",
+    { preHandler: requireAuth },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const userId = (request as any).userId;
-
-      if (!userId) {
-        return reply.status(401).send({
-          success: false,
-          error: { code: "UNAUTHORIZED", message: "Unauthorized" },
-        });
-      }
+      const user = getUser(request);
+      const userId = user.id as string;
 
       const configured = isNotificationsConfigured();
 
@@ -92,15 +88,10 @@ export async function notificationRoutes(fastify: FastifyInstance) {
   // ============================================================================
   fastify.post(
     "/api/notifications/subscribe",
+    { preHandler: requireAuth },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const userId = (request as any).userId;
-
-      if (!userId) {
-        return reply.status(401).send({
-          success: false,
-          error: { code: "UNAUTHORIZED", message: "Unauthorized" },
-        });
-      }
+      const user = getUser(request);
+      const userId = user.id as string;
 
       const body = subscribeSchema.safeParse(request.body);
       if (!body.success) {
@@ -159,15 +150,10 @@ export async function notificationRoutes(fastify: FastifyInstance) {
   // ============================================================================
   fastify.delete(
     "/api/notifications/unsubscribe",
+    { preHandler: requireAuth },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const userId = (request as any).userId;
-
-      if (!userId) {
-        return reply.status(401).send({
-          success: false,
-          error: { code: "UNAUTHORIZED", message: "Unauthorized" },
-        });
-      }
+      const user = getUser(request);
+      const userId = user.id as string;
 
       const body = z.object({ endpoint: z.string().url() }).safeParse(request.body);
       if (!body.success) {
@@ -204,15 +190,10 @@ export async function notificationRoutes(fastify: FastifyInstance) {
   // ============================================================================
   fastify.get(
     "/api/notifications/preferences",
+    { preHandler: requireAuth },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const userId = (request as any).userId;
-
-      if (!userId) {
-        return reply.status(401).send({
-          success: false,
-          error: { code: "UNAUTHORIZED", message: "Unauthorized" },
-        });
-      }
+      const user = getUser(request);
+      const userId = user.id as string;
 
       // Get or create preferences
       let prefs = await prisma.notificationPreferences.findUnique({
@@ -244,15 +225,10 @@ export async function notificationRoutes(fastify: FastifyInstance) {
   // ============================================================================
   fastify.put(
     "/api/notifications/preferences",
+    { preHandler: requireAuth },
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const userId = (request as any).userId;
-
-      if (!userId) {
-        return reply.status(401).send({
-          success: false,
-          error: { code: "UNAUTHORIZED", message: "Unauthorized" },
-        });
-      }
+      const user = getUser(request);
+      const userId = user.id as string;
 
       const body = preferencesSchema.safeParse(request.body);
       if (!body.success) {
