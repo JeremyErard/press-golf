@@ -10,6 +10,8 @@ interface GameLiveStatus {
   type: string;
   betAmount: number;
   isAutoPress?: boolean;
+  name?: string;  // Custom game name for distinguishing multiple games of same type
+  participantNames?: string[];  // Names of players in this game
   // Nassau/Match Play specific
   nassauStatus?: {
     front: { score: number; label: string; holesPlayed: number; holesRemaining: number };
@@ -97,9 +99,9 @@ export function GamesSummary({
     return (
       <Card key={game.gameId} className="overflow-hidden">
         <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Nassau</span>
+              <span className="font-semibold">{game.name || "Nassau"}</span>
               <Badge variant="default" className="text-xs">
                 {formatBet(game.betAmount)}
               </Badge>
@@ -108,6 +110,11 @@ export function GamesSummary({
               )}
             </div>
           </div>
+          {game.participantNames && game.participantNames.length > 0 && (
+            <p className="text-xs text-muted mb-3">
+              {game.participantNames.join(" vs ")}
+            </p>
+          )}
 
           <div className="space-y-2">
             {segments.map((segment) => {
@@ -202,9 +209,9 @@ export function GamesSummary({
       <Card key={game.gameId}>
         <CardContent className="p-4">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-lg">Skins</span>
+              <span className="font-semibold text-lg">{game.name || "Skins"}</span>
               <Badge variant="default" className="text-xs">
                 {formatBet(game.betAmount)}/skin
               </Badge>
@@ -215,6 +222,11 @@ export function GamesSummary({
               </Badge>
             )}
           </div>
+          {game.participantNames && game.participantNames.length > 0 && (
+            <p className="text-xs text-muted mb-3">
+              {game.participantNames.join(", ")}
+            </p>
+          )}
 
           {/* Player standings */}
           {sortedPlayers.length > 0 ? (
@@ -285,9 +297,9 @@ export function GamesSummary({
     return (
       <Card key={game.gameId}>
         <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Match Play</span>
+              <span className="font-semibold">{game.name || "Match Play"}</span>
               <Badge variant="default" className="text-xs">
                 {formatBet(game.betAmount)}
               </Badge>
@@ -297,6 +309,11 @@ export function GamesSummary({
               {text}
             </div>
           </div>
+          {game.participantNames && game.participantNames.length > 0 && (
+            <p className="text-xs text-muted mb-2">
+              {game.participantNames.join(" vs ")}
+            </p>
+          )}
 
           {pressInfo && (
             <div className="text-sm text-muted">
@@ -357,9 +374,9 @@ export function GamesSummary({
     return (
       <Card key={game.gameId}>
         <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Wolf</span>
+              <span className="font-semibold">{game.name || "Wolf"}</span>
               <Badge variant="default" className="text-xs">
                 {formatBet(game.betAmount)}/pt
               </Badge>
@@ -371,6 +388,11 @@ export function GamesSummary({
               {status.points > 0 ? "+" : ""}{status.points} pts
             </span>
           </div>
+          {game.participantNames && game.participantNames.length > 0 && (
+            <p className="text-xs text-muted mb-2">
+              {game.participantNames.join(", ")}
+            </p>
+          )}
 
           {status.nextPickHole && (
             <div className="text-sm text-muted">
@@ -389,27 +411,42 @@ export function GamesSummary({
     return (
       <Card key={game.gameId}>
         <CardContent className="p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
-              <span className="font-semibold">Stableford</span>
+              <span className="font-semibold">{game.name || "Stableford"}</span>
               <Badge variant="default" className="text-xs">
                 {formatBet(game.betAmount)}
               </Badge>
             </div>
             <span className="font-bold text-lg">{status.points} pts</span>
           </div>
+          {game.participantNames && game.participantNames.length > 0 && (
+            <p className="text-xs text-muted">
+              {game.participantNames.join(", ")}
+            </p>
+          )}
         </CardContent>
       </Card>
     );
   };
 
   const renderGenericGame = (game: GameLiveStatus) => {
+    // Map game type to display name
+    const gameTypeDisplayNames: Record<string, string> = {
+      NINES: "Nines",
+      BINGO_BANGO_BONGO: "Bingo Bango Bongo",
+      VEGAS: "Vegas",
+      SNAKE: "Snake",
+      BANKER: "Banker",
+    };
+    const displayName = game.name || gameTypeDisplayNames[game.type] || game.type;
+
     return (
       <Card key={game.gameId}>
         <CardContent className="p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2">
-              <span className="font-semibold">{game.type}</span>
+              <span className="font-semibold">{displayName}</span>
               <Badge variant="default" className="text-xs">
                 {formatBet(game.betAmount)}
               </Badge>
@@ -418,6 +455,11 @@ export function GamesSummary({
               <span className="text-sm text-muted">{game.description}</span>
             )}
           </div>
+          {game.participantNames && game.participantNames.length > 0 && (
+            <p className="text-xs text-muted">
+              {game.participantNames.join(", ")}
+            </p>
+          )}
         </CardContent>
       </Card>
     );

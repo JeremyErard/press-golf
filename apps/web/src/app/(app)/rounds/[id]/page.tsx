@@ -520,10 +520,9 @@ export default function RoundDetailPage() {
     }
   };
 
-  const existingGameTypes = round?.games?.map((g) => g.type) || [];
-  const availableGameTypes = ALL_GAME_TYPES.filter(
-    (type) => !existingGameTypes.includes(type)
-  );
+  // All game types are always available - users can add multiple instances of the same game type
+  // with different players and bet amounts
+  const availableGameTypes = ALL_GAME_TYPES;
 
   if (isLoading) {
     return (
@@ -721,7 +720,7 @@ export default function RoundDetailPage() {
         <div>
           <div className="flex items-center justify-between mb-md">
             <h2 className="text-h3 font-semibold">Games</h2>
-            {round.status === "SETUP" && availableGameTypes.length > 0 && (
+            {round.status === "SETUP" && (
               <Button size="sm" variant="ghost" onClick={() => setShowAddGame(true)}>
                 <Plus className="h-4 w-4 mr-1" />
                 Add Game
@@ -732,43 +731,59 @@ export default function RoundDetailPage() {
           {round.games.length > 0 ? (
             <Card>
               <CardContent className="p-0 divide-y divide-border">
-                {round.games.map((game) => (
-                  <button
-                    key={game.id}
-                    onClick={() => round.status !== "COMPLETED" && handleEditGame({
-                      id: game.id,
-                      type: game.type,
-                      betAmount: Number(game.betAmount),
-                    })}
-                    disabled={round.status === "COMPLETED"}
-                    className={cn(
-                      "w-full flex items-center justify-between p-lg text-left",
-                      round.status !== "COMPLETED" && "hover:bg-surface transition-colors"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={cn("p-2 rounded-lg bg-black/20", gameTypeIconColors[game.type])}>
-                        {gameTypeIcons[game.type]}
+                {round.games.map((game) => {
+                  // Get participant names for display
+                  const participantIds = game.participantIds || [];
+                  const participants = participantIds.length > 0
+                    ? round.players.filter(p => participantIds.includes(p.userId))
+                    : round.players;
+                  const participantNames = participants
+                    .map(p => p.user.displayName || p.user.firstName || "Player")
+                    .slice(0, 3);
+                  const moreCount = participants.length - 3;
+
+                  return (
+                    <button
+                      key={game.id}
+                      onClick={() => round.status !== "COMPLETED" && handleEditGame({
+                        id: game.id,
+                        type: game.type,
+                        betAmount: Number(game.betAmount),
+                      })}
+                      disabled={round.status === "COMPLETED"}
+                      className={cn(
+                        "w-full flex items-center justify-between p-lg text-left",
+                        round.status !== "COMPLETED" && "hover:bg-surface transition-colors"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={cn("p-2 rounded-lg bg-black/20", gameTypeIconColors[game.type])}>
+                          {gameTypeIcons[game.type]}
+                        </div>
+                        <div>
+                          <p className="text-body font-medium">
+                            {game.name || gameTypeLabels[game.type]}
+                          </p>
+                          <p className="text-caption text-muted">
+                            {participantNames.join(", ")}
+                            {moreCount > 0 && ` +${moreCount} more`}
+                          </p>
+                          {game.isAutoPress && (
+                            <p className="text-caption text-brand">Auto-press</p>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-body font-medium">
-                          {gameTypeLabels[game.type]}
-                        </p>
-                        {game.isAutoPress && (
-                          <p className="text-caption text-muted">Auto-press enabled</p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="accent">
+                          ${Number(game.betAmount)}
+                        </Badge>
+                        {round.status !== "COMPLETED" && (
+                          <Pencil className="h-4 w-4 text-muted" />
                         )}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="accent">
-                        ${Number(game.betAmount)}
-                      </Badge>
-                      {round.status !== "COMPLETED" && (
-                        <Pencil className="h-4 w-4 text-muted" />
-                      )}
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </CardContent>
             </Card>
           ) : (
@@ -996,8 +1011,8 @@ export default function RoundDetailPage() {
                   </label>
                 )}
 
-                {/* Player Selection - only show if more than 4 players in round */}
-                {round && round.players.length > 4 && (
+                {/* Player Selection - always visible to select which players are in this game */}
+                {round && round.players.length >= 2 && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium text-white">
@@ -1011,12 +1026,14 @@ export default function RoundDetailPage() {
                     </div>
                     <p className="text-xs text-muted">
                       {selectedGameType === "NASSAU" || selectedGameType === "MATCH_PLAY"
-                        ? "Select exactly 2 players, or leave empty for all"
+                        ? "Select exactly 2 players for head-to-head"
                         : selectedGameType === "VEGAS"
                         ? "Select exactly 4 players for teams"
-                        : selectedGameType === "WOLF" || selectedGameType === "NINES"
-                        ? "Select 3-4 players, or leave empty for all"
-                        : "Select players or leave empty for all"}
+                        : selectedGameType === "WOLF"
+                        ? "Select exactly 4 players"
+                        : selectedGameType === "NINES"
+                        ? "Select 3-4 players"
+                        : "Select players for this game"}
                     </p>
                     <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
                       {round.players.map((player) => (
@@ -1050,8 +1067,8 @@ export default function RoundDetailPage() {
                   </div>
                 )}
 
-                {/* Optional Game Name - useful for multiple games of same type */}
-                {round && round.players.length > 4 && (
+                {/* Game Name - helps identify multiple games of same type */}
+                {round && (
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-white">
                       Game Name <span className="text-muted">(optional)</span>
@@ -1059,7 +1076,7 @@ export default function RoundDetailPage() {
                     <Input
                       value={gameName}
                       onChange={(e) => setGameName(e.target.value)}
-                      placeholder={`e.g., "Foursome A ${gameTypeLabels[selectedGameType]}"`}
+                      placeholder={`e.g., "Front 9 ${gameTypeLabels[selectedGameType]}" or "Alex vs Mike"`}
                       className="text-sm"
                     />
                   </div>
