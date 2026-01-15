@@ -14,6 +14,7 @@ import buddyRoutes from './routes/buddies.js';
 import handicapRoutes from './routes/handicap.js';
 import { adminRoutes } from './routes/admin.js';
 import { realtimeRoutes } from './routes/realtime.js';
+import { notificationRoutes } from './routes/notifications.js';
 import { prisma } from './lib/prisma.js';
 import { registerRateLimiting } from './middleware/rate-limit.js';
 
@@ -218,6 +219,7 @@ await app.register(webhookRoutes, { prefix: '/api' });
 await app.register(buddyRoutes, { prefix: '/api' });
 await app.register(handicapRoutes, { prefix: '/api/handicap' });
 await app.register(realtimeRoutes, { prefix: '/api/realtime' });
+await app.register(notificationRoutes);
 await app.register(adminRoutes);
 
 // Start server

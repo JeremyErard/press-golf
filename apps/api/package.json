@@ -31,10 +31,12 @@
     "fastify-raw-body": "^4.3.0",
     "ioredis": "^5.9.1",
     "stripe": "^20.1.0",
+    "web-push": "^3.6.7",
     "zod": "^4.2.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^4.0.16",
     "prisma": "^5.0.0",
     "tsx": "^4.0.0",

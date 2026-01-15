@@ -9,6 +9,7 @@ import {
   CreditCard,
   LogOut,
   Crown,
+  Bell,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, Button, Badge, ListItem, ListItemGroup, SectionHeader } from "@/components/ui";
@@ -142,6 +143,12 @@ export default function ProfilePage() {
                   ? "Payment issue"
                   : "Subscription required"
               }
+            />
+            <ListItem
+              href="/profile/notifications"
+              icon={<Bell className="h-5 w-5 text-muted" />}
+              title="Notifications"
+              subtitle="Push notification settings"
             />
           </ListItemGroup>
         </div>

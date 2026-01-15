@@ -450,6 +450,34 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ scores }),
     }, token),
+
+  // Push Notifications
+  getVapidKey: () =>
+    apiRequest<{ publicKey: string }>("/notifications/vapid-key", {}),
+
+  getNotificationStatus: (token: string) =>
+    apiRequest<NotificationStatus>("/notifications/status", {}, token),
+
+  subscribeToNotifications: (token: string, subscription: PushSubscriptionData) =>
+    apiRequest<{ subscription: PushSubscriptionRecord; updated: boolean }>("/notifications/subscribe", {
+      method: "POST",
+      body: JSON.stringify(subscription),
+    }, token),
+
+  unsubscribeFromNotifications: (token: string, endpoint: string) =>
+    apiRequest<{ success: boolean }>("/notifications/unsubscribe", {
+      method: "DELETE",
+      body: JSON.stringify({ endpoint }),
+    }, token),
+
+  getNotificationPreferences: (token: string) =>
+    apiRequest<NotificationPreferences>("/notifications/preferences", {}, token),
+
+  updateNotificationPreferences: (token: string, prefs: Partial<NotificationPreferences>) =>
+    apiRequest<NotificationPreferences>("/notifications/preferences", {
+      method: "PUT",
+      body: JSON.stringify(prefs),
+    }, token),
 };
 
 // Types
@@ -935,4 +963,39 @@ export interface PaymentMethod {
   handle: string;
   isPreferred: boolean;
   createdAt: string;
+}
+
+// Push Notification types
+export interface NotificationStatus {
+  available: boolean;
+  subscribed: boolean;
+  subscriptionCount: number;
+}
+
+export interface PushSubscriptionData {
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+  userAgent?: string;
+}
+
+export interface PushSubscriptionRecord {
+  id: string;
+  userId: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  userAgent?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationPreferences {
+  roundInvites: boolean;
+  gameInvites: boolean;
+  scoreUpdates: boolean;
+  teeTimeReminders: boolean;
+  settlementUpdates: boolean;
 }

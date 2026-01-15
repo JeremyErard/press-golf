@@ -155,3 +155,136 @@ self.addEventListener('sync', (event) => {
     console.log('Background sync triggered for scores');
   }
 });
+
+// ============================================================================
+// Push Notification Handlers
+// ============================================================================
+
+// Handle incoming push notifications
+self.addEventListener('push', (event) => {
+  if (!event.data) {
+    console.log('[SW] Push received but no data');
+    return;
+  }
+
+  let data;
+  try {
+    data = event.data.json();
+  } catch (e) {
+    console.error('[SW] Failed to parse push data:', e);
+    return;
+  }
+
+  const {
+    type,
+    title,
+    body,
+    icon = '/icons/icon-192x192.png',
+    badge = '/icons/icon-72x72.png',
+    tag,
+    data: notificationData = {},
+  } = data;
+
+  // Build notification options based on type
+  const options = {
+    body,
+    icon,
+    badge,
+    tag: tag || type, // Group notifications by type
+    renotify: true,
+    requireInteraction: type === 'round_invite' || type === 'game_invite',
+    data: {
+      type,
+      url: notificationData.url || '/',
+      ...notificationData,
+    },
+    vibrate: [100, 50, 100],
+  };
+
+  // Add actions based on notification type
+  switch (type) {
+    case 'round_invite':
+      options.actions = [
+        { action: 'view', title: 'View Round' },
+        { action: 'dismiss', title: 'Dismiss' },
+      ];
+      break;
+    case 'game_invite':
+      options.actions = [
+        { action: 'view', title: 'View Game' },
+        { action: 'dismiss', title: 'Dismiss' },
+      ];
+      break;
+    case 'score_update':
+      options.actions = [
+        { action: 'view', title: 'View Scores' },
+      ];
+      break;
+    case 'tee_time_reminder':
+      options.actions = [
+        { action: 'view', title: 'View Round' },
+      ];
+      break;
+    case 'settlement':
+      options.actions = [
+        { action: 'view', title: 'View Settlement' },
+      ];
+      break;
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+// Handle notification click events
+self.addEventListener('notificationclick', (event) => {
+  const notification = event.notification;
+  const action = event.action;
+  const data = notification.data || {};
+
+  // Close the notification
+  notification.close();
+
+  // If user clicked dismiss, don't do anything else
+  if (action === 'dismiss') {
+    return;
+  }
+
+  // Determine the URL to open
+  const urlToOpen = data.url || '/';
+
+  event.waitUntil(
+    // Check if there's already a window open
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((windowClients) => {
+        // Try to find an existing window with the app
+        for (const client of windowClients) {
+          const clientUrl = new URL(client.url);
+          // If we find a window with our app, focus it and navigate
+          if (clientUrl.origin === self.location.origin) {
+            return client.focus().then((focusedClient) => {
+              // Navigate to the notification URL
+              if (focusedClient.navigate) {
+                return focusedClient.navigate(urlToOpen);
+              }
+              // Fallback: post message to navigate
+              focusedClient.postMessage({
+                type: 'NOTIFICATION_CLICK',
+                url: urlToOpen,
+              });
+              return focusedClient;
+            });
+          }
+        }
+        // No existing window, open a new one
+        return clients.openWindow(urlToOpen);
+      })
+  );
+});
+
+// Handle notification close events (for analytics)
+self.addEventListener('notificationclose', (event) => {
+  const data = event.notification.data || {};
+  console.log('[SW] Notification closed:', data.type);
+});
