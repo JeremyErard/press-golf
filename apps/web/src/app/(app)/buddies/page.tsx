@@ -3,25 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { Plus, Search, ChevronRight, UserPlus } from "lucide-react";
-import { Card, CardContent, Skeleton, Avatar, Badge, EmptyState, FAB } from "@/components/ui";
+import { Card, CardContent, Skeleton, Avatar, EmptyState, FAB } from "@/components/ui";
 import { Header } from "@/components/layout/header";
 import { api, type Buddy } from "@/lib/api";
 import { BuddyDetailSheet } from "@/components/buddies/buddy-detail-sheet";
 import { AddBuddySheet } from "@/components/buddies/add-buddy-sheet";
 import { HeadToHeadBadge } from "@/components/buddies/head-to-head-badge";
-
-function getSourceLabel(sourceType: Buddy["sourceType"]): string {
-  switch (sourceType) {
-    case "INVITE":
-      return "Via invite";
-    case "ROUND":
-      return "Played together";
-    case "MANUAL":
-      return "Added manually";
-    default:
-      return "";
-  }
-}
 
 export default function BuddiesPage() {
   const { getToken } = useAuth();

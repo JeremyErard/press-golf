@@ -207,13 +207,6 @@ function formatMoney(amount: number): string {
   return `${sign}$${Math.abs(amount).toFixed(0)}`;
 }
 
-function getPositionSuffix(position: number): string {
-  if (position === 1) return "st";
-  if (position === 2) return "nd";
-  if (position === 3) return "rd";
-  return "th";
-}
-
 export default function RoundDetailPage() {
   const params = useParams();
   const router = useRouter();
