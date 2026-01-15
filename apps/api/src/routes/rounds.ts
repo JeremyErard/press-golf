@@ -17,6 +17,8 @@ interface CreateRoundBody {
   courseId: string;
   teeId: string;
   date?: string;
+  groupId?: string;
+  challengeId?: string;
 }
 
 interface TeeTimeGroupBody {
@@ -126,7 +128,7 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
     preHandler: requireAuth,
   }, async (request, reply) => {
     const user = getUser(request);
-    const { courseId, teeId, date } = request.body;
+    const { courseId, teeId, date, groupId, challengeId } = request.body;
 
     // Check subscription status
     const subscription = await requireActiveSubscription(user.id as string);
@@ -166,6 +168,40 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
       );
     }
 
+    // Verify group if provided
+    if (groupId) {
+      const group = await prisma.group.findUnique({
+        where: { id: groupId },
+        include: { members: true },
+      });
+      if (!group) {
+        return notFound(reply, 'Group not found');
+      }
+      // Verify user is a member of the group
+      if (!group.members.some(m => m.userId === user.id)) {
+        return forbidden(reply, 'You are not a member of this group');
+      }
+    }
+
+    // Verify and update challenge if provided
+    let challenge = null;
+    if (challengeId) {
+      challenge = await prisma.challenge.findUnique({
+        where: { id: challengeId },
+      });
+      if (!challenge) {
+        return notFound(reply, 'Challenge not found');
+      }
+      // Verify user is a participant
+      if (challenge.challengerId !== user.id && challenge.challengedId !== user.id) {
+        return forbidden(reply, 'You are not a participant in this challenge');
+      }
+      // Verify challenge is accepted
+      if (challenge.status !== 'ACCEPTED') {
+        return badRequest(reply, 'Challenge must be accepted before starting a round');
+      }
+    }
+
     // Create round with creator as first player
     try {
       const round = await prisma.round.create({
@@ -174,6 +210,7 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
           teeId,
           date: date ? new Date(date) : new Date(),
           createdById: user.id as string,
+          groupId: groupId || null,
           players: {
             create: {
               userId: user.id as string,
@@ -194,6 +231,14 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
           },
         },
       });
+
+      // Update challenge with round ID if provided
+      if (challengeId) {
+        await prisma.challenge.update({
+          where: { id: challengeId },
+          data: { roundId: round.id },
+        });
+      }
 
       return {
         success: true,

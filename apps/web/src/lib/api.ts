@@ -488,6 +488,66 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(prefs),
     }, token),
+
+  // Groups
+  getGroups: (token: string) =>
+    apiRequest<Group[]>("/groups", {}, token),
+  createGroup: (token: string, data: { name: string; description?: string; memberIds?: string[] }) =>
+    apiRequest<Group>("/groups", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }, token),
+  getGroup: (token: string, id: string) =>
+    apiRequest<GroupDetail>(`/groups/${id}`, {}, token),
+  updateGroup: (token: string, id: string, data: { name?: string; description?: string }) =>
+    apiRequest<Group>(`/groups/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }, token),
+  deleteGroup: (token: string, id: string) =>
+    apiRequest<{ deleted: boolean }>(`/groups/${id}`, {
+      method: "DELETE",
+    }, token),
+  addGroupMember: (token: string, groupId: string, userId: string) =>
+    apiRequest<GroupMember>(`/groups/${groupId}/members`, {
+      method: "POST",
+      body: JSON.stringify({ userId }),
+    }, token),
+  removeGroupMember: (token: string, groupId: string, memberId: string) =>
+    apiRequest<{ removed: boolean }>(`/groups/${groupId}/members/${memberId}`, {
+      method: "DELETE",
+    }, token),
+  getGroupLeaderboard: (token: string, groupId: string) =>
+    apiRequest<GroupLeaderboard>(`/groups/${groupId}/leaderboard`, {}, token),
+  getGroupRounds: (token: string, groupId: string, limit?: number) =>
+    apiRequest<GroupRound[]>(`/groups/${groupId}/rounds${limit ? `?limit=${limit}` : ""}`, {}, token),
+
+  // Challenges
+  getChallenges: (token: string) =>
+    apiRequest<ChallengesResponse>("/challenges", {}, token),
+  createChallenge: (token: string, data: CreateChallengeInput) =>
+    apiRequest<Challenge>("/challenges", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }, token),
+  getChallenge: (token: string, id: string) =>
+    apiRequest<ChallengeDetail>(`/challenges/${id}`, {}, token),
+  acceptChallenge: (token: string, id: string) =>
+    apiRequest<Challenge>(`/challenges/${id}/accept`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }, token),
+  declineChallenge: (token: string, id: string) =>
+    apiRequest<Challenge>(`/challenges/${id}/decline`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }, token),
+  cancelChallenge: (token: string, id: string) =>
+    apiRequest<{ deleted: boolean }>(`/challenges/${id}`, {
+      method: "DELETE",
+    }, token),
+  getPendingChallengeCount: (token: string) =>
+    apiRequest<{ count: number }>("/challenges/pending/count", {}, token),
 };
 
 // Types
@@ -731,6 +791,8 @@ export interface CreateRoundInput {
   courseId: string;
   teeId: string;
   date?: string;
+  groupId?: string;
+  challengeId?: string;
 }
 
 export interface CreateCourseInput {
@@ -1129,4 +1191,138 @@ export interface RoundSummary {
   winner: { userId: string; earnings: number } | null;
   myEarnings: number;
   settlements: RoundSummarySettlement[];
+}
+
+// Group types
+export type GroupRole = "OWNER" | "MEMBER";
+
+export interface GroupMember {
+  id: string;
+  userId: string;
+  role: GroupRole;
+  joinedAt: string;
+  user: {
+    id: string;
+    displayName?: string;
+    firstName?: string;
+    avatarUrl?: string;
+    handicapIndex?: number;
+  };
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  createdById: string;
+  createdAt: string;
+  members: GroupMember[];
+  _count?: {
+    members: number;
+    rounds: number;
+  };
+}
+
+export interface GroupDetail extends Group {
+  createdBy: {
+    id: string;
+    displayName?: string;
+    firstName?: string;
+    avatarUrl?: string;
+  };
+}
+
+export interface GroupLeaderboardMember {
+  rank: number;
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+  roundsPlayed: number;
+  netEarnings: number;
+  wins: number;
+  losses: number;
+}
+
+export interface GroupLeaderboard {
+  groupId: string;
+  groupName: string;
+  totalRounds: number;
+  members: GroupLeaderboardMember[];
+}
+
+export interface GroupRound {
+  id: string;
+  date: string;
+  status: "SETUP" | "ACTIVE" | "COMPLETED";
+  course: {
+    id: string;
+    name: string;
+  };
+  games: {
+    type: GameType;
+    betAmount: number;
+  }[];
+  playerCount: number;
+}
+
+// Challenge types
+export type ChallengeStatus = "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED" | "COMPLETED";
+
+export interface Challenge {
+  id: string;
+  gameType: GameType;
+  betAmount: number;
+  proposedDate?: string;
+  courseId?: string;
+  courseName?: string;
+  message?: string;
+  status: ChallengeStatus;
+  roundId?: string;
+  createdAt: string;
+  respondedAt?: string;
+  direction: "sent" | "received";
+  opponent: {
+    id: string;
+    displayName?: string;
+    firstName?: string;
+    avatarUrl?: string;
+  };
+}
+
+export interface ChallengeDetail extends Challenge {
+  challenger: {
+    id: string;
+    displayName?: string;
+    firstName?: string;
+    avatarUrl?: string;
+  };
+  challenged: {
+    id: string;
+    displayName?: string;
+    firstName?: string;
+    avatarUrl?: string;
+  };
+  course?: {
+    id: string;
+    name: string;
+  };
+  round?: {
+    id: string;
+    status: string;
+  };
+}
+
+export interface ChallengesResponse {
+  pending: Challenge[];
+  accepted: Challenge[];
+  completed: Challenge[];
+}
+
+export interface CreateChallengeInput {
+  challengedId: string;
+  gameType: GameType;
+  betAmount: number;
+  proposedDate?: string;
+  courseId?: string;
+  message?: string;
 }

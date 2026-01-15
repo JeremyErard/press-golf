@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { Trash2 } from "lucide-react";
+import { Swords, Trash2 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -16,6 +16,7 @@ import {
 import { api, type Buddy } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 import { HeadToHeadBadge } from "./head-to-head-badge";
+import { CreateChallengeSheet } from "@/components/challenges/create-challenge-sheet";
 
 interface BuddyDetailSheetProps {
   buddy: Buddy | null;
@@ -55,6 +56,7 @@ export function BuddyDetailSheet({
   const [nickname, setNickname] = useState(buddy?.nickname || "");
   const [isSaving, setIsSaving] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [showChallengeSheet, setShowChallengeSheet] = useState(false);
 
   // Update nickname state when buddy changes
   if (buddy && nickname !== (buddy.nickname || "") && !isSaving) {
@@ -154,6 +156,14 @@ export function BuddyDetailSheet({
           <div className="space-y-3 pt-4">
             <Button
               className="w-full"
+              variant="outline"
+              onClick={() => setShowChallengeSheet(true)}
+            >
+              <Swords className="h-4 w-4 mr-2" />
+              Challenge
+            </Button>
+            <Button
+              className="w-full"
               onClick={handleSave}
               disabled={!hasChanges || isSaving}
             >
@@ -171,6 +181,18 @@ export function BuddyDetailSheet({
           </div>
         </div>
       </SheetContent>
+
+      {/* Challenge Sheet */}
+      <CreateChallengeSheet
+        open={showChallengeSheet}
+        onClose={() => setShowChallengeSheet(false)}
+        onChallengeCreated={() => {
+          setShowChallengeSheet(false);
+          onClose();
+        }}
+        buddies={buddy ? [buddy] : []}
+        preselectedBuddyId={buddy?.user.id}
+      />
     </Sheet>
   );
 }

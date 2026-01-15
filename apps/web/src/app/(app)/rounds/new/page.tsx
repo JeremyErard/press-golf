@@ -4,10 +4,10 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import Image from "next/image";
-import { ChevronRight, ChevronDown, Check, Crown } from "lucide-react";
+import { ChevronRight, ChevronDown, Check, Crown, Users, Swords } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Skeleton, Input } from "@/components/ui";
-import { api, type Tee, type CourseDetail, type BillingStatus } from "@/lib/api";
+import { api, type Tee, type CourseDetail, type BillingStatus, type GroupDetail, type ChallengeDetail } from "@/lib/api";
 import { getTeeColor, formatCourseName } from "@/lib/utils";
 
 type Step = "tee" | "confirm";
@@ -47,6 +47,8 @@ export default function NewRoundPage() {
   const { getToken } = useAuth();
 
   const courseId = searchParams.get("courseId");
+  const groupId = searchParams.get("groupId");
+  const challengeId = searchParams.get("challengeId");
 
   const [step, setStep] = useState<Step>("tee");
   const [course, setCourse] = useState<CourseDetail | null>(null);
@@ -57,6 +59,8 @@ export default function NewRoundPage() {
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [checkingSubscription, setCheckingSubscription] = useState(true);
+  const [group, setGroup] = useState<GroupDetail | null>(null);
+  const [challenge, setChallenge] = useState<ChallengeDetail | null>(null);
 
   // Check subscription status
   useEffect(() => {
@@ -106,6 +110,46 @@ export default function NewRoundPage() {
     fetchCourse();
   }, [courseId, getToken, router]);
 
+  // Fetch group details if provided
+  useEffect(() => {
+    async function fetchGroup() {
+      if (!groupId) return;
+
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const data = await api.getGroup(token, groupId);
+        setGroup(data);
+      } catch (error) {
+        console.error("Failed to fetch group:", error);
+      }
+    }
+
+    fetchGroup();
+  }, [groupId, getToken]);
+
+  // Fetch challenge details if provided
+  useEffect(() => {
+    async function fetchChallenge() {
+      if (!challengeId) return;
+
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const data = await api.getChallenge(token, challengeId);
+        setChallenge(data);
+        // Set the proposed date from challenge if available
+        if (data.proposedDate) {
+          setSelectedDate(data.proposedDate.split("T")[0]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch challenge:", error);
+      }
+    }
+
+    fetchChallenge();
+  }, [challengeId, getToken]);
+
   // Categorize tees into primary and alternate
   const { primary: primaryTees, alternate: alternateTees } = useMemo(() => {
     if (!course?.tees) return { primary: [], alternate: [] };
@@ -129,6 +173,8 @@ export default function NewRoundPage() {
         courseId: course.id,
         teeId: selectedTee.id,
         date: selectedDate,
+        groupId: groupId || undefined,
+        challengeId: challengeId || undefined,
       });
 
       router.push(`/rounds/${round.id}`);
@@ -338,6 +384,37 @@ export default function NewRoundPage() {
             {/* Step: Confirm */}
             {step === "confirm" && selectedTee && (
               <div className="space-y-lg">
+                {/* Group/Challenge Info Banners */}
+                {group && (
+                  <Card className="bg-brand/10 border-brand/30">
+                    <CardContent className="p-md flex items-center gap-md">
+                      <div className="h-10 w-10 rounded-full bg-brand/20 flex items-center justify-center flex-shrink-0">
+                        <Users className="h-5 w-5 text-brand" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-muted">Playing with group</p>
+                        <p className="font-semibold text-foreground truncate">{group.name}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {challenge && (
+                  <Card className="bg-amber-500/10 border-amber-500/30">
+                    <CardContent className="p-md flex items-center gap-md">
+                      <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                        <Swords className="h-5 w-5 text-amber-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-muted">Challenge vs</p>
+                        <p className="font-semibold text-foreground truncate">
+                          {challenge.opponent.displayName || challenge.opponent.firstName || "Opponent"}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Course Card with Hero Backdrop */}
                 <Card className="relative overflow-hidden rounded-xl">
                   <div className="absolute inset-0">

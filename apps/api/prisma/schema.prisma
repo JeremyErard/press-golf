@@ -68,6 +68,10 @@ model User {
   pushSubscriptions    PushSubscription[]
   notificationPrefs    NotificationPreferences?
   handicapHistory      HandicapHistory[]
+  groupsCreated        Group[]        @relation("GroupsCreated")
+  groupMemberships     GroupMember[]
+  challengesSent       Challenge[]    @relation("ChallengesSent")
+  challengesReceived   Challenge[]    @relation("ChallengesReceived")
 
   @@index([clerkId])
   @@index([email])
@@ -173,6 +177,7 @@ model Course {
   holes       Hole[]
   rounds      Round[]
   homeCourses HomeCourse[]
+  challenges  Challenge[]
 
   @@index([name])
   @@index([state])
@@ -248,23 +253,27 @@ model Round {
   status      RoundStatus @default(SETUP)
   inviteCode  String      @unique @default(cuid())
   createdById String
+  groupId     String?     // Optional: round played with a group
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
   course        Course          @relation(fields: [courseId], references: [id])
   tee           Tee             @relation(fields: [teeId], references: [id])
   createdBy     User            @relation("RoundsCreated", fields: [createdById], references: [id])
+  group         Group?          @relation(fields: [groupId], references: [id])
   players       RoundPlayer[]
   games         Game[]
   settlements   Settlement[]
   invites       Invite[]
   handicapApprovals HandicapApproval[]
   teeTimeGroups TeeTimeGroup[]
+  challenges    Challenge[]
 
   @@index([courseId])
   @@index([createdById])
   @@index([inviteCode])
   @@index([status])
+  @@index([groupId])
 }
 
 enum RoundStatus {
@@ -621,4 +630,82 @@ model HandicapHistory {
 
   @@index([userId])
   @@index([userId, createdAt])
+}
+
+// ===================
+// GROUPS (Persistent Foursomes)
+// ===================
+
+model Group {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  createdById String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  createdBy   User          @relation("GroupsCreated", fields: [createdById], references: [id])
+  members     GroupMember[]
+  rounds      Round[]
+
+  @@index([createdById])
+}
+
+model GroupMember {
+  id        String    @id @default(cuid())
+  groupId   String
+  userId    String
+  role      GroupRole @default(MEMBER)
+  joinedAt  DateTime  @default(now())
+
+  group     Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@index([groupId])
+}
+
+enum GroupRole {
+  OWNER
+  MEMBER
+}
+
+// ===================
+// CHALLENGES (Betting Challenges)
+// ===================
+
+model Challenge {
+  id           String          @id @default(cuid())
+  challengerId String
+  challengedId String
+  gameType     GameType
+  betAmount    Decimal         @db.Decimal(10, 2)
+  proposedDate DateTime?
+  courseId     String?
+  message      String?
+  status       ChallengeStatus @default(PENDING)
+  roundId      String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  respondedAt  DateTime?
+
+  challenger   User    @relation("ChallengesSent", fields: [challengerId], references: [id])
+  challenged   User    @relation("ChallengesReceived", fields: [challengedId], references: [id])
+  course       Course? @relation(fields: [courseId], references: [id])
+  round        Round?  @relation(fields: [roundId], references: [id])
+
+  @@index([challengerId])
+  @@index([challengedId])
+  @@index([status])
+  @@index([courseId])
+  @@index([roundId])
+}
+
+enum ChallengeStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  COMPLETED
 }
