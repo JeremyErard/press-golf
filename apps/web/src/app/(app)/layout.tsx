@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { OnboardingCheck } from "@/components/handicap/onboarding-check";
+import { SessionKeepAlive } from "@/components/auth/session-keep-alive";
 import { registerServiceWorker, setupInstallPrompt } from "@/lib/pwa";
 
 export default function AppLayout({
@@ -36,6 +37,7 @@ export default function AppLayout({
 
   return (
     <OnboardingCheck>
+      <SessionKeepAlive />
       <div className={`min-h-screen relative ${isOnboarding ? "" : "pb-20"}`}>
         {/* Subtle fairway texture background */}
         <div className="fixed inset-0 -z-10">
