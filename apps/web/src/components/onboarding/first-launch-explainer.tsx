@@ -58,12 +58,12 @@ function ScreenshotMockup({ src, alt }: { src: string; alt: string }) {
     <div className="relative w-64 sm:w-72 mx-auto">
       {/* Phone frame */}
       <div className="bg-black/80 rounded-[2.5rem] p-2 shadow-2xl border border-white/20">
-        <div className="rounded-[2rem] overflow-hidden relative" style={{ aspectRatio: '9/19.5' }}>
+        <div className="rounded-[2rem] overflow-hidden relative bg-black" style={{ aspectRatio: '9/19.5' }}>
           <Image
             src={src}
             alt={alt}
             fill
-            className="object-cover object-top"
+            className="object-contain"
             sizes="288px"
           />
         </div>
