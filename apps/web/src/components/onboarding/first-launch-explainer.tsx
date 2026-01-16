@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui";
-import { ChevronRight, DollarSign, Users, Trophy, Flag } from "lucide-react";
+import { ChevronRight, Flag } from "lucide-react";
 import Image from "next/image";
 
 interface FirstLaunchExplainerProps {
@@ -115,16 +115,14 @@ function ScorecardMockup() {
                 <div className="bg-[#0a0f14] p-1 text-center text-white/40">Par</div>
                 <div className="bg-[#0a0f14] p-1 text-center text-white/40">You</div>
                 <div className="bg-[#0a0f14] p-1 text-center text-white/40">+/-</div>
-                {holes.map((h) => (
-                  <>
-                    <div key={`hole-${h.hole}`} className="bg-[#0a0f14] p-1 text-center text-white font-medium">{h.hole}</div>
-                    <div key={`par-${h.hole}`} className="bg-[#0a0f14] p-1 text-center text-white/60">{h.par}</div>
-                    <div key={`score-${h.hole}`} className="bg-[#0a0f14] p-1 text-center text-white font-bold">{h.score}</div>
+                {holes.map((h) => [
+                    <div key={`hole-${h.hole}`} className="bg-[#0a0f14] p-1 text-center text-white font-medium">{h.hole}</div>,
+                    <div key={`par-${h.hole}`} className="bg-[#0a0f14] p-1 text-center text-white/60">{h.par}</div>,
+                    <div key={`score-${h.hole}`} className="bg-[#0a0f14] p-1 text-center text-white font-bold">{h.score}</div>,
                     <div key={`diff-${h.hole}`} className={`bg-[#0a0f14] p-1 text-center font-medium ${h.score < h.par ? 'text-brand' : h.score > h.par ? 'text-error' : 'text-white/40'}`}>
                       {h.score - h.par === 0 ? 'E' : h.score - h.par > 0 ? `+${h.score - h.par}` : h.score - h.par}
-                    </div>
-                  </>
-                ))}
+                    </div>,
+                ])}
               </div>
             </div>
             <div className="flex items-center justify-between px-1">
