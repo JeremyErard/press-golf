@@ -92,7 +92,7 @@ export function FirstLaunchExplainer({ onComplete }: FirstLaunchExplainerProps) 
   const isFirstScreen = currentScreen === 0;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black">
+    <div className="fixed inset-0 z-[100] bg-black" style={{ minHeight: '100dvh' }}>
       {/* Background image with gradient overlay */}
       <div className="absolute inset-0">
         <Image
@@ -139,7 +139,7 @@ export function FirstLaunchExplainer({ onComplete }: FirstLaunchExplainerProps) 
         </div>
 
         {/* Bottom section - Text and CTA */}
-        <div className="px-8 pb-12">
+        <div className="px-8" style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }}>
           {/* Text content */}
           <div className="text-center mb-8">
             {!isFirstScreen && (
