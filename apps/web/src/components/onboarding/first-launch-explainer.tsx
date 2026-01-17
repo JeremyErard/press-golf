@@ -139,7 +139,7 @@ export function FirstLaunchExplainer({ onComplete }: FirstLaunchExplainerProps) 
         </div>
 
         {/* Bottom section - Text and CTA - overlaps phone bezel on screenshot screens */}
-        <div className={`px-8 relative z-10 ${!isFirstScreen ? '-mt-20' : ''}`} style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }}>
+        <div className={`px-8 relative z-10 ${!isFirstScreen ? '-mt-36' : ''}`} style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }}>
           {/* Text content */}
           <div className="text-center mb-8">
             {!isFirstScreen && (
