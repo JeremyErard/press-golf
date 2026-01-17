@@ -120,7 +120,7 @@ export function FirstLaunchExplainer({ onComplete }: FirstLaunchExplainerProps) 
       {/* Content */}
       <div className="relative h-full flex flex-col">
         {/* Top section - Mockup or Logo */}
-        <div className="flex-1 flex items-center justify-center pt-16 pb-8">
+        <div className={`flex-1 flex items-center justify-center pt-12 ${isFirstScreen ? 'pb-8' : 'pb-0'}`}>
           {isFirstScreen ? (
             <div className="text-center animate-fade-in">
               <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-brand/20 backdrop-blur-sm border border-brand/30 flex items-center justify-center">
@@ -138,8 +138,8 @@ export function FirstLaunchExplainer({ onComplete }: FirstLaunchExplainerProps) 
           ) : null}
         </div>
 
-        {/* Bottom section - Text and CTA */}
-        <div className="px-8" style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }}>
+        {/* Bottom section - Text and CTA - overlaps phone bezel on screenshot screens */}
+        <div className={`px-8 relative z-10 ${!isFirstScreen ? '-mt-20' : ''}`} style={{ paddingBottom: 'calc(3rem + env(safe-area-inset-bottom, 0px))' }}>
           {/* Text content */}
           <div className="text-center mb-8">
             {!isFirstScreen && (
