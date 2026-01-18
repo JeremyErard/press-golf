@@ -72,6 +72,7 @@ model User {
   groupMemberships     GroupMember[]
   challengesSent       Challenge[]    @relation("ChallengesSent")
   challengesReceived   Challenge[]    @relation("ChallengesReceived")
+  dotsAchievements     DotsAchievement[]
 
   @@index([clerkId])
   @@index([email])
@@ -257,6 +258,10 @@ model Round {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
+  // Dots (side bet achievements) settings
+  dotsEnabled Boolean  @default(false)
+  dotsAmount  Decimal? @db.Decimal(10, 2) // $ per dot
+
   course        Course          @relation(fields: [courseId], references: [id])
   tee           Tee             @relation(fields: [teeId], references: [id])
   createdBy     User            @relation("RoundsCreated", fields: [createdById], references: [id])
@@ -268,6 +273,7 @@ model Round {
   handicapApprovals HandicapApproval[]
   teeTimeGroups TeeTimeGroup[]
   challenges    Challenge[]
+  dotsAchievements DotsAchievement[]
 
   @@index([courseId])
   @@index([createdById])
@@ -708,4 +714,30 @@ enum ChallengeStatus {
   DECLINED
   EXPIRED
   COMPLETED
+}
+
+// ===================
+// DOTS (Side Bet Achievements)
+// ===================
+
+enum DotsType {
+  GREENIE  // Closest to pin on par 3
+  SANDY    // Up-and-down from bunker (par or better)
+  POLEY    // One-putt
+}
+
+model DotsAchievement {
+  id         String   @id @default(cuid())
+  roundId    String
+  holeNumber Int
+  type       DotsType
+  userId     String
+  createdAt  DateTime @default(now())
+
+  round Round @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([roundId, holeNumber, type]) // One winner per achievement per hole
+  @@index([roundId])
+  @@index([userId])
 }

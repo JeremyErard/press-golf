@@ -7,6 +7,7 @@ import { badRequest, notFound, forbidden, sendError, ErrorCodes } from '../lib/e
 import { emitScoreUpdate, emitPlayerJoined } from './realtime.js';
 import { uploadScorecardPhoto, validateImage } from '../lib/blob.js';
 import { notifyScoreUpdate } from '../lib/notifications.js';
+import { dotsRoutes } from './dots.js';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -19,6 +20,8 @@ interface CreateRoundBody {
   date?: string;
   groupId?: string;
   challengeId?: string;
+  dotsEnabled?: boolean;
+  dotsAmount?: number;
 }
 
 interface TeeTimeGroupBody {
@@ -128,7 +131,7 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
     preHandler: requireAuth,
   }, async (request, reply) => {
     const user = getUser(request);
-    const { courseId, teeId, date, groupId, challengeId } = request.body;
+    const { courseId, teeId, date, groupId, challengeId, dotsEnabled, dotsAmount } = request.body;
 
     // Check subscription status
     const subscription = await requireActiveSubscription(user.id as string);
@@ -211,6 +214,8 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
           date: date ? new Date(date) : new Date(),
           createdById: user.id as string,
           groupId: groupId || null,
+          dotsEnabled: dotsEnabled ?? false,
+          dotsAmount: dotsAmount ?? null,
           players: {
             create: {
               userId: user.id as string,
@@ -666,14 +671,14 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
 
   // =====================
   // PATCH /api/rounds/:id
-  // Update round details (date only, and only in SETUP status)
+  // Update round details (date, dots settings, only in SETUP status)
   // =====================
-  app.patch<{ Params: { id: string }; Body: { date?: string } }>('/:id', {
+  app.patch<{ Params: { id: string }; Body: { date?: string; dotsEnabled?: boolean; dotsAmount?: number | null } }>('/:id', {
     preHandler: requireAuth,
   }, async (request, reply) => {
     const user = getUser(request);
     const { id } = request.params;
-    const { date } = request.body;
+    const { date, dotsEnabled, dotsAmount } = request.body;
 
     const round = await prisma.round.findUnique({
       where: { id },
@@ -702,10 +707,17 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    // Validate dotsAmount if provided
+    if (dotsAmount !== undefined && dotsAmount !== null && dotsAmount < 0) {
+      return badRequest(reply, 'Dots amount cannot be negative');
+    }
+
     const updatedRound = await prisma.round.update({
       where: { id },
       data: {
         ...(parsedDate && { date: parsedDate }),
+        ...(dotsEnabled !== undefined && { dotsEnabled }),
+        ...(dotsAmount !== undefined && { dotsAmount }),
       },
       include: {
         course: true,
@@ -1564,4 +1576,7 @@ Confidence should be: high, medium, or low`,
       },
     });
   });
+
+  // Register dots routes (sub-routes of rounds)
+  await app.register(dotsRoutes);
 };

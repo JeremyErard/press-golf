@@ -123,6 +123,24 @@ export const api = {
     apiRequest<{ deleted: boolean }>(`/rounds/${id}`, {
       method: "DELETE",
     }, token),
+  updateRound: (token: string, id: string, data: { date?: string; dotsEnabled?: boolean; dotsAmount?: number | null }) =>
+    apiRequest<RoundDetail>(`/rounds/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }, token),
+
+  // Dots (side bet achievements)
+  getDots: (token: string, roundId: string) =>
+    apiRequest<DotsData>(`/rounds/${roundId}/dots`, {}, token),
+  awardDot: (token: string, roundId: string, holeNumber: number, type: DotsType, userId: string) =>
+    apiRequest<DotsAchievement>(`/rounds/${roundId}/dots`, {
+      method: "POST",
+      body: JSON.stringify({ holeNumber, type, userId }),
+    }, token),
+  removeDot: (token: string, roundId: string, dotId: string) =>
+    apiRequest<{ deleted: boolean }>(`/rounds/${roundId}/dots/${dotId}`, {
+      method: "DELETE",
+    }, token),
 
   // Courses
   getCourses: (token: string) => apiRequest<Course[]>("/courses", {}, token),
@@ -578,6 +596,8 @@ export interface Round {
   status: "SETUP" | "ACTIVE" | "COMPLETED";
   inviteCode: string;
   createdById: string;
+  dotsEnabled?: boolean;
+  dotsAmount?: number | null;
   _count?: {
     players: number;
   };
@@ -677,6 +697,25 @@ export type GameType =
   | "VEGAS"
   | "SNAKE"
   | "BANKER";
+
+// Dots (side bet achievements)
+export type DotsType = "GREENIE" | "SANDY" | "POLEY";
+
+export interface DotsAchievement {
+  id: string;
+  roundId: string;
+  holeNumber: number;
+  type: DotsType;
+  userId: string;
+  userName?: string | null;
+  createdAt: string;
+}
+
+export interface DotsData {
+  dotsEnabled: boolean;
+  dotsAmount: number | null;
+  achievements: DotsAchievement[];
+}
 
 export interface GameResult {
   id: string;
@@ -793,6 +832,8 @@ export interface CreateRoundInput {
   date?: string;
   groupId?: string;
   challengeId?: string;
+  dotsEnabled?: boolean;
+  dotsAmount?: number;
 }
 
 export interface CreateCourseInput {

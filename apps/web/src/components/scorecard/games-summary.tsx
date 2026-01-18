@@ -1,9 +1,9 @@
 "use client";
 
-import { TrendingUp, TrendingDown, Minus as TiedIcon, AlertCircle, DollarSign } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus as TiedIcon, AlertCircle, DollarSign, Target, CircleDot } from "lucide-react";
 import { Card, CardContent, Button, Badge } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import type { PressStatus, PressSegment } from "@/lib/api";
+import type { PressStatus, PressSegment, DotsAchievement } from "@/lib/api";
 
 interface GameLiveStatus {
   gameId: string;
@@ -45,12 +45,27 @@ interface GameLiveStatus {
   description?: string;
 }
 
+interface DotsStanding {
+  userId: string;
+  userName: string;
+  greenies: number;
+  sandies: number;
+  poleys: number;
+  totalDots: number;
+  netAmount: number;
+}
+
 interface GamesSummaryProps {
   games: GameLiveStatus[];
   pressStatus?: PressStatus[];
   onPress?: (gameId: string, segment: PressSegment, startHole: number, parentPressId?: string) => void;
   isPressing?: boolean;
   currentHole?: number;
+  // Dots props
+  dotsEnabled?: boolean;
+  dotsAmount?: number | null;
+  dots?: DotsAchievement[];
+  players?: Array<{ id: string; name: string }>;
 }
 
 // Format currency for display
@@ -78,8 +93,47 @@ export function GamesSummary({
   onPress,
   isPressing = false,
   currentHole = 1,
+  dotsEnabled = false,
+  dotsAmount,
+  dots = [],
+  players = [],
 }: GamesSummaryProps) {
-  if (games.length === 0) {
+  // Calculate dots standings
+  const calculateDotsStandings = (): DotsStanding[] => {
+    if (!dotsEnabled || !dots.length || !players.length) return [];
+
+    const standings: DotsStanding[] = players.map(player => {
+      const playerDots = dots.filter(d => d.userId === player.id);
+      const greenies = playerDots.filter(d => d.type === "GREENIE").length;
+      const sandies = playerDots.filter(d => d.type === "SANDY").length;
+      const poleys = playerDots.filter(d => d.type === "POLEY").length;
+      const totalDots = greenies + sandies + poleys;
+
+      // Calculate net amount (total dots * dotsAmount - average share)
+      const totalAllDots = dots.length;
+      const averageDots = totalAllDots / players.length;
+      const netDots = totalDots - averageDots;
+      const netAmount = netDots * (dotsAmount || 0);
+
+      return {
+        userId: player.id,
+        userName: player.name,
+        greenies,
+        sandies,
+        poleys,
+        totalDots,
+        netAmount: Math.round(netAmount * 100) / 100,
+      };
+    });
+
+    // Sort by total dots (most first)
+    return standings.sort((a, b) => b.totalDots - a.totalDots);
+  };
+
+  const dotsStandings = calculateDotsStandings();
+  const showDots = dotsEnabled && dots.length > 0;
+
+  if (games.length === 0 && !showDots) {
     return null;
   }
 
@@ -465,11 +519,72 @@ export function GamesSummary({
     );
   };
 
+  // Render dots standings section
+  const renderDotsSection = () => {
+    if (!showDots) return null;
+
+    return (
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">Dots</span>
+              <Badge variant="default" className="text-xs">
+                {formatBet(dotsAmount)}/dot
+              </Badge>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {dotsStandings.map((standing, index) => (
+              <div
+                key={standing.userId}
+                className={cn(
+                  "flex items-center justify-between py-2 px-3 rounded-lg",
+                  index === 0 && standing.netAmount > 0 ? "bg-success/10" : "bg-surface"
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium">{standing.userName}</span>
+                  <div className="flex items-center gap-1">
+                    {standing.greenies > 0 && (
+                      <span className="flex items-center gap-0.5 text-xs text-brand">
+                        <Target className="h-3 w-3" />×{standing.greenies}
+                      </span>
+                    )}
+                    {standing.sandies > 0 && (
+                      <span className="text-xs text-amber-400">
+                        🏖️×{standing.sandies}
+                      </span>
+                    )}
+                    {standing.poleys > 0 && (
+                      <span className="flex items-center gap-0.5 text-xs text-purple-400">
+                        <CircleDot className="h-3 w-3" />×{standing.poleys}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className={cn(
+                  "font-bold",
+                  standing.netAmount > 0 ? "text-success" : standing.netAmount < 0 ? "text-error" : "text-muted"
+                )}>
+                  {standing.netAmount >= 0 ? "+" : ""}{formatBet(standing.netAmount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-muted uppercase tracking-wide px-1">
-        Games
-      </h3>
+      {games.length > 0 && (
+        <h3 className="text-sm font-semibold text-muted uppercase tracking-wide px-1">
+          Games
+        </h3>
+      )}
 
       {games.map((game) => {
         const press = pressStatus.find((p) => p.gameId === game.gameId);
@@ -489,6 +604,9 @@ export function GamesSummary({
             return renderGenericGame(game);
         }
       })}
+
+      {/* Dots section */}
+      {renderDotsSection()}
     </div>
   );
 }

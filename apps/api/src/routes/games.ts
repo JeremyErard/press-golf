@@ -477,6 +477,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
             },
           },
         },
+        dotsAchievements: true,
       },
     });
 
@@ -730,6 +731,61 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
                     amount: Math.round(amount * 100) / 100,
                   });
                 }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Calculate dots settlements if dots are enabled
+    if (round.dotsEnabled && round.dotsAmount && round.dotsAchievements.length > 0) {
+      const dotsPerPlayer: Record<string, number> = {};
+
+      // Count dots per player
+      for (const player of round.players) {
+        dotsPerPlayer[player.userId] = 0;
+      }
+
+      for (const dot of round.dotsAchievements) {
+        dotsPerPlayer[dot.userId] = (dotsPerPlayer[dot.userId] || 0) + 1;
+      }
+
+      // Calculate total dots and average per player
+      const totalDots = round.dotsAchievements.length;
+      const playerCount = round.players.length;
+      const averageDots = totalDots / playerCount;
+      const dotsAmountPerDot = Number(round.dotsAmount);
+
+      // Create settlements: players below average pay players above average
+      for (const player of round.players) {
+        const playerDots = dotsPerPlayer[player.userId];
+        const netDots = playerDots - averageDots;
+
+        if (netDots < 0) {
+          // This player owes money (below average)
+          for (const winner of round.players) {
+            const winnerDots = dotsPerPlayer[winner.userId];
+            const winnerNetDots = winnerDots - averageDots;
+
+            if (winnerNetDots > 0 && winner.userId !== player.userId) {
+              // Calculate proportional amount
+              const totalWinnerNetDots = Object.values(dotsPerPlayer)
+                .filter(d => d - averageDots > 0)
+                .reduce((sum, d) => sum + (d - averageDots), 0);
+
+              // Guard against division by zero
+              if (totalWinnerNetDots === 0) continue;
+
+              const proportion = winnerNetDots / totalWinnerNetDots;
+              const amount = Math.abs(netDots) * dotsAmountPerDot * proportion;
+
+              if (amount > 0) {
+                settlements.push({
+                  fromUserId: player.userId,
+                  toUserId: winner.userId,
+                  amount: Math.round(amount * 100) / 100,
+                });
               }
             }
           }

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui";
+import { Target, CircleDot } from "lucide-react";
+import type { DotsType, DotsAchievement } from "@/lib/api";
 
 interface HoleData {
   holeNumber: number;
@@ -13,6 +15,7 @@ interface HoleData {
 
 interface PlayerData {
   id: string;
+  userId?: string;
   name: string;
   handicapIndex?: number;
   courseHandicap?: number;
@@ -25,6 +28,9 @@ interface ScorecardGridProps {
   currentPlayerId?: string; // To highlight current player's row
   onScoreClick?: (playerId: string, holeNumber: number, currentScore: number) => void;
   teeYardage?: number; // Total yardage for selected tee
+  // Dots (side bets)
+  dotsEnabled?: boolean;
+  dots?: DotsAchievement[];
 }
 
 export function ScorecardGrid({
@@ -34,8 +40,40 @@ export function ScorecardGrid({
   currentPlayerId,
   onScoreClick,
   teeYardage: _teeYardage,
+  dotsEnabled = false,
+  dots = [],
 }: ScorecardGridProps) {
   const [activeTab, setActiveTab] = useState<"front" | "back">("front");
+
+  // Helper to get dots for a player on a specific hole
+  const getDotsForPlayerHole = (playerId: string, holeNumber: number): DotsType[] => {
+    // Find the player's userId (dots use userId, not roundPlayer id)
+    const player = players.find(p => p.id === playerId);
+    const userId = player?.userId;
+    if (!userId) return [];
+
+    return dots
+      .filter(d => d.userId === userId && d.holeNumber === holeNumber)
+      .map(d => d.type);
+  };
+
+  // Render dots icons
+  const renderDotsIcons = (playerDots: DotsType[]) => {
+    if (playerDots.length === 0) return null;
+    return (
+      <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
+        {playerDots.includes("GREENIE") && (
+          <Target className="w-2.5 h-2.5 text-brand" />
+        )}
+        {playerDots.includes("SANDY") && (
+          <span className="text-[8px]">🏖️</span>
+        )}
+        {playerDots.includes("POLEY") && (
+          <CircleDot className="w-2.5 h-2.5 text-purple-400" />
+        )}
+      </span>
+    );
+  };
 
   // Split holes into front 9 and back 9
   const frontNine = holes.filter((h) => h.holeNumber <= 9).sort((a, b) => a.holeNumber - b.holeNumber);
@@ -210,6 +248,7 @@ export function ScorecardGrid({
                   {holeList.map((hole) => {
                     const score = scores[player.id]?.[hole.holeNumber];
                     const strokesGiven = getStrokesGiven(player.id, hole.handicapRank);
+                    const playerDots = dotsEnabled ? getDotsForPlayerHole(player.id, hole.holeNumber) : [];
 
                     return (
                       <td
@@ -240,6 +279,8 @@ export function ScorecardGrid({
                               ))}
                             </span>
                           )}
+                          {/* Dots icons */}
+                          {renderDotsIcons(playerDots)}
                         </div>
                       </td>
                     );

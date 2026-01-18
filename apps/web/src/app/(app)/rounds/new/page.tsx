@@ -4,9 +4,10 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import Image from "next/image";
-import { ChevronRight, ChevronDown, Check, Crown, Users, Swords } from "lucide-react";
+import { ChevronRight, ChevronDown, Check, Crown, Users, Swords, Target, CircleDot } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Skeleton, Input } from "@/components/ui";
+import { Toggle } from "@/components/ui/toggle";
 import { api, type Tee, type CourseDetail, type BillingStatus, type GroupDetail, type ChallengeDetail } from "@/lib/api";
 import { getTeeColor, formatCourseName } from "@/lib/utils";
 
@@ -61,6 +62,9 @@ export default function NewRoundPage() {
   const [checkingSubscription, setCheckingSubscription] = useState(true);
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [challenge, setChallenge] = useState<ChallengeDetail | null>(null);
+  // Dots (side bets) settings
+  const [dotsEnabled, setDotsEnabled] = useState(false);
+  const [dotsAmount, setDotsAmount] = useState<string>("1");
 
   // Check subscription status
   useEffect(() => {
@@ -175,6 +179,8 @@ export default function NewRoundPage() {
         date: selectedDate,
         groupId: groupId || undefined,
         challengeId: challengeId || undefined,
+        dotsEnabled,
+        dotsAmount: dotsEnabled ? parseFloat(dotsAmount) || 1 : undefined,
       });
 
       router.push(`/rounds/${round.id}`);
@@ -459,6 +465,52 @@ export default function NewRoundPage() {
                       value={selectedDate}
                       onChange={(e) => setSelectedDate(e.target.value)}
                     />
+                  </CardContent>
+                </Card>
+
+                {/* Dots (Side Bets) Card */}
+                <Card>
+                  <CardContent className="p-lg">
+                    <div className="flex items-start justify-between gap-md">
+                      <div className="flex items-start gap-md">
+                        <div className="h-10 w-10 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
+                          <Target className="h-5 w-5 text-brand" />
+                        </div>
+                        <div>
+                          <p className="font-medium">Dots</p>
+                          <p className="text-caption text-muted">Track Greenies, Sandies, and Poleys</p>
+                        </div>
+                      </div>
+                      <Toggle
+                        checked={dotsEnabled}
+                        onChange={setDotsEnabled}
+                        size="sm"
+                      />
+                    </div>
+                    {dotsEnabled && (
+                      <div className="mt-md pt-md border-t border-border">
+                        <div className="flex items-center gap-sm">
+                          <span className="text-muted text-sm">$</span>
+                          <Input
+                            type="number"
+                            min="0.25"
+                            step="0.25"
+                            value={dotsAmount}
+                            onChange={(e) => setDotsAmount(e.target.value)}
+                            className="w-20 text-center"
+                            placeholder="1"
+                          />
+                          <span className="text-muted text-sm">per dot</span>
+                        </div>
+                        <div className="mt-sm flex flex-wrap gap-sm">
+                          <span className="text-xs bg-brand/10 text-brand px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <CircleDot className="h-3 w-3" /> Greenie
+                          </span>
+                          <span className="text-xs bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full">Sandy</span>
+                          <span className="text-xs bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded-full">Poley</span>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 

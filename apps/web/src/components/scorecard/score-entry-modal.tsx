@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { X, Delete } from "lucide-react";
+import { X, Delete, Target, CircleDot } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -10,11 +10,12 @@ import {
   Button,
 } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import type { DotsType } from "@/lib/api";
 
 interface ScoreEntryModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (score: number) => void;
+  onSave: (score: number, dots?: DotsType[]) => void;
   playerName: string;
   holeNumber: number;
   par: number;
@@ -23,6 +24,9 @@ interface ScoreEntryModalProps {
   currentScore?: number;
   strokesGiven?: number;
   isSaving?: boolean;
+  // Dots (side bets) props
+  dotsEnabled?: boolean;
+  existingDots?: DotsType[];
 }
 
 export function ScoreEntryModal({
@@ -37,15 +41,33 @@ export function ScoreEntryModal({
   currentScore = 0,
   strokesGiven = 0,
   isSaving = false,
+  dotsEnabled = false,
+  existingDots = [],
 }: ScoreEntryModalProps) {
   const [score, setScore] = useState<string>(currentScore > 0 ? String(currentScore) : "");
+  const [selectedDots, setSelectedDots] = useState<Set<DotsType>>(new Set(existingDots));
 
-  // Reset score when modal opens with new data
+  // Reset score and dots when modal opens with new data
   useEffect(() => {
     if (open) {
       setScore(currentScore > 0 ? String(currentScore) : "");
+      setSelectedDots(new Set(existingDots));
     }
-  }, [open, currentScore]);
+  }, [open, currentScore, existingDots]);
+
+  const toggleDot = useCallback((dotType: DotsType) => {
+    setSelectedDots(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(dotType)) {
+        newSet.delete(dotType);
+      } else {
+        newSet.add(dotType);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const isPar3 = par === 3;
 
   const handleNumberPress = useCallback((num: number) => {
     setScore((prev) => {
@@ -76,9 +98,10 @@ export function ScoreEntryModal({
   const handleSave = useCallback(() => {
     const numScore = parseInt(score, 10);
     if (!isNaN(numScore) && numScore >= 1 && numScore <= 20) {
-      onSave(numScore);
+      const dotsArray = Array.from(selectedDots);
+      onSave(numScore, dotsArray.length > 0 ? dotsArray : undefined);
     }
-  }, [score, onSave]);
+  }, [score, selectedDots, onSave]);
 
   const numericScore = parseInt(score, 10) || 0;
   const isValidScore = numericScore >= 1 && numericScore <= 20;
@@ -142,6 +165,64 @@ export function ScoreEntryModal({
               )}
             </div>
           </div>
+
+          {/* Dots (side bets) */}
+          {dotsEnabled && (
+            <div className="px-2 py-2 rounded-xl bg-surface">
+              <p className="text-xs text-muted text-center mb-2">DOTS</p>
+              <div className="flex justify-center gap-2">
+                {/* Greenie - only on par 3 */}
+                <button
+                  onClick={() => isPar3 && toggleDot("GREENIE")}
+                  disabled={!isPar3}
+                  className={cn(
+                    "flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all",
+                    isPar3 ? "cursor-pointer" : "opacity-40 cursor-not-allowed",
+                    selectedDots.has("GREENIE")
+                      ? "bg-brand/20 ring-2 ring-brand"
+                      : "bg-elevated hover:bg-elevated/80"
+                  )}
+                >
+                  <Target className={cn("h-5 w-5", selectedDots.has("GREENIE") ? "text-brand" : "text-muted")} />
+                  <span className={cn("text-xs", selectedDots.has("GREENIE") ? "text-brand font-medium" : "text-muted")}>
+                    Greenie
+                  </span>
+                </button>
+
+                {/* Sandy */}
+                <button
+                  onClick={() => toggleDot("SANDY")}
+                  className={cn(
+                    "flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all cursor-pointer",
+                    selectedDots.has("SANDY")
+                      ? "bg-amber-500/20 ring-2 ring-amber-500"
+                      : "bg-elevated hover:bg-elevated/80"
+                  )}
+                >
+                  <span className={cn("text-lg", selectedDots.has("SANDY") ? "" : "grayscale")}>🏖️</span>
+                  <span className={cn("text-xs", selectedDots.has("SANDY") ? "text-amber-400 font-medium" : "text-muted")}>
+                    Sandy
+                  </span>
+                </button>
+
+                {/* Poley */}
+                <button
+                  onClick={() => toggleDot("POLEY")}
+                  className={cn(
+                    "flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all cursor-pointer",
+                    selectedDots.has("POLEY")
+                      ? "bg-purple-500/20 ring-2 ring-purple-500"
+                      : "bg-elevated hover:bg-elevated/80"
+                  )}
+                >
+                  <CircleDot className={cn("h-5 w-5", selectedDots.has("POLEY") ? "text-purple-400" : "text-muted")} />
+                  <span className={cn("text-xs", selectedDots.has("POLEY") ? "text-purple-400 font-medium" : "text-muted")}>
+                    Poley
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Quick score buttons */}
           <div className="flex justify-center gap-2">

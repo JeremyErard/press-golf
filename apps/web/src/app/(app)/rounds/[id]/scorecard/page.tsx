@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { Check, ChevronLeft } from "lucide-react";
 import { Button, Skeleton } from "@/components/ui";
-import { api, type RoundDetail, type PressStatus, type PressSegment, type GameLiveStatus } from "@/lib/api";
+import { api, type RoundDetail, type PressStatus, type PressSegment, type GameLiveStatus, type DotsType, type DotsAchievement } from "@/lib/api";
 import { ScorecardGrid } from "@/components/scorecard/scorecard-grid";
 import { ScoreEntryModal } from "@/components/scorecard/score-entry-modal";
 import { GamesSummary } from "@/components/scorecard/games-summary";
@@ -40,6 +40,7 @@ interface ScorecardState {
   scoreModalOpen: boolean;
   selectedScore: SelectedScore | null;
   localScores: Record<string, Record<number, number>>;
+  dots: DotsAchievement[];
 }
 
 type ScorecardAction =
@@ -53,7 +54,8 @@ type ScorecardAction =
   | { type: "CLOSE_SCORE_MODAL" }
   | { type: "INIT_LOCAL_SCORES"; payload: Record<string, Record<number, number>> }
   | { type: "UPDATE_LOCAL_SCORE"; payload: { playerId: string; holeNumber: number; score: number } }
-  | { type: "CLEAR_SELECTED_SCORE" };
+  | { type: "CLEAR_SELECTED_SCORE" }
+  | { type: "SET_DOTS"; payload: DotsAchievement[] };
 
 const initialState: ScorecardState = {
   round: null,
@@ -66,6 +68,7 @@ const initialState: ScorecardState = {
   scoreModalOpen: false,
   selectedScore: null,
   localScores: {},
+  dots: [],
 };
 
 function scorecardReducer(state: ScorecardState, action: ScorecardAction): ScorecardState {
@@ -101,6 +104,8 @@ function scorecardReducer(state: ScorecardState, action: ScorecardAction): Score
       };
     case "CLEAR_SELECTED_SCORE":
       return { ...state, selectedScore: null };
+    case "SET_DOTS":
+      return { ...state, dots: action.payload };
     default:
       return state;
   }
@@ -125,6 +130,7 @@ export default function ScorecardPage() {
     scoreModalOpen,
     selectedScore,
     localScores,
+    dots,
   } = state;
 
   // Fetch press status and game live status
@@ -142,6 +148,19 @@ export default function ScorecardPage() {
       dispatch({ type: "SET_GAME_STATUS", payload: { pressStatus: pressData, gameLiveStatus: liveData } });
     } catch (error) {
       console.error("Failed to fetch game status:", error);
+    }
+  }, [getToken, roundId]);
+
+  // Fetch dots achievements
+  const fetchDots = useCallback(async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const dotsData = await api.getDots(token, roundId);
+      dispatch({ type: "SET_DOTS", payload: dotsData.achievements });
+    } catch (error) {
+      console.error("Failed to fetch dots:", error);
     }
   }, [getToken, roundId]);
 
@@ -226,6 +245,11 @@ export default function ScorecardPage() {
 
         // Fetch game status
         fetchGameStatus();
+
+        // Fetch dots if enabled
+        if (data.dotsEnabled) {
+          fetchDots();
+        }
       } catch (error) {
         console.error("Failed to fetch round:", error);
       } finally {
@@ -234,7 +258,7 @@ export default function ScorecardPage() {
     }
 
     fetchRound();
-  }, [getToken, roundId, fetchGameStatus]);
+  }, [getToken, roundId, fetchGameStatus, fetchDots]);
 
   const handleScoreClick = useCallback(
     (playerId: string, holeNumber: number, currentScore: number) => {
@@ -244,10 +268,14 @@ export default function ScorecardPage() {
   );
 
   const handleScoreSave = useCallback(
-    async (newScore: number) => {
+    async (newScore: number, newDots?: DotsType[]) => {
       if (!selectedScore) return;
 
       const { playerId, holeNumber, currentScore } = selectedScore;
+
+      // Find the player's userId for dots API
+      const player = round?.players.find(p => p.id === playerId);
+      const playerUserId = player?.userId;
 
       // Optimistic update
       dispatch({ type: "UPDATE_LOCAL_SCORE", payload: { playerId, holeNumber, score: newScore } });
@@ -264,6 +292,43 @@ export default function ScorecardPage() {
           playerId,
         });
 
+        // Handle dots changes if dots are enabled
+        if (round?.dotsEnabled && playerUserId && newDots !== undefined) {
+          // Get existing dots for this player/hole
+          const existingDotsForHole = dots.filter(
+            d => d.userId === playerUserId && d.holeNumber === holeNumber
+          );
+          const existingDotTypes = existingDotsForHole.map(d => d.type);
+
+          // Find dots to add
+          const dotsToAdd = newDots.filter(dt => !existingDotTypes.includes(dt));
+          // Find dots to remove
+          const dotsToRemove = existingDotsForHole.filter(d => !newDots.includes(d.type));
+
+          // Add new dots
+          for (const dotType of dotsToAdd) {
+            try {
+              await api.awardDot(token, roundId, holeNumber, dotType, playerUserId);
+            } catch (e) {
+              console.error(`Failed to award ${dotType}:`, e);
+            }
+          }
+
+          // Remove dots
+          for (const dot of dotsToRemove) {
+            try {
+              await api.removeDot(token, roundId, dot.id);
+            } catch (e) {
+              console.error(`Failed to remove ${dot.type}:`, e);
+            }
+          }
+
+          // Refresh dots after changes
+          if (dotsToAdd.length > 0 || dotsToRemove.length > 0) {
+            fetchDots();
+          }
+        }
+
         // Refresh game status after score update
         fetchGameStatus();
       } catch (error) {
@@ -275,7 +340,7 @@ export default function ScorecardPage() {
         dispatch({ type: "SET_SAVING_SCORE", payload: null });
       }
     },
-    [getToken, roundId, selectedScore, fetchGameStatus]
+    [getToken, roundId, selectedScore, fetchGameStatus, fetchDots, round, dots]
   );
 
   const handlePress = useCallback(
@@ -355,6 +420,7 @@ export default function ScorecardPage() {
 
     return round.players.map((player) => ({
       id: player.id,
+      userId: player.userId,
       name: player.user.displayName || player.user.firstName || "Player",
       handicapIndex: player.user.handicapIndex,
       courseHandicap: player.courseHandicap ?? undefined,
@@ -480,6 +546,8 @@ export default function ScorecardPage() {
           scores={localScores}
           currentPlayerId={currentPlayer?.id}
           onScoreClick={handleScoreClick}
+          dotsEnabled={round.dotsEnabled}
+          dots={dots}
         />
 
         {/* Games Summary - Always Visible */}
@@ -490,6 +558,10 @@ export default function ScorecardPage() {
             onPress={handlePress}
             isPressing={isPressing}
             currentHole={1}
+            dotsEnabled={round.dotsEnabled}
+            dotsAmount={round.dotsAmount ? Number(round.dotsAmount) : undefined}
+            dots={dots}
+            players={round.players.map(p => ({ id: p.userId, name: p.user.displayName || p.user.firstName || "Player" }))}
           />
         )}
 
@@ -525,6 +597,17 @@ export default function ScorecardPage() {
           currentScore={selectedScore?.currentScore}
           strokesGiven={selectedHoleData.strokesGiven}
           isSaving={savingScore === `${selectedScore?.playerId}-${selectedScore?.holeNumber}`}
+          dotsEnabled={round.dotsEnabled}
+          existingDots={
+            round.dotsEnabled && selectedScore
+              ? dots
+                  .filter(d => {
+                    const player = round.players.find(p => p.id === selectedScore.playerId);
+                    return d.userId === player?.userId && d.holeNumber === selectedScore.holeNumber;
+                  })
+                  .map(d => d.type)
+              : []
+          }
         />
       )}
 

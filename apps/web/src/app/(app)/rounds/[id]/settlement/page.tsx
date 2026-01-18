@@ -10,10 +10,12 @@ import {
   ExternalLink,
   Check,
   Clock,
+  Target,
+  CircleDot,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
-import { api, type RoundDetail, type GameType, type ApiSettlement, type PaymentMethodType } from "@/lib/api";
+import { api, type RoundDetail, type GameType, type ApiSettlement, type PaymentMethodType, type DotsData } from "@/lib/api";
 import { formatMoney, cn } from "@/lib/utils";
 import { toast } from "@/components/ui/sonner";
 
@@ -38,6 +40,7 @@ export default function SettlementPage() {
 
   const [round, setRound] = useState<RoundDetail | null>(null);
   const [settlements, setSettlements] = useState<ApiSettlement[]>([]);
+  const [dotsData, setDotsData] = useState<DotsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
   const [confirmingPayment, setConfirmingPayment] = useState<string | null>(null);
@@ -55,6 +58,16 @@ export default function SettlementPage() {
 
         setRound(roundData);
         setSettlements(settlementsData);
+
+        // Fetch dots if enabled
+        if (roundData.dotsEnabled) {
+          try {
+            const dots = await api.getDots(token, roundId);
+            setDotsData(dots);
+          } catch (e) {
+            console.error("Failed to fetch dots:", e);
+          }
+        }
       } catch (error) {
         console.error("Failed to fetch data:", error);
         toast.error("Failed to load settlement data");
@@ -232,18 +245,85 @@ export default function SettlementPage() {
         <div>
           <h2 className="text-h3 font-semibold mb-md">Games Played</h2>
 
-          {round.games.length > 0 ? (
+          {round.games.length > 0 || (dotsData?.dotsEnabled && dotsData?.achievements?.length > 0) ? (
             <div className="flex flex-wrap gap-sm">
               {round.games.map((game) => (
                 <Badge key={game.id} variant="accent">
                   {gameTypeLabels[game.type]} ${Number(game.betAmount)}
                 </Badge>
               ))}
+              {dotsData?.dotsEnabled && dotsData?.achievements?.length > 0 && (
+                <Badge variant="accent">
+                  Dots ${Number(dotsData.dotsAmount)}
+                </Badge>
+              )}
             </div>
           ) : (
             <p className="text-muted text-caption">No games were played</p>
           )}
         </div>
+
+        {/* Dots Summary */}
+        {dotsData?.dotsEnabled && dotsData?.achievements?.length > 0 && (
+          <div>
+            <h2 className="text-h3 font-semibold mb-md">Dots Awarded</h2>
+            <Card>
+              <CardContent className="p-lg">
+                <div className="space-y-sm">
+                  {(() => {
+                    // Group dots by player
+                    const dotsByPlayer: Record<string, { name: string; greenies: number; sandies: number; poleys: number }> = {};
+
+                    dotsData.achievements.forEach(dot => {
+                      if (!dotsByPlayer[dot.userId]) {
+                        dotsByPlayer[dot.userId] = {
+                          name: dot.userName || "Unknown",
+                          greenies: 0,
+                          sandies: 0,
+                          poleys: 0,
+                        };
+                      }
+                      if (dot.type === "GREENIE") dotsByPlayer[dot.userId].greenies++;
+                      else if (dot.type === "SANDY") dotsByPlayer[dot.userId].sandies++;
+                      else if (dot.type === "POLEY") dotsByPlayer[dot.userId].poleys++;
+                    });
+
+                    return Object.entries(dotsByPlayer).map(([userId, data]) => {
+                      const totalDots = data.greenies + data.sandies + data.poleys;
+                      return (
+                        <div key={userId} className="flex items-center justify-between py-2 px-3 rounded-lg bg-surface">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-medium">{data.name}</span>
+                            <div className="flex items-center gap-2">
+                              {data.greenies > 0 && (
+                                <span className="flex items-center gap-0.5 text-xs text-brand">
+                                  <Target className="h-3 w-3" />×{data.greenies}
+                                </span>
+                              )}
+                              {data.sandies > 0 && (
+                                <span className="text-xs text-amber-400">
+                                  🏖️×{data.sandies}
+                                </span>
+                              )}
+                              {data.poleys > 0 && (
+                                <span className="flex items-center gap-0.5 text-xs text-purple-400">
+                                  <CircleDot className="h-3 w-3" />×{data.poleys}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-sm text-muted">
+                            {totalDots} dot{totalDots !== 1 ? "s" : ""}
+                          </span>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Settlements */}
         <div>
