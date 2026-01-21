@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { MapPin, Users, Play, Trophy } from "lucide-react";
 
 const steps = [
