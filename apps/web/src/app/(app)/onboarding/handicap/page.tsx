@@ -109,7 +109,7 @@ export default function HandicapOnboardingPage() {
   };
 
   const handleContinue = () => {
-    router.push("/");
+    router.push("/dashboard");
   };
 
   const handleBack = () => {

@@ -222,7 +222,7 @@ export default function OnboardingPage() {
       } else if (currentStep === 6) {
         // Mark onboarding complete and go to dashboard
         await api.completeOnboarding(token);
-        router.push("/");
+        router.push("/dashboard");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");

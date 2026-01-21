@@ -6,7 +6,7 @@ import { Home, Flag, MapPin, User, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Home", icon: Home },
+  { href: "/dashboard", label: "Home", icon: Home },
   { href: "/rounds", label: "Rounds", icon: Flag },
   { href: "/buddies", label: "Buddies", icon: Users },
   { href: "/courses", label: "Courses", icon: MapPin },
@@ -22,7 +22,7 @@ export function BottomNav() {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href ||
-            (item.href !== "/" && pathname.startsWith(item.href));
+            (item.href !== "/dashboard" && pathname.startsWith(item.href));
 
           return (
             <Link
