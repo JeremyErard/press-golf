@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Crown, Check, CreditCard } from "lucide-react";
+import { Crown, Check, CreditCard, LogIn, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui";
+import { useUserState } from "@/hooks/use-user-state";
 
 const benefits = [
   "10 game types included",
@@ -20,6 +21,8 @@ const paymentMethods = [
 ];
 
 export function CtaSection() {
+  const userState = useUserState();
+
   return (
     <section className="py-24 px-6 relative overflow-hidden">
       {/* Background */}
@@ -62,31 +65,70 @@ export function CtaSection() {
                 ))}
               </div>
 
-              {/* CTAs */}
+              {/* CTAs - Dynamic based on user state */}
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/sign-up">
-                  <Button
-                    className="w-full sm:w-auto h-14 px-8 text-base font-semibold shadow-lg shadow-brand/30"
-                    size="lg"
-                  >
-                    <Crown className="h-5 w-5 mr-2" />
-                    Start Free Trial
-                  </Button>
-                </Link>
-                <Link href="/sign-in">
-                  <Button
-                    variant="secondary"
-                    className="w-full sm:w-auto h-14 px-8 text-base font-semibold bg-white/10 hover:bg-white/20 border border-white/20"
-                    size="lg"
-                  >
-                    Sign In
-                  </Button>
-                </Link>
+                {userState === "loading" ? (
+                  <div className="h-14 w-48 bg-white/10 rounded-lg animate-pulse" />
+                ) : userState === "authenticated" ? (
+                  <Link href="/dashboard">
+                    <Button
+                      className="w-full sm:w-auto h-14 px-8 text-base font-semibold shadow-lg shadow-brand/30"
+                      size="lg"
+                    >
+                      <ArrowRight className="h-5 w-5 mr-2" />
+                      Go to Dashboard
+                    </Button>
+                  </Link>
+                ) : userState === "returning" ? (
+                  <>
+                    <Link href="/sign-in">
+                      <Button
+                        className="w-full sm:w-auto h-14 px-8 text-base font-semibold shadow-lg shadow-brand/30"
+                        size="lg"
+                      >
+                        <LogIn className="h-5 w-5 mr-2" />
+                        Welcome Back - Sign In
+                      </Button>
+                    </Link>
+                    <Link href="/sign-up">
+                      <Button
+                        variant="secondary"
+                        className="w-full sm:w-auto h-14 px-8 text-base font-semibold bg-white/10 hover:bg-white/20 border border-white/20"
+                        size="lg"
+                      >
+                        New Account
+                      </Button>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link href="/sign-up">
+                      <Button
+                        className="w-full sm:w-auto h-14 px-8 text-base font-semibold shadow-lg shadow-brand/30"
+                        size="lg"
+                      >
+                        <Crown className="h-5 w-5 mr-2" />
+                        Get Started - $2.49/mo
+                      </Button>
+                    </Link>
+                    <Link href="/sign-in">
+                      <Button
+                        variant="secondary"
+                        className="w-full sm:w-auto h-14 px-8 text-base font-semibold bg-white/10 hover:bg-white/20 border border-white/20"
+                        size="lg"
+                      >
+                        Sign In
+                      </Button>
+                    </Link>
+                  </>
+                )}
               </div>
 
-              <p className="text-sm text-white/40 mt-4">
-                $2.49/month after trial • Cancel anytime
-              </p>
+              {userState !== "authenticated" && (
+                <p className="text-sm text-white/40 mt-4">
+                  $2.49/month or $19.99/year • Cancel anytime
+                </p>
+              )}
             </div>
 
             {/* Right: Payment methods card */}

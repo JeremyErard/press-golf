@@ -34,6 +34,9 @@ coverage/
 # Prisma
 # Keep schema.prisma in git, ignore generated client in node_modules
 
+# Apple Keys (Sign in with Apple)
+.keys/
+
 # Expo
 *.jks
 *.p8
