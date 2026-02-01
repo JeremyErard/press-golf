@@ -81,21 +81,25 @@ export default function SettlementPage() {
 
   // Calculate user's position and settlement summary
   const settlementSummary = useMemo(() => {
-    if (!user) return { net: 0, owed: 0, receivable: 0, paidCount: 0, pendingCount: 0 };
+    if (!user) return { net: 0, owed: 0, receivable: 0, settledCount: 0, pendingCount: 0, totalCount: 0 };
 
-    let owed = 0;
-    let receivable = 0;
-    let paidCount = 0;
+    let owed = 0;        // Amount I still owe (not settled)
+    let receivable = 0;  // Amount owed to me (not settled)
+    let settledCount = 0;
     let pendingCount = 0;
 
     settlements.forEach(s => {
+      const isSettled = s.status === "SETTLED";
+
       if (s.toUserId === user.id) {
-        receivable += Number(s.amount);
-        if (s.status === "PAID") paidCount++;
+        // I'm the recipient
+        if (!isSettled) receivable += Number(s.amount);
+        if (isSettled) settledCount++;
         else pendingCount++;
       } else if (s.fromUserId === user.id) {
-        owed += Number(s.amount);
-        if (s.status === "PAID") paidCount++;
+        // I'm the payer
+        if (!isSettled) owed += Number(s.amount);
+        if (isSettled) settledCount++;
         else pendingCount++;
       }
     });
@@ -104,8 +108,9 @@ export default function SettlementPage() {
       net: receivable - owed,
       owed,
       receivable,
-      paidCount,
+      settledCount,
       pendingCount,
+      totalCount: settledCount + pendingCount,
     };
   }, [settlements, user]);
 
@@ -145,10 +150,32 @@ export default function SettlementPage() {
       setSettlements(prev =>
         prev.map(s => s.id === settlementId ? updated : s)
       );
-      toast.success("Payment marked as paid");
+      toast.success("Payment sent! Waiting for confirmation.");
     } catch (error) {
       console.error("Failed to mark settlement as paid:", error);
       toast.error("Failed to mark payment as paid");
+    } finally {
+      setMarkingPaid(null);
+    }
+  }, [getToken]);
+
+  const handleConfirmReceipt = useCallback(async (settlementId: string) => {
+    setMarkingPaid(settlementId);
+    setConfirmingPayment(null);
+    try {
+      const token = await getToken();
+      if (!token) return;
+
+      const updated = await api.confirmSettlement(token, settlementId);
+
+      // Update local state
+      setSettlements(prev =>
+        prev.map(s => s.id === settlementId ? updated : s)
+      );
+      toast.success("Payment confirmed! Settlement complete.");
+    } catch (error) {
+      console.error("Failed to confirm settlement:", error);
+      toast.error("Failed to confirm payment");
     } finally {
       setMarkingPaid(null);
     }
@@ -233,7 +260,7 @@ export default function SettlementPage() {
                 <div className="text-center flex-1 border-l border-border/50">
                   <p className="text-muted">Status</p>
                   <p className="font-semibold text-foreground">
-                    {settlementSummary.paidCount}/{settlementSummary.paidCount + settlementSummary.pendingCount} Paid
+                    {settlementSummary.settledCount}/{settlementSummary.totalCount} Settled
                   </p>
                 </div>
               </div>
@@ -358,6 +385,7 @@ export default function SettlementPage() {
                           <p
                             className={cn(
                               "text-h2 font-bold",
+                              settlement.status === "SETTLED" ? "text-muted" :
                               isOwed ? "text-error" : "text-success"
                             )}
                           >
@@ -365,13 +393,19 @@ export default function SettlementPage() {
                           </p>
                           <Badge
                             variant={
-                              settlement.status === "PAID" ? "success" : "warning"
+                              settlement.status === "SETTLED" ? "success" :
+                              settlement.status === "PAID" ? "warning" : "default"
                             }
                           >
-                            {settlement.status === "PAID" ? (
+                            {settlement.status === "SETTLED" ? (
                               <>
                                 <Check className="h-3 w-3 mr-1" />
-                                Paid
+                                Settled
+                              </>
+                            ) : settlement.status === "PAID" ? (
+                              <>
+                                <Clock className="h-3 w-3 mr-1" />
+                                Awaiting Confirmation
                               </>
                             ) : (
                               <>
@@ -383,7 +417,8 @@ export default function SettlementPage() {
                         </div>
                       </div>
 
-                      {isOwed && settlement.status !== "PAID" && (
+                      {/* PAYER VIEW: Show payment buttons and "I've Paid" when PENDING */}
+                      {isOwed && settlement.status === "PENDING" && (
                         <div className="space-y-sm">
                           {/* Payment method buttons */}
                           {settlement.toUser.paymentMethods.length > 0 ? (
@@ -423,7 +458,7 @@ export default function SettlementPage() {
                                   disabled={markingPaid === settlement.id}
                                 >
                                   <Check className="h-4 w-4 mr-1" />
-                                  {markingPaid === settlement.id ? "Confirming..." : "Yes, Paid"}
+                                  {markingPaid === settlement.id ? "Sending..." : "Yes, I've Paid"}
                                 </Button>
                                 <Button
                                   variant="secondary"
@@ -444,9 +479,71 @@ export default function SettlementPage() {
                               disabled={markingPaid === settlement.id}
                             >
                               <Check className="h-4 w-4 mr-1" />
-                              Mark as Paid
+                              I&apos;ve Paid
                             </Button>
                           )}
+                        </div>
+                      )}
+
+                      {/* PAYER VIEW: Show waiting message when PAID (awaiting recipient confirmation) */}
+                      {isOwed && settlement.status === "PAID" && (
+                        <div className="p-sm bg-surface rounded-md text-center">
+                          <p className="text-caption text-muted">
+                            Waiting for {otherName} to confirm receipt
+                          </p>
+                        </div>
+                      )}
+
+                      {/* RECIPIENT VIEW: Show "Confirm Received" when PAID */}
+                      {!isOwed && settlement.status === "PAID" && (
+                        <div className="space-y-sm">
+                          {confirmingPayment === settlement.id ? (
+                            <div className="p-sm bg-success/10 border border-success/30 rounded-md">
+                              <p className="text-caption text-success mb-sm">
+                                Confirm {otherName} paid you ${Number(settlement.amount).toFixed(2)}?
+                              </p>
+                              <div className="flex gap-sm">
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  className="flex-1"
+                                  onClick={() => handleConfirmReceipt(settlement.id)}
+                                  disabled={markingPaid === settlement.id}
+                                >
+                                  <Check className="h-4 w-4 mr-1" />
+                                  {markingPaid === settlement.id ? "Confirming..." : "Yes, Received"}
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  className="flex-1"
+                                  onClick={() => setConfirmingPayment(null)}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => setConfirmingPayment(settlement.id)}
+                              disabled={markingPaid === settlement.id}
+                            >
+                              <Check className="h-4 w-4 mr-1" />
+                              Confirm Payment Received
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* RECIPIENT VIEW: Show waiting message when PENDING */}
+                      {!isOwed && settlement.status === "PENDING" && (
+                        <div className="p-sm bg-surface rounded-md text-center">
+                          <p className="text-caption text-muted">
+                            Waiting for {otherName} to send payment
+                          </p>
                         </div>
                       )}
                     </CardContent>

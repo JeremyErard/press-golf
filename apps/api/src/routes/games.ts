@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { requireAuth, getUser } from '../lib/auth.js';
 import { badRequest, notFound, forbidden, sendError, ErrorCodes } from '../lib/errors.js';
 import { Decimal } from '@prisma/client/runtime/library';
-import { notifyGameInvite, notifySettlementUpdate } from '../lib/notifications.js';
+import { notifyGameInvite, notifySettlementUpdate, notifyPaymentSent } from '../lib/notifications.js';
 
 interface CreateGameBody {
   roundId: string;
@@ -924,7 +924,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         const toUserName = await getUserName(settlement.toUserId);
 
         // Notify the person who owes money
-        notifySettlementUpdate(
+        await notifySettlementUpdate(
           settlement.fromUserId,
           toUserName,
           Number(settlement.amount),
@@ -933,7 +933,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         );
 
         // Notify the person who is owed money
-        notifySettlementUpdate(
+        await notifySettlementUpdate(
           settlement.toUserId,
           fromUserName,
           Number(settlement.amount),
@@ -1011,7 +1011,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
 
   // =====================
   // PATCH /api/games/settlements/:id/paid
-  // Mark a settlement as paid
+  // Payer marks a settlement as paid (step 1 of 2)
   // =====================
   app.patch<{ Params: { id: string } }>('/settlements/:id/paid', {
     preHandler: requireAuth,
@@ -1021,20 +1021,23 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
 
     const settlement = await prisma.settlement.findUnique({
       where: { id },
+      include: {
+        fromUser: { select: { displayName: true, firstName: true } },
+        toUser: { select: { displayName: true, firstName: true } },
+      },
     });
 
     if (!settlement) {
       return notFound(reply, 'Settlement not found');
     }
 
-    // Only the recipient (person being paid) can confirm payment received
-    // This prevents the payer from falsely marking their own debt as paid
-    if (settlement.toUserId !== (user.id as string)) {
-      return forbidden(reply, 'Only the payment recipient can confirm payment received');
+    // Only the payer (person who owes) can mark as paid
+    if (settlement.fromUserId !== (user.id as string)) {
+      return forbidden(reply, 'Only the payer can mark a settlement as paid');
     }
 
     // Prevent marking already-paid settlements
-    if (settlement.status === 'PAID') {
+    if (settlement.status !== 'PENDING') {
       return badRequest(reply, 'Settlement has already been marked as paid');
     }
 
@@ -1046,7 +1049,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       amount: Number(settlement.amount),
       fromUserId: settlement.fromUserId,
       toUserId: settlement.toUserId,
-    }, 'User attempting to mark settlement as paid');
+    }, 'Payer attempting to mark settlement as paid');
 
     // Use updateMany with status check for race condition protection
     const result = await prisma.settlement.updateMany({
@@ -1081,7 +1084,102 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       userId: user.id,
       amount: Number(settlement.amount),
       roundId: settlement.roundId,
-    }, 'Settlement marked as paid');
+    }, 'Settlement marked as paid by payer');
+
+    // Notify recipient that payer says they've paid
+    const payerName = settlement.fromUser.displayName ||
+      settlement.fromUser.firstName ||
+      'A player';
+
+    await notifyPaymentSent(
+      settlement.toUserId,
+      payerName,
+      Number(settlement.amount),
+      settlement.roundId
+    );
+
+    return {
+      success: true,
+      data: updated,
+    };
+  });
+
+  // =====================
+  // PATCH /api/games/settlements/:id/confirm
+  // Recipient confirms payment received (step 2 of 2)
+  // =====================
+  app.patch<{ Params: { id: string } }>('/settlements/:id/confirm', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const { id } = request.params;
+
+    const settlement = await prisma.settlement.findUnique({
+      where: { id },
+    });
+
+    if (!settlement) {
+      return notFound(reply, 'Settlement not found');
+    }
+
+    // Only the recipient (person being paid) can confirm
+    if (settlement.toUserId !== (user.id as string)) {
+      return forbidden(reply, 'Only the payment recipient can confirm payment received');
+    }
+
+    // Must be in PAID status (payer has marked as paid)
+    if (settlement.status === 'PENDING') {
+      return badRequest(reply, 'Payment has not been marked as sent yet');
+    }
+
+    if (settlement.status === 'SETTLED') {
+      return badRequest(reply, 'Settlement has already been confirmed');
+    }
+
+    // Audit log: confirmation attempt
+    request.log.info({
+      action: 'SETTLEMENT_CONFIRM_ATTEMPT',
+      settlementId: id,
+      userId: user.id,
+      amount: Number(settlement.amount),
+      fromUserId: settlement.fromUserId,
+      toUserId: settlement.toUserId,
+    }, 'Recipient attempting to confirm settlement');
+
+    // Use updateMany with status check for race condition protection
+    const result = await prisma.settlement.updateMany({
+      where: {
+        id,
+        status: 'PAID', // Only update if in PAID status
+      },
+      data: {
+        status: 'SETTLED',
+        confirmedAt: new Date(),
+      },
+    });
+
+    if (result.count === 0) {
+      request.log.warn({
+        action: 'SETTLEMENT_CONFIRM_RACE',
+        settlementId: id,
+        userId: user.id,
+      }, 'Settlement already updated by another request');
+      return badRequest(reply, 'Settlement was already updated by another request');
+    }
+
+    // Fetch the updated settlement
+    const updated = await prisma.settlement.findUnique({
+      where: { id },
+    });
+
+    // Audit log: successful confirmation
+    request.log.info({
+      action: 'SETTLEMENT_CONFIRMED',
+      settlementId: id,
+      userId: user.id,
+      amount: Number(settlement.amount),
+      roundId: settlement.roundId,
+    }, 'Settlement confirmed by recipient');
 
     return {
       success: true,

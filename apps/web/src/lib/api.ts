@@ -241,6 +241,10 @@ export const api = {
     apiRequest<ApiSettlement>(`/games/settlements/${settlementId}/paid`, {
       method: "PATCH",
     }, token),
+  confirmSettlement: (token: string, settlementId: string) =>
+    apiRequest<ApiSettlement>(`/games/settlements/${settlementId}/confirm`, {
+      method: "PATCH",
+    }, token),
   finalizeRound: (token: string, roundId: string) =>
     apiRequest<{ settlements: ApiSettlement[] }>(`/games/${roundId}/finalize`, {
       method: "POST",
@@ -786,8 +790,9 @@ export interface ApiSettlement {
   fromUserId: string;
   toUserId: string;
   amount: number;
-  status: "PENDING" | "PAID" | "DISPUTED";
+  status: "PENDING" | "PAID" | "SETTLED" | "DISPUTED";
   paidAt?: string;
+  confirmedAt?: string;
   fromUser: {
     id: string;
     displayName: string | null;

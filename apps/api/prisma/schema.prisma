@@ -516,7 +516,8 @@ model Settlement {
   toUserId    String
   amount      Decimal          @db.Decimal(10, 2)
   status      SettlementStatus @default(PENDING)
-  paidAt      DateTime?
+  paidAt      DateTime?        // When payer marked as paid
+  confirmedAt DateTime?        // When recipient confirmed receipt
   createdAt   DateTime         @default(now())
 
   round    Round @relation(fields: [roundId], references: [id], onDelete: Cascade)
@@ -530,9 +531,10 @@ model Settlement {
 }
 
 enum SettlementStatus {
-  PENDING
-  PAID
-  DISPUTED
+  PENDING   // Awaiting payment
+  PAID      // Payer marked as paid, awaiting recipient confirmation
+  SETTLED   // Recipient confirmed receipt - complete
+  DISPUTED  // Payment dispute
 }
 
 // ===================

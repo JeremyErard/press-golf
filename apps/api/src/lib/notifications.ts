@@ -237,7 +237,26 @@ export async function notifySettlementUpdate(
     title: "Settlement Update",
     body,
     data: {
-      url: `/round/${roundId}/settle`,
+      url: `/rounds/${roundId}/settlement`,
+      roundId,
+    },
+  });
+}
+
+export async function notifyPaymentSent(
+  recipientUserId: string,
+  payerName: string,
+  amount: number,
+  roundId: string
+): Promise<void> {
+  const formattedAmount = amount.toFixed(2);
+
+  await sendNotificationToUser(recipientUserId, {
+    type: "settlement",
+    title: "Payment Received",
+    body: `${payerName} says they paid you $${formattedAmount}. Tap to confirm.`,
+    data: {
+      url: `/rounds/${roundId}/settlement`,
       roundId,
     },
   });
