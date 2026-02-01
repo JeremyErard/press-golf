@@ -15,5 +15,15 @@
     "sourceMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "src/lib/comprehensive-edge-test.ts",
+    "src/lib/extreme-16-player-test.ts",
+    "src/lib/settlement-flow-test.ts",
+    "src/lib/settlement-notification-test.ts",
+    "src/lib/settlement-verification.ts"
+  ]
 }
