@@ -16,7 +16,7 @@ export function ReturningUserTracker() {
       // Set cookie that expires in 1 year
       const expiryDate = new Date();
       expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-      document.cookie = `press_returning_user=true; expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax`;
+      document.cookie = `press_returning_user=true; expires=${expiryDate.toUTCString()}; path=/; SameSite=Lax; Secure`;
     }
   }, [isSignedIn]);
 

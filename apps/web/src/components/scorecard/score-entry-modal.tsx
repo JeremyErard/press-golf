@@ -97,14 +97,14 @@ export function ScoreEntryModal({
 
   const handleSave = useCallback(() => {
     const numScore = parseInt(score, 10);
-    if (!isNaN(numScore) && numScore >= 1 && numScore <= 20) {
+    if (!isNaN(numScore) && numScore >= 1 && numScore <= 15) {
       const dotsArray = Array.from(selectedDots);
       onSave(numScore, dotsArray.length > 0 ? dotsArray : undefined);
     }
   }, [score, selectedDots, onSave]);
 
   const numericScore = parseInt(score, 10) || 0;
-  const isValidScore = numericScore >= 1 && numericScore <= 20;
+  const isValidScore = numericScore >= 1 && numericScore <= 15;
   const diff = numericScore - par;
 
   const getScoreLabel = () => {

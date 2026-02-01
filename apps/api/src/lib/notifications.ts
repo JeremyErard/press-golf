@@ -18,7 +18,8 @@ export type NotificationType =
   | "game_invite"
   | "score_update"
   | "tee_time_reminder"
-  | "settlement";
+  | "settlement"
+  | "challenge";
 
 interface NotificationPayload {
   type: NotificationType;
@@ -254,6 +255,58 @@ export async function notifyPlayerJoinedRound(
     data: {
       url: `/rounds/${roundId}`,
       roundId,
+    },
+  });
+}
+
+export async function notifyChallengeReceived(
+  challengedUserId: string,
+  challengerName: string,
+  gameType: string,
+  betAmount: number,
+  challengeId: string
+): Promise<void> {
+  await sendNotificationToUser(challengedUserId, {
+    type: "challenge",
+    title: "New Challenge!",
+    body: `${challengerName} challenged you to ${gameType} for $${betAmount}`,
+    data: {
+      url: `/challenges`,
+      challengeId,
+    },
+  });
+}
+
+export async function notifyChallengeAccepted(
+  challengerUserId: string,
+  challengedName: string,
+  gameType: string,
+  challengeId: string
+): Promise<void> {
+  await sendNotificationToUser(challengerUserId, {
+    type: "challenge",
+    title: "Challenge Accepted!",
+    body: `${challengedName} accepted your ${gameType} challenge`,
+    data: {
+      url: `/challenges`,
+      challengeId,
+    },
+  });
+}
+
+export async function notifyChallengeDeclined(
+  challengerUserId: string,
+  challengedName: string,
+  gameType: string,
+  challengeId: string
+): Promise<void> {
+  await sendNotificationToUser(challengerUserId, {
+    type: "challenge",
+    title: "Challenge Declined",
+    body: `${challengedName} declined your ${gameType} challenge`,
+    data: {
+      url: `/challenges`,
+      challengeId,
     },
   });
 }

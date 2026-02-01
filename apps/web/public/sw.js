@@ -1,5 +1,5 @@
 // Service Worker for Press PWA
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `press-${CACHE_VERSION}`;
 const STATIC_CACHE_NAME = `press-static-${CACHE_VERSION}`;
 
@@ -141,18 +141,160 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Handle messages from the app
+// Handle messages from the app (note: additional handlers added in offline score section)
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
 
-// Background sync for offline score updates (future enhancement)
+// ============================================================================
+// IndexedDB for Offline Score Storage
+// ============================================================================
+
+const DB_NAME = 'press-offline-db';
+const DB_VERSION = 1;
+const SCORE_STORE = 'pending-scores';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(SCORE_STORE)) {
+        const store = db.createObjectStore(SCORE_STORE, { keyPath: 'id', autoIncrement: true });
+        store.createIndex('roundId', 'roundId', { unique: false });
+        store.createIndex('timestamp', 'timestamp', { unique: false });
+      }
+    };
+  });
+}
+
+async function savePendingScore(scoreData) {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(SCORE_STORE, 'readwrite');
+    const store = tx.objectStore(SCORE_STORE);
+
+    await new Promise((resolve, reject) => {
+      const request = store.add({
+        ...scoreData,
+        timestamp: Date.now(),
+        synced: false
+      });
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+
+    db.close();
+    console.log('[SW] Score saved to offline queue');
+    return true;
+  } catch (error) {
+    console.error('[SW] Failed to save score offline:', error);
+    return false;
+  }
+}
+
+async function getPendingScores() {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(SCORE_STORE, 'readonly');
+    const store = tx.objectStore(SCORE_STORE);
+
+    const scores = await new Promise((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    db.close();
+    return scores.filter(s => !s.synced);
+  } catch (error) {
+    console.error('[SW] Failed to get pending scores:', error);
+    return [];
+  }
+}
+
+async function markScoreSynced(id) {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(SCORE_STORE, 'readwrite');
+    const store = tx.objectStore(SCORE_STORE);
+
+    await new Promise((resolve, reject) => {
+      const request = store.delete(id);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+
+    db.close();
+  } catch (error) {
+    console.error('[SW] Failed to mark score synced:', error);
+  }
+}
+
+async function syncPendingScores() {
+  const pendingScores = await getPendingScores();
+
+  if (pendingScores.length === 0) {
+    console.log('[SW] No pending scores to sync');
+    return;
+  }
+
+  console.log(`[SW] Syncing ${pendingScores.length} pending scores`);
+
+  for (const score of pendingScores) {
+    try {
+      const response = await fetch(score.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': score.authHeader
+        },
+        body: JSON.stringify(score.body),
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        await markScoreSynced(score.id);
+        console.log(`[SW] Score synced successfully: hole ${score.body.holeNumber}`);
+
+        // Notify the app that a score was synced
+        const clients = await self.clients.matchAll();
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'SCORE_SYNCED',
+            data: score.body
+          });
+        });
+      } else {
+        console.error(`[SW] Failed to sync score: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('[SW] Error syncing score:', error);
+    }
+  }
+}
+
+// Background sync for offline score updates
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-scores') {
-    // TODO: Implement score syncing when back online
-    console.log('Background sync triggered for scores');
+    event.waitUntil(syncPendingScores());
+  }
+});
+
+// Handle messages from the app to queue offline scores
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'QUEUE_SCORE') {
+    event.waitUntil(savePendingScore(event.data.scoreData));
+  }
+
+  if (event.data && event.data.type === 'SYNC_NOW') {
+    event.waitUntil(syncPendingScores());
   }
 });
 

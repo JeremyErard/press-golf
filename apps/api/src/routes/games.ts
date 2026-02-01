@@ -1027,9 +1027,10 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       return notFound(reply, 'Settlement not found');
     }
 
-    // Either party can mark as paid
-    if (settlement.fromUserId !== (user.id as string) && settlement.toUserId !== (user.id as string)) {
-      return forbidden(reply, 'You are not part of this settlement');
+    // Only the recipient (person being paid) can confirm payment received
+    // This prevents the payer from falsely marking their own debt as paid
+    if (settlement.toUserId !== (user.id as string)) {
+      return forbidden(reply, 'Only the payment recipient can confirm payment received');
     }
 
     // Prevent marking already-paid settlements
@@ -2241,6 +2242,24 @@ function calculateNines(
   // In 2 players: Winner=6, Loser=3 (tie=4.5 each)
 
   const numPlayers = players.length;
+
+  // Guard against invalid player counts (Nines requires 2-4 players)
+  if (numPlayers < 2 || numPlayers > 4) {
+    return {
+      holeResults: [],
+      standings: players.map(p => ({
+        userId: p.userId,
+        playerName: p.user?.displayName || p.user?.firstName || 'Unknown',
+        frontPoints: 0,
+        backPoints: 0,
+        totalPoints: 0,
+        frontMoney: 0,
+        backMoney: 0,
+        totalMoney: 0,
+      })),
+      error: `Nines requires 2-4 players, found ${numPlayers}`,
+    };
+  }
   const POINTS_PER_HOLE = 9;
 
   const minHandicap = Math.min(...players.map(p => p.courseHandicap || 0));

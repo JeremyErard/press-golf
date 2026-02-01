@@ -40,6 +40,13 @@ async function request<T>(
 
   if (!response.ok || !json.success) {
     const error = json.error || { code: "UNKNOWN", message: "An error occurred" };
+
+    // Handle 401 (unauthorized) - redirect to sign-in
+    if (response.status === 401 && typeof window !== "undefined") {
+      window.location.href = "/sign-in?expired=true";
+      throw new ApiError("SESSION_EXPIRED", "Your session has expired. Please sign in again.", 401);
+    }
+
     throw new ApiError(error.code, error.message, response.status);
   }
 

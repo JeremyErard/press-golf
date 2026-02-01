@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { toast } from "@/components/ui/sonner";
 
 /**
  * SessionKeepAlive - Maintains session freshness on mobile devices
@@ -10,7 +11,7 @@ import { useAuth } from "@clerk/nextjs";
  * by refreshing the Clerk session whenever:
  * 1. The page becomes visible again (user returns to app)
  * 2. The app regains focus
- * 3. Periodically while the app is active (every 30 minutes)
+ * 3. Periodically while the app is active (every 15 minutes)
  *
  * This keeps the session cookie fresh and prevents unexpected logouts
  * during long golf rounds (4-6 hours).
@@ -18,19 +19,35 @@ import { useAuth } from "@clerk/nextjs";
 export function SessionKeepAlive() {
   const { getToken, isSignedIn } = useAuth();
   const lastRefreshRef = useRef<number>(Date.now());
-  const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
+  const REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes
 
   useEffect(() => {
     if (!isSignedIn) return;
 
+    let consecutiveFailures = 0;
+
     const refreshSession = async () => {
       try {
         // Force a fresh token fetch, which refreshes the session cookie
-        await getToken({ skipCache: true });
+        const token = await getToken({ skipCache: true });
+        if (!token) {
+          throw new Error("No token returned");
+        }
         lastRefreshRef.current = Date.now();
+        consecutiveFailures = 0; // Reset on success
         console.log("[SessionKeepAlive] Session refreshed");
       } catch (error) {
         console.error("[SessionKeepAlive] Failed to refresh session:", error);
+        consecutiveFailures++;
+
+        // After 2 consecutive failures, notify user and redirect
+        if (consecutiveFailures >= 2) {
+          toast.error("Your session has expired. Please sign in again.");
+          // Small delay before redirect to show toast
+          setTimeout(() => {
+            window.location.href = "/sign-in?expired=true";
+          }, 1500);
+        }
       }
     };
 

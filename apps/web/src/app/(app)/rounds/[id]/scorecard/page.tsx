@@ -331,6 +331,9 @@ export default function ScorecardPage() {
 
         // Refresh game status after score update
         fetchGameStatus();
+
+        // Show success feedback
+        toast.success("Score saved");
       } catch (error) {
         console.error("Failed to save score:", error);
         toast.error("Failed to save score");

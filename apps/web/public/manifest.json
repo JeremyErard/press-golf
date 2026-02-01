@@ -64,7 +64,29 @@
       "purpose": "any"
     }
   ],
-  "screenshots": [],
+  "screenshots": [
+    {
+      "src": "/screenshots/dashboard.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Dashboard - Track your rounds and winnings"
+    },
+    {
+      "src": "/screenshots/scorecard.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Scorecard - Enter scores with one tap"
+    },
+    {
+      "src": "/screenshots/games.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Games - Nassau, Skins, Wolf and more"
+    }
+  ],
   "categories": ["sports", "games", "lifestyle"],
   "prefer_related_applications": false
 }

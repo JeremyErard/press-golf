@@ -1,7 +1,31 @@
-import { FastifyPluginAsync } from 'fastify';
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '../lib/prisma.js';
 import { Decimal } from '@prisma/client/runtime/library';
 import Anthropic from '@anthropic-ai/sdk';
+
+// Admin authentication - requires ADMIN_SECRET env var
+const ADMIN_SECRET = process.env.ADMIN_SECRET;
+
+async function requireAdminAuth(request: FastifyRequest, reply: FastifyReply) {
+  // Check for admin secret in header or query param
+  const headerSecret = request.headers['x-admin-secret'] as string | undefined;
+  const querySecret = (request.query as Record<string, string>)?.secret;
+  const providedSecret = headerSecret || querySecret;
+
+  if (!ADMIN_SECRET) {
+    return reply.code(503).send({
+      success: false,
+      error: { code: 'ADMIN_DISABLED', message: 'Admin endpoints are disabled (no ADMIN_SECRET configured)' },
+    });
+  }
+
+  if (providedSecret !== ADMIN_SECRET) {
+    return reply.code(401).send({
+      success: false,
+      error: { code: 'UNAUTHORIZED', message: 'Invalid or missing admin secret' },
+    });
+  }
+}
 
 const TEST_USERS = [
   { clerkId: 'test_alice_001', email: 'test.alice@press.golf', firstName: 'Alice', lastName: 'Test', displayName: 'Alice T', handicapIndex: 12.5 },
@@ -32,7 +56,7 @@ function randomPutts(): number {
 
 export const adminRoutes: FastifyPluginAsync = async (app) => {
   // Run integration test - creates test data and verifies calculations
-  app.get('/admin/integration-test', async (request, reply) => {
+  app.get('/admin/integration-test', { preHandler: requireAdminAuth }, async (request, reply) => {
     const results: string[] = [];
     const log = (msg: string) => results.push(msg);
 
@@ -438,7 +462,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Test Anthropic/Claude Vision integration
-  app.get('/admin/test-anthropic', async (request, reply) => {
+  app.get('/admin/test-anthropic', { preHandler: requireAdminAuth }, async (request, reply) => {
     try {
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (!apiKey) {
@@ -483,7 +507,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Cleanup test data
-  app.delete('/admin/test-data', async () => {
+  app.delete('/admin/test-data', { preHandler: requireAdminAuth }, async () => {
     try {
       // Delete test rounds
       const testRounds = await prisma.round.findMany({
@@ -521,7 +545,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Create a 16-player test round with multiple games between different player subsets
-  app.get('/admin/create-16-player-round', async (request, reply) => {
+  app.get('/admin/create-16-player-round', { preHandler: requireAdminAuth }, async (request, reply) => {
     const results: string[] = [];
     const log = (msg: string) => results.push(msg);
 
@@ -768,7 +792,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Add test players to an existing round
-  app.get('/admin/add-test-players/:roundId', async (request, reply) => {
+  app.get('/admin/add-test-players/:roundId', { preHandler: requireAdminAuth }, async (request, reply) => {
     const { roundId } = request.params as { roundId: string };
     const results: string[] = [];
     const log = (msg: string) => results.push(msg);
@@ -856,7 +880,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Add random test scores for all players on specified holes
-  app.get('/admin/add-test-scores/:roundId', async (request, reply) => {
+  app.get('/admin/add-test-scores/:roundId', { preHandler: requireAdminAuth }, async (request, reply) => {
     const { roundId } = request.params as { roundId: string };
     const { holes = '1' } = request.query as { holes?: string };
     const holeNumbers = holes.split(',').map(h => parseInt(h.trim(), 10)).filter(h => h >= 1 && h <= 18);
@@ -945,7 +969,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Get game status for a round (admin, no auth required)
-  app.get('/admin/game-status/:roundId', async (request, reply) => {
+  app.get('/admin/game-status/:roundId', { preHandler: requireAdminAuth }, async (request, reply) => {
     const { roundId } = request.params as { roundId: string };
 
     try {
@@ -1013,7 +1037,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Test game validation rules
-  app.get('/admin/test-game-validation', async (request, reply) => {
+  app.get('/admin/test-game-validation', { preHandler: requireAdminAuth }, async (request, reply) => {
     const results: { test: string; playerCount: number; gameType: string; expected: string; result: string; passed: boolean }[] = [];
 
     // Game validation rules (same as in games.ts)
@@ -1094,7 +1118,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Get detailed Nassau calculations for a round (no auth)
-  app.get('/admin/nassau-status/:roundId', async (request, reply) => {
+  app.get('/admin/nassau-status/:roundId', { preHandler: requireAdminAuth }, async (request, reply) => {
     const { roundId } = request.params as { roundId: string };
 
     try {
@@ -1223,7 +1247,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Create a proper 2-player Nassau test round with scores
-  app.get('/admin/create-nassau-test', async (request, reply) => {
+  app.get('/admin/create-nassau-test', { preHandler: requireAdminAuth }, async (request, reply) => {
     const results: string[] = [];
     const log = (msg: string) => results.push(msg);
 
@@ -1352,7 +1376,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Create a 4-player Wolf test round with scores
-  app.get('/admin/create-wolf-test', async (request, reply) => {
+  app.get('/admin/create-wolf-test', { preHandler: requireAdminAuth }, async (request, reply) => {
     const results: string[] = [];
     const log = (msg: string) => results.push(msg);
 
@@ -1501,7 +1525,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Create a Skins test round
-  app.get('/admin/create-skins-test', async (request, reply) => {
+  app.get('/admin/create-skins-test', { preHandler: requireAdminAuth }, async (request, reply) => {
     const results: string[] = [];
     const log = (msg: string) => results.push(msg);
 
@@ -1657,7 +1681,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Get Skins calculations for a round (no auth)
-  app.get('/admin/skins-status/:roundId', async (request, reply) => {
+  app.get('/admin/skins-status/:roundId', { preHandler: requireAdminAuth }, async (request, reply) => {
     const { roundId } = request.params as { roundId: string };
 
     try {
@@ -1795,7 +1819,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Create a Nassau round with Mike and a test player
-  app.get('/admin/create-nassau-with-mike', async (request, reply) => {
+  app.get('/admin/create-nassau-with-mike', { preHandler: requireAdminAuth }, async (request, reply) => {
     const results: string[] = [];
     const log = (msg: string) => results.push(msg);
 

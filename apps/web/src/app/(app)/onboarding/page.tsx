@@ -123,21 +123,23 @@ export default function OnboardingPage() {
     return () => {
       if (pollInterval) clearInterval(pollInterval);
     };
+  }, [getToken, clerkUser, checkoutSuccess, router]);
 
-    // Listen for PWA install prompt
-    const handleBeforeInstall = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
-
+  // Listen for PWA install prompt (separate effect to avoid dead code)
+  useEffect(() => {
     // Check if already installed
     if (window.matchMedia("(display-mode: standalone)").matches) {
       setIsInstalled(true);
     }
 
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
     return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
-  }, [getToken, clerkUser, checkoutSuccess, router]);
+  }, []);
 
   // Pre-fill profile from Clerk when moving to step 2
   useEffect(() => {

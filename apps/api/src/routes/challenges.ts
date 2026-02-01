@@ -3,6 +3,11 @@ import { prisma } from "../lib/prisma.js";
 import { requireAuth, getUser } from "../lib/auth.js";
 import { GameType, ChallengeStatus } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
+import {
+  notifyChallengeReceived,
+  notifyChallengeAccepted,
+  notifyChallengeDeclined,
+} from "../lib/notifications.js";
 
 const VALID_GAME_TYPES: GameType[] = [
   "NASSAU",
@@ -243,7 +248,20 @@ export default async function challengeRoutes(fastify: FastifyInstance) {
         },
       });
 
-      // TODO: Send push notification to challenged user
+      // Send push notification to challenged user
+      const challenger = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { displayName: true, firstName: true },
+      });
+      const challengerName = challenger?.displayName || challenger?.firstName || "Someone";
+
+      notifyChallengeReceived(
+        challengedId,
+        challengerName,
+        gameType,
+        betAmount,
+        challenge.id
+      ).catch((err) => console.error("[Challenges] Notification error:", err));
 
       return reply.send({
         success: true,
@@ -378,7 +396,19 @@ export default async function challengeRoutes(fastify: FastifyInstance) {
         },
       });
 
-      // TODO: Send push notification to challenger
+      // Send push notification to challenger
+      const challenged = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { displayName: true, firstName: true },
+      });
+      const challengedName = challenged?.displayName || challenged?.firstName || "Someone";
+
+      notifyChallengeAccepted(
+        challenge.challengerId,
+        challengedName,
+        challenge.gameType,
+        updated.id
+      ).catch((err) => console.error("[Challenges] Notification error:", err));
 
       return reply.send({
         success: true,
@@ -438,7 +468,19 @@ export default async function challengeRoutes(fastify: FastifyInstance) {
         },
       });
 
-      // TODO: Send push notification to challenger
+      // Send push notification to challenger
+      const challenged = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { displayName: true, firstName: true },
+      });
+      const challengedName = challenged?.displayName || challenged?.firstName || "Someone";
+
+      notifyChallengeDeclined(
+        challenge.challengerId,
+        challengedName,
+        challenge.gameType,
+        updated.id
+      ).catch((err) => console.error("[Challenges] Notification error:", err));
 
       return reply.send({
         success: true,

@@ -3,9 +3,46 @@ import Stripe from "stripe";
 import crypto from "crypto";
 import { prisma } from "../lib/prisma.js";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe.js";
+import { getRedisClient } from "../lib/redis.js";
 
 // Clerk webhook secret from environment
 const CLERK_WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
+
+// Idempotency tracking for webhooks (prevents duplicate processing)
+const processedEvents = new Set<string>();
+const PROCESSED_EVENT_TTL = 24 * 60 * 60 * 1000; // 24 hours in memory
+
+async function isEventProcessed(eventId: string): Promise<boolean> {
+  // Try Redis first for distributed idempotency
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      const exists = await redis.get(`webhook:processed:${eventId}`);
+      return exists !== null;
+    } catch (err) {
+      // Fall through to memory check
+    }
+  }
+  return processedEvents.has(eventId);
+}
+
+async function markEventProcessed(eventId: string): Promise<void> {
+  // Try Redis first
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      await redis.setex(`webhook:processed:${eventId}`, 86400, "1"); // 24 hour TTL
+      return;
+    } catch (err) {
+      // Fall through to memory
+    }
+  }
+  processedEvents.add(eventId);
+  // Clean up old events periodically (simple approach)
+  if (processedEvents.size > 10000) {
+    processedEvents.clear();
+  }
+}
 
 // Clerk webhook event types
 interface ClerkUserEvent {
@@ -58,7 +95,13 @@ export default async function webhookRoutes(fastify: FastifyInstance) {
         return reply.code(400).send({ error: "Invalid signature" });
       }
 
-      fastify.log.info(`Stripe webhook: ${event.type}`);
+      fastify.log.info(`Stripe webhook: ${event.type} (${event.id})`);
+
+      // Idempotency check - prevent duplicate processing
+      if (await isEventProcessed(event.id)) {
+        fastify.log.info(`Stripe webhook ${event.id} already processed, skipping`);
+        return reply.send({ received: true, duplicate: true });
+      }
 
       try {
         switch (event.type) {
@@ -94,6 +137,9 @@ export default async function webhookRoutes(fastify: FastifyInstance) {
         fastify.log.error({ err, eventType: event.type }, "Error handling webhook event");
         return reply.code(500).send({ error: "Webhook handler failed" });
       }
+
+      // Mark event as processed after successful handling
+      await markEventProcessed(event.id);
 
       return reply.send({ received: true });
     }

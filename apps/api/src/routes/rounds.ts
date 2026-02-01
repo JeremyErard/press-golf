@@ -557,8 +557,13 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
       return badRequest(reply, 'Hole number must be between 1 and 18');
     }
 
-    if (strokes !== null && (strokes < 1 || strokes > 20)) {
-      return badRequest(reply, 'Strokes must be between 1 and 20');
+    if (strokes !== null && (strokes < 1 || strokes > 15)) {
+      return badRequest(reply, 'Strokes must be between 1 and 15');
+    }
+
+    // Validate putts don't exceed strokes
+    if (putts !== undefined && putts !== null && strokes !== null && putts > strokes) {
+      return badRequest(reply, 'Putts cannot exceed total strokes');
     }
 
     // Get round and find players
@@ -888,7 +893,7 @@ Confidence should be: high, medium, or low`,
 
       // Validate extracted scores
       const validScores = (extracted.scores || []).filter((s: ExtractedScore) =>
-        s.holeNumber >= 1 && s.holeNumber <= 18 && s.strokes >= 1 && s.strokes <= 20
+        s.holeNumber >= 1 && s.holeNumber <= 18 && s.strokes >= 1 && s.strokes <= 15
       );
 
       return reply.send({
@@ -926,7 +931,7 @@ Confidence should be: high, medium, or low`,
       if (score.holeNumber < 1 || score.holeNumber > 18) {
         return badRequest(reply, `Invalid hole number: ${score.holeNumber}`);
       }
-      if (score.strokes < 1 || score.strokes > 20) {
+      if (score.strokes < 1 || score.strokes > 15) {
         return badRequest(reply, `Invalid strokes for hole ${score.holeNumber}: ${score.strokes}`);
       }
     }
