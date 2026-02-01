@@ -69,7 +69,8 @@ export async function queueScoreForSync(
   // Request background sync when online
   if ('sync' in registration) {
     try {
-      await (registration as ServiceWorkerRegistration & { sync: SyncManager }).sync.register('sync-scores');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (registration as any).sync.register('sync-scores');
       console.log('[OfflineScores] Background sync registered');
     } catch (error) {
       console.warn('[OfflineScores] Background sync not supported:', error);
