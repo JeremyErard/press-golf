@@ -69,6 +69,7 @@ export async function sendNotificationToUser(
       score_update: "scoreUpdates",
       tee_time_reminder: "teeTimeReminders",
       settlement: "settlementUpdates",
+      challenge: "gameInvites", // Challenges use same preference as game invites
     };
 
     const prefKey = typeToPreference[payload.type];
