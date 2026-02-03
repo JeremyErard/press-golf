@@ -71,9 +71,46 @@ npx tsx src/lib/invitation-flow-test.ts
 ## Production URLs
 - Web: https://pressbet.golf
 - API: https://press-api.onrender.com
-- Clerk Dashboard: https://dashboard.clerk.com
-- Render Dashboard: https://dashboard.render.com
-- Vercel Dashboard: https://vercel.com
+
+## Service Dashboards
+
+### Clerk (Authentication)
+- Dashboard: https://dashboard.clerk.com
+- Select "press-golf" application
+- **Users**: View/manage user accounts, see sign-in activity
+- **Sessions**: Debug auth issues, revoke sessions
+- **Webhooks**: User sync webhook sends to `/webhooks/clerk` on API
+- **API Keys**: `CLERK_SECRET_KEY` (API), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (Web)
+
+### Vercel (Web Hosting)
+- Dashboard: https://vercel.com → press-golf project
+- **Deployments**: View deploy history, rollback if needed
+- **Logs**: Real-time function logs for debugging
+- **Environment Variables**: Clerk keys, API URL config
+- **Domains**: pressbet.golf DNS settings
+- Auto-deploys on push to main branch
+
+### Render (API Hosting)
+- Dashboard: https://dashboard.render.com → press-api service
+- **Logs**: View API server logs, error tracking
+- **Environment**: All API secrets (DATABASE_URL, Clerk, Stripe, VAPID keys)
+- **Manual Deploy**: Can trigger deploy without git push
+- **Shell**: SSH into running service for debugging
+- Auto-deploys on push to main branch
+
+### Stripe (Subscriptions)
+- Dashboard: https://dashboard.stripe.com
+- **Products**: "Press Pro" subscription tier
+- **Customers**: View subscriber list, payment history
+- **Webhooks**: Subscription events → `/webhooks/stripe` on API
+- **Test Mode**: Toggle for testing payments without real charges
+- **API Keys**: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
+
+### Neon (Database)
+- Dashboard: https://console.neon.tech
+- **SQL Editor**: Run queries directly
+- **Branches**: Database branching for testing
+- **Connection String**: `DATABASE_URL` in Render env vars
 
 ## Environment Files Needed
 - `apps/api/.env` - Database, Clerk, Stripe, Anthropic keys
