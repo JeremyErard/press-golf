@@ -22,14 +22,11 @@ export default clerkMiddleware(async (auth, request) => {
 
   // If it's not a public route, require authentication
   if (!isPublicRoute(request)) {
-    // Check if user has logged in before on this device (cookie-based)
-    const hasLoggedInBefore = request.cookies.get("press_returning_user")?.value === "true";
-
-    // Redirect to sign-in for returning users, sign-up for new users
-    const authUrl = hasLoggedInBefore ? "/sign-in" : "/sign-up";
-
+    // Default to sign-in for all unauthenticated users
+    // This is better UX since returning users are more common,
+    // and new users can easily click "Sign up" from the sign-in page
     await auth.protect({
-      unauthenticatedUrl: new URL(authUrl, request.url).toString(),
+      unauthenticatedUrl: new URL("/sign-in", request.url).toString(),
     });
   }
 });
