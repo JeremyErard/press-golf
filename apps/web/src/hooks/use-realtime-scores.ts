@@ -36,7 +36,11 @@ export interface UseRealtimeScoresReturn {
   connectionStatus: ConnectionStatus;
   lastUpdate: RealtimeScoreUpdate | null;
   reconnect: () => void;
+  lastPingTime: number | null;
 }
+
+// Heartbeat timeout - if no ping received in this time, connection is considered stale
+const HEARTBEAT_TIMEOUT_MS = 75000; // 75 seconds (2.5 missed 30s pings)
 
 export function useRealtimeScores(
   options: UseRealtimeScoresOptions
@@ -46,9 +50,11 @@ export function useRealtimeScores(
 
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected");
   const [lastUpdate, setLastUpdate] = useState<RealtimeScoreUpdate | null>(null);
+  const [lastPingTime, setLastPingTime] = useState<number | null>(null);
 
   const clientRef = useRef<SSEClient | null>(null);
   const callbacksRef = useRef({ onScoreUpdate, onPlayerJoined, onRoundCompleted });
+  const heartbeatCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Keep callbacks up to date
   useEffect(() => {
@@ -87,10 +93,12 @@ export function useRealtimeScores(
 
       case "connected":
         console.log("SSE connected to round:", (event as { data: { roundId: string } }).data.roundId);
+        setLastPingTime(Date.now()); // Initial connection counts as heartbeat
         break;
 
       case "ping":
-        // Keep-alive ping - no action needed
+        // Update last ping time for heartbeat monitoring
+        setLastPingTime(Date.now());
         break;
     }
   }, []);
@@ -127,6 +135,16 @@ export function useRealtimeScores(
     }
   }, [enabled, roundId, getToken, handleEvent]);
 
+  // Manual reconnect function
+  const reconnect = useCallback(() => {
+    if (clientRef.current) {
+      clientRef.current.resetReconnects();
+      clientRef.current.disconnect();
+    }
+    setLastPingTime(null);
+    connect();
+  }, [connect]);
+
   // Connect on mount / when roundId changes
   useEffect(() => {
     connect();
@@ -139,18 +157,58 @@ export function useRealtimeScores(
     };
   }, [connect]);
 
-  // Manual reconnect function
-  const reconnect = useCallback(() => {
-    if (clientRef.current) {
-      clientRef.current.resetReconnects();
-      clientRef.current.disconnect();
-    }
-    connect();
-  }, [connect]);
+  // Heartbeat monitoring - detect stale connections
+  useEffect(() => {
+    if (!enabled) return;
+
+    heartbeatCheckRef.current = setInterval(() => {
+      if (lastPingTime && connectionStatus === "connected") {
+        const timeSinceLastPing = Date.now() - lastPingTime;
+        if (timeSinceLastPing > HEARTBEAT_TIMEOUT_MS) {
+          console.warn("SSE heartbeat timeout - reconnecting...");
+          reconnect();
+        }
+      }
+    }, 30000); // Check every 30 seconds (matches server ping interval)
+
+    return () => {
+      if (heartbeatCheckRef.current) {
+        clearInterval(heartbeatCheckRef.current);
+      }
+    };
+  }, [enabled, lastPingTime, connectionStatus, reconnect]);
+
+  // Visibility change detection - reconnect when user returns to tab
+  useEffect(() => {
+    if (!enabled) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        // User returned to tab - check if we need to reconnect
+        if (connectionStatus === "disconnected" || connectionStatus === "error") {
+          console.log("Tab became visible - reconnecting SSE...");
+          reconnect();
+        } else if (lastPingTime) {
+          // Check if connection might be stale
+          const timeSinceLastPing = Date.now() - lastPingTime;
+          if (timeSinceLastPing > HEARTBEAT_TIMEOUT_MS) {
+            console.log("Tab became visible - connection stale, reconnecting...");
+            reconnect();
+          }
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [enabled, connectionStatus, lastPingTime, reconnect]);
 
   return {
     connectionStatus,
     lastUpdate,
     reconnect,
+    lastPingTime,
   };
 }

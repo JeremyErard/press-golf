@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useCallback, useMemo } from "react";
+import { useEffect, useReducer, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { Check, ChevronLeft } from "lucide-react";
@@ -13,6 +13,9 @@ import { cn, formatCourseName } from "@/lib/utils";
 import { useRealtimeScores, type RealtimeScoreUpdate, type RealtimePlayerJoined } from "@/hooks/use-realtime-scores";
 import { toast } from "@/components/ui/sonner";
 import Link from "next/link";
+
+// Debounce delay for game status fetches (batches rapid score updates)
+const GAME_STATUS_DEBOUNCE_MS = 500;
 
 // ----- Types -----
 
@@ -133,8 +136,11 @@ export default function ScorecardPage() {
     dots,
   } = state;
 
-  // Fetch press status and game live status
-  const fetchGameStatus = useCallback(async () => {
+  // Debounce timer ref for game status fetches
+  const gameStatusDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Internal fetch function (not debounced)
+  const fetchGameStatusInternal = useCallback(async () => {
     try {
       const token = await getToken();
       if (!token) return;
@@ -150,6 +156,35 @@ export default function ScorecardPage() {
       console.error("Failed to fetch game status:", error);
     }
   }, [getToken, roundId]);
+
+  // Debounced fetch - batches multiple rapid score updates into single fetch
+  const fetchGameStatus = useCallback((immediate = false) => {
+    // Clear any pending debounce
+    if (gameStatusDebounceRef.current) {
+      clearTimeout(gameStatusDebounceRef.current);
+      gameStatusDebounceRef.current = null;
+    }
+
+    if (immediate) {
+      // Fetch immediately (for user-initiated actions)
+      fetchGameStatusInternal();
+    } else {
+      // Debounce (for real-time score updates from others)
+      gameStatusDebounceRef.current = setTimeout(() => {
+        fetchGameStatusInternal();
+        gameStatusDebounceRef.current = null;
+      }, GAME_STATUS_DEBOUNCE_MS);
+    }
+  }, [fetchGameStatusInternal]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (gameStatusDebounceRef.current) {
+        clearTimeout(gameStatusDebounceRef.current);
+      }
+    };
+  }, []);
 
   // Fetch dots achievements
   const fetchDots = useCallback(async () => {
@@ -175,10 +210,10 @@ export default function ScorecardPage() {
         type: "UPDATE_LOCAL_SCORE",
         payload: { playerId: player.id, holeNumber: update.holeNumber, score: update.strokes ?? 0 },
       });
-    }
 
-    // Refresh game status when scores change
-    fetchGameStatus();
+      // Refresh game status when scores change (debounced to batch rapid updates)
+      fetchGameStatus(false);
+    }
   }, [round, localScores, fetchGameStatus]);
 
   // Handle player joined events
@@ -243,8 +278,8 @@ export default function ScorecardPage() {
         });
         dispatch({ type: "INIT_LOCAL_SCORES", payload: scores });
 
-        // Fetch game status
-        fetchGameStatus();
+        // Fetch game status (immediate for initial load)
+        fetchGameStatus(true);
 
         // Fetch dots if enabled
         if (data.dotsEnabled) {
@@ -329,8 +364,8 @@ export default function ScorecardPage() {
           }
         }
 
-        // Refresh game status after score update
-        fetchGameStatus();
+        // Refresh game status after score update (immediate for user action)
+        fetchGameStatus(true);
 
         // Show success feedback
         toast.success("Score saved");
@@ -360,7 +395,7 @@ export default function ScorecardPage() {
         });
 
         toast.success("Press created");
-        fetchGameStatus();
+        fetchGameStatus(true);
       } catch (error) {
         console.error("Failed to create press:", error);
         toast.error("Failed to create press");
