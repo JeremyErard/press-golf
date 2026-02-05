@@ -273,7 +273,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (app) => {
       cleanup = () => localEvents.off(`round:${roundId}`, eventHandler);
     }
 
-    // Keep-alive ping every 15 seconds (more frequent to prevent proxy timeouts)
+    // Keep-alive ping every 30 seconds (more frequent to prevent proxy timeouts)
     const pingInterval = setInterval(() => {
       try {
         reply.raw.write(`event: ping\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`);
@@ -281,7 +281,7 @@ export const realtimeRoutes: FastifyPluginAsync = async (app) => {
         // Connection closed
         clearInterval(pingInterval);
       }
-    }, 15000);
+    }, 30000);
 
     // Clean up on connection close
     request.raw.on('close', () => {
