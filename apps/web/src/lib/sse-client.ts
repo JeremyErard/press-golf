@@ -1,6 +1,9 @@
 /**
  * SSE Client for real-time score updates
- * Handles connection, reconnection, and event parsing
+ *
+ * This is a simple transport layer that manages the EventSource connection.
+ * It does NOT handle reconnection - that responsibility belongs to the hook
+ * which can get fresh auth tokens on each reconnection attempt.
  */
 
 // Use production API URL as fallback (same as api.ts)
@@ -75,30 +78,22 @@ export interface SSEClientOptions {
   token: string;
   onEvent: (event: SSEEvent) => void;
   onStatusChange: (status: ConnectionStatus) => void;
-  reconnectInterval?: number;
-  maxReconnectAttempts?: number;
 }
 
 export class SSEClient {
   private eventSource: EventSource | null = null;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private reconnectAttempts = 0;
   private isDestroyed = false;
 
   private readonly roundId: string;
   private readonly token: string;
   private readonly onEvent: (event: SSEEvent) => void;
   private readonly onStatusChange: (status: ConnectionStatus) => void;
-  private readonly reconnectInterval: number;
-  private readonly maxReconnectAttempts: number;
 
   constructor(options: SSEClientOptions) {
     this.roundId = options.roundId;
     this.token = options.token;
     this.onEvent = options.onEvent;
     this.onStatusChange = options.onStatusChange;
-    this.reconnectInterval = options.reconnectInterval ?? 3000;
-    this.maxReconnectAttempts = options.maxReconnectAttempts ?? 10;
   }
 
   connect(): void {
@@ -115,7 +110,6 @@ export class SSEClient {
       this.eventSource = new EventSource(url.toString());
 
       this.eventSource.onopen = () => {
-        this.reconnectAttempts = 0;
         this.onStatusChange("connected");
       };
 
@@ -150,51 +144,22 @@ export class SSEClient {
         });
       });
 
+      // On error, report status and let the hook handle reconnection
       this.eventSource.onerror = (error) => {
         console.error("SSE connection error:", error);
         this.onStatusChange("error");
-        this.scheduleReconnect();
+        // Don't reconnect here - the hook will handle it with a fresh token
       };
     } catch (error) {
       console.error("Failed to create EventSource:", error);
       this.onStatusChange("error");
-      this.scheduleReconnect();
     }
-  }
-
-  private scheduleReconnect(): void {
-    if (this.isDestroyed) return;
-
-    this.cleanup();
-
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.warn("Max reconnect attempts reached");
-      this.onStatusChange("disconnected");
-      return;
-    }
-
-    this.reconnectAttempts++;
-    const delay = Math.min(
-      this.reconnectInterval * Math.pow(1.5, this.reconnectAttempts - 1),
-      30000 // Max 30 seconds
-    );
-
-    console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
-    this.onStatusChange("connecting");
-
-    this.reconnectTimer = setTimeout(() => {
-      this.connect();
-    }, delay);
   }
 
   private cleanup(): void {
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = null;
-    }
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
     }
   }
 
@@ -204,9 +169,8 @@ export class SSEClient {
     this.onStatusChange("disconnected");
   }
 
-  // Reset reconnection attempts (useful when manually reconnecting)
-  resetReconnects(): void {
-    this.reconnectAttempts = 0;
+  isConnected(): boolean {
+    return this.eventSource?.readyState === EventSource.OPEN;
   }
 }
 
