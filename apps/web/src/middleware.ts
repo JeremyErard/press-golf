@@ -7,6 +7,8 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/join/(.*)",     // Invite landing pages
+  "/offline",       // PWA offline fallback
+  "/manifest.json", // PWA manifest
   "/api/webhooks(.*)", // Webhook endpoints
   "/sitemap.xml",   // SEO sitemap
   "/robots.txt",    // SEO robots
