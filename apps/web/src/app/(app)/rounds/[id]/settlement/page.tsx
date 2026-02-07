@@ -125,6 +125,8 @@ export default function SettlementPage() {
         return `https://cash.app/$${handle}/${amountStr}`;
       case "ZELLE":
         return `mailto:${handle}?subject=Press Golf Payment&body=Payment of $${amountStr}`;
+      case "APPLE_PAY":
+        return `sms:${handle}&body=Press%20Golf%20payment%20%24${amountStr}`;
       default:
         return null;
     }
@@ -434,7 +436,7 @@ export default function SettlementPage() {
                                   {method.type === "VENMO" ? "Venmo" :
                                    method.type === "CASHAPP" ? "CashApp" :
                                    method.type === "ZELLE" ? "Zelle" :
-                                   method.type === "APPLE_PAY" ? "Apple Pay" : method.type}
+                                   method.type === "APPLE_PAY" ? "Apple Cash" : method.type}
                                 </Button>
                               ))}
                             </div>

@@ -10,7 +10,7 @@ const PAYMENT_TYPES: { type: PaymentMethodType; label: string; placeholder: stri
   { type: "VENMO", label: "Venmo", placeholder: "@username", prefix: "@" },
   { type: "CASHAPP", label: "Cash App", placeholder: "$cashtag", prefix: "$" },
   { type: "ZELLE", label: "Zelle", placeholder: "Email or phone", prefix: "" },
-  { type: "APPLE_PAY", label: "Apple Pay", placeholder: "Phone number", prefix: "" },
+  { type: "APPLE_PAY", label: "Apple Cash", placeholder: "Phone number", prefix: "" },
 ];
 
 export default function PaymentMethodsPage() {
