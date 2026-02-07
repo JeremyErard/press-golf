@@ -88,6 +88,11 @@ export async function requireAuth(
           },
         }) as User;
 
+        // Create default notification preferences (all enabled)
+        await prisma.notificationPreferences.create({
+          data: { userId: (user as any).id },
+        }).catch(() => {}); // Ignore if already exists
+
         request.log.info({ userId: (user as any).id, clerkId: auth.userId }, 'Created new user from Clerk session');
       }
 

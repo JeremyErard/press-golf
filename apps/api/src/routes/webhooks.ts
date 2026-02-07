@@ -254,7 +254,7 @@ async function handleClerkUserSync(
     null;
 
   // Upsert user record - use clerkId as the unique identifier
-  await prisma.user.upsert({
+  const user = await prisma.user.upsert({
     where: { clerkId: data.id },
     create: {
       clerkId: data.id,
@@ -272,6 +272,13 @@ async function handleClerkUserSync(
       ...(displayName && { displayName }),
       ...(data.image_url && { avatarUrl: data.image_url }),
     },
+  });
+
+  // Ensure notification preferences exist with all defaults enabled
+  await prisma.notificationPreferences.upsert({
+    where: { userId: user.id },
+    create: { userId: user.id },
+    update: {},
   });
 
   fastify.log.info(
