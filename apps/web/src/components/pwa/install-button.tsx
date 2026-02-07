@@ -7,7 +7,8 @@ import { isStandalone } from "@/lib/utils";
 
 export function InstallButton() {
   const [showInstructions, setShowInstructions] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
+  // Start with null to prevent flash - we don't know install state until client-side check
+  const [isInstalled, setIsInstalled] = useState<boolean | null>(null);
   const [instructions, setInstructions] = useState<ReturnType<typeof getInstallInstructions> | null>(null);
 
   useEffect(() => {
@@ -16,8 +17,9 @@ export function InstallButton() {
     setInstructions(getInstallInstructions());
   }, []);
 
-  // Don't show if already installed
-  if (isInstalled) return null;
+  // Don't render until we've checked install state (prevents flash)
+  // Also don't show if already installed
+  if (isInstalled === null || isInstalled) return null;
 
   const handleInstall = async () => {
     if (instructions?.canPrompt) {

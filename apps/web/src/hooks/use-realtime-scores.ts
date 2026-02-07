@@ -3,33 +3,33 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
 import {
-  SSEClient,
-  createSSEClient,
-  type SSEEvent,
-  type ConnectionStatus,
-  type ScoreUpdatedEvent,
-  type PlayerJoinedEvent,
+      SSEClient,
+      createSSEClient,
+      type SSEEvent,
+      type ConnectionStatus,
+      type ScoreUpdatedEvent,
+      type PlayerJoinedEvent,
 } from "@/lib/sse-client";
 
 export interface RealtimeScoreUpdate {
-  userId: string;
-  holeNumber: number;
-  strokes: number | null;
-  timestamp: number;
+      userId: string;
+      holeNumber: number;
+      strokes: number | null;
+      timestamp: number;
 }
 
 export interface RealtimePlayerJoined {
-  userId: string;
-  displayName: string | null;
-  timestamp: number;
+      userId: string;
+      displayName: string | null;
+      timestamp: number;
 }
 
 export interface UseRealtimeScoresOptions {
-  roundId: string;
-  enabled?: boolean;
-  onScoreUpdate?: (update: RealtimeScoreUpdate) => void;
-  onPlayerJoined?: (player: RealtimePlayerJoined) => void;
-  onRoundCompleted?: () => void;
+      roundId: string;
+      enabled?: boolean;
+      onScoreUpdate?: (update: RealtimeScoreUpdate) => void;
+      onPlayerJoined?: (player: RealtimePlayerJoined) => void;
+      onRoundCompleted?: () => void;
 }
 
 export interface UseRealtimeScoresReturn {
@@ -48,10 +48,10 @@ const MAX_RECONNECT_DELAY_MS = 30000; // Max 30 seconds
 const MAX_RECONNECT_ATTEMPTS = 20; // Give up after 20 attempts (~5 minutes with backoff)
 
 export function useRealtimeScores(
-  options: UseRealtimeScoresOptions
-): UseRealtimeScoresReturn {
-  const { roundId, enabled = true, onScoreUpdate, onPlayerJoined, onRoundCompleted } = options;
-  const { getToken } = useAuth();
+      options: UseRealtimeScoresOptions
+    ): UseRealtimeScoresReturn {
+      const { roundId, enabled = true, onScoreUpdate, onPlayerJoined, onRoundCompleted } = options;
+      const { getToken } = useAuth();
 
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected");
   const [lastUpdate, setLastUpdate] = useState<RealtimeScoreUpdate | null>(null);
@@ -66,7 +66,7 @@ export function useRealtimeScores(
 
   // Keep callbacks up to date
   useEffect(() => {
-    callbacksRef.current = { onScoreUpdate, onPlayerJoined, onRoundCompleted };
+          callbacksRef.current = { onScoreUpdate, onPlayerJoined, onRoundCompleted };
   }, [onScoreUpdate, onPlayerJoined, onRoundCompleted]);
 
   // Clear any pending reconnect timer
@@ -208,7 +208,7 @@ export function useRealtimeScores(
 
   // Connect on mount / when roundId changes
   useEffect(() => {
-    connect();
+          connect();
 
     return () => {
       clearReconnectTimer();

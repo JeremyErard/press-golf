@@ -10,7 +10,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://press-api.onrender.com/api";
 
 export type SSEEventType =
-  | "score_updated"
+    | "score_updated"
   | "game_updated"
   | "player_joined"
   | "round_completed"
@@ -18,53 +18,53 @@ export type SSEEventType =
   | "ping";
 
 export interface ScoreUpdatedEvent {
-  type: "score_updated";
-  data: {
-    userId: string;
-    holeNumber: number;
-    strokes: number | null;
-  };
+    type: "score_updated";
+    data: {
+      userId: string;
+      holeNumber: number;
+      strokes: number | null;
+    };
 }
 
 export interface GameUpdatedEvent {
-  type: "game_updated";
-  data: {
-    gameId: string;
-    changes: Record<string, unknown>;
-  };
+    type: "game_updated";
+    data: {
+      gameId: string;
+      changes: Record<string, unknown>;
+    };
 }
 
 export interface PlayerJoinedEvent {
-  type: "player_joined";
-  data: {
-    userId: string;
-    displayName: string | null;
-  };
+    type: "player_joined";
+    data: {
+      userId: string;
+      displayName: string | null;
+    };
 }
 
 export interface RoundCompletedEvent {
-  type: "round_completed";
-  data: {
-    roundId: string;
-  };
+    type: "round_completed";
+    data: {
+      roundId: string;
+    };
 }
 
 export interface ConnectedEvent {
-  type: "connected";
-  data: {
-    roundId: string;
-  };
+    type: "connected";
+    data: {
+      roundId: string;
+    };
 }
 
 export interface PingEvent {
-  type: "ping";
-  data: {
-    timestamp: number;
-  };
+    type: "ping";
+    data: {
+      timestamp: number;
+    };
 }
 
 export type SSEEvent =
-  | ScoreUpdatedEvent
+    | ScoreUpdatedEvent
   | GameUpdatedEvent
   | PlayerJoinedEvent
   | RoundCompletedEvent
@@ -97,52 +97,52 @@ export class SSEClient {
   }
 
   connect(): void {
-    if (this.isDestroyed) return;
+        if (this.isDestroyed) return;
 
-    this.cleanup();
-    this.onStatusChange("connecting");
+      this.cleanup();
+        this.onStatusChange("connecting");
 
-    // Build URL with auth token as query param (SSE doesn't support headers)
-    const url = new URL(`${API_URL}/realtime/rounds/${this.roundId}/live`);
-    url.searchParams.set("token", this.token);
+      // Build URL with auth token as query param (SSE doesn't support headers)
+      const url = new URL(`${API_URL}/realtime/rounds/${this.roundId}/live`);
+        url.searchParams.set("token", this.token);
 
-    try {
-      this.eventSource = new EventSource(url.toString());
+      try {
+              this.eventSource = new EventSource(url.toString());
 
       this.eventSource.onopen = () => {
         this.onStatusChange("connected");
       };
 
-      // Handler for parsing events
-      const parseEvent = (event: MessageEvent, type?: SSEEventType) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          // If type is provided (named event), use it; otherwise get from data
-          const eventType = type || parsed.type;
-          this.onEvent({ ...parsed, type: eventType } as SSEEvent);
-        } catch (error) {
-          console.error("Failed to parse SSE event:", error, event.data);
-        }
-      };
+          // Handler for parsing events
+          const parseEvent = (event: MessageEvent, type?: SSEEventType) => {
+                    try {
+                                const parsed = JSON.parse(event.data);
+                                // If type is provided (named event), use it; otherwise get from data
+                      const eventType = type || parsed.type;
+                                this.onEvent({ ...parsed, type: eventType } as SSEEvent);
+                    } catch (error) {
+                                console.error("Failed to parse SSE event:", error, event.data);
+                    }
+          };
 
-      // Listen for unnamed events (fallback)
-      this.eventSource.onmessage = (event) => parseEvent(event);
+          // Listen for unnamed events (fallback)
+          this.eventSource.onmessage = (event) => parseEvent(event);
 
-      // Listen for named events (SSE sends these with "event: type")
-      const eventTypes: SSEEventType[] = [
-        "score_updated",
-        "game_updated",
-        "player_joined",
-        "round_completed",
-        "connected",
-        "ping",
-      ];
+          // Listen for named events (SSE sends these with "event: type")
+          const eventTypes: SSEEventType[] = [
+                    "score_updated",
+                    "game_updated",
+                    "player_joined",
+                    "round_completed",
+                    "connected",
+                    "ping",
+                  ];
 
-      eventTypes.forEach((eventType) => {
-        this.eventSource!.addEventListener(eventType, (event) => {
-          parseEvent(event as MessageEvent, eventType);
-        });
-      });
+          eventTypes.forEach((eventType) => {
+                    this.eventSource!.addEventListener(eventType, (event) => {
+                                parseEvent(event as MessageEvent, eventType);
+                    });
+          });
 
       // On error, report status and let the hook handle reconnection
       this.eventSource.onerror = (error) => {
@@ -164,9 +164,9 @@ export class SSEClient {
   }
 
   disconnect(): void {
-    this.isDestroyed = true;
-    this.cleanup();
-    this.onStatusChange("disconnected");
+        this.isDestroyed = true;
+        this.cleanup();
+        this.onStatusChange("disconnected");
   }
 
   isConnected(): boolean {
@@ -176,5 +176,5 @@ export class SSEClient {
 
 // Factory function for creating SSE client
 export function createSSEClient(options: SSEClientOptions): SSEClient {
-  return new SSEClient(options);
+    return new SSEClient(options);
 }
