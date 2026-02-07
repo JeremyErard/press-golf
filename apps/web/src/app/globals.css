@@ -64,6 +64,16 @@
     text-wrap: balance;
   }
 
+  /* Bottom nav height: 64px nav + safe area inset */
+  .pb-nav {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* For fixed elements that sit above the bottom nav */
+  .bottom-nav {
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
   /* Safe area utilities for notched devices */
   .safe-area-top {
     padding-top: env(safe-area-inset-top);

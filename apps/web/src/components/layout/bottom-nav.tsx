@@ -17,7 +17,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#0a0f1a]/95 backdrop-blur-xl border-t border-white/10">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#0a0f1a]/95 backdrop-blur-xl border-t border-white/10 safe-area-bottom">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-1">
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -57,8 +57,6 @@ export function BottomNav() {
           );
         })}
       </div>
-      {/* Safe area spacer for notched devices */}
-      <div className="safe-area-bottom" />
     </nav>
   );
 }

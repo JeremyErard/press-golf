@@ -38,7 +38,7 @@ export default function AppLayout({
   return (
     <OnboardingCheck>
       <SessionKeepAlive />
-      <div className={`min-h-screen relative ${isOnboarding ? "" : "pb-20"}`}>
+      <div className={`min-h-screen relative ${isOnboarding ? "" : "pb-nav"}`}>
         {/* Subtle fairway texture background */}
         <div className="fixed inset-0 -z-10">
           <Image

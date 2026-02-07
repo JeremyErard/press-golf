@@ -5,6 +5,8 @@ import { useAuth } from "@clerk/nextjs";
 import { usePathname, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 
+const ONBOARDING_COMPLETE_KEY = "press_onboarding_complete";
+
 export function OnboardingCheck({ children }: { children: React.ReactNode }) {
   const { getToken, isLoaded } = useAuth();
   const pathname = usePathname();
@@ -15,6 +17,12 @@ export function OnboardingCheck({ children }: { children: React.ReactNode }) {
     async function checkOnboarding() {
       // Skip check if already on onboarding page
       if (pathname?.startsWith("/onboarding")) {
+        setChecked(true);
+        return;
+      }
+
+      // If we've already confirmed onboarding is complete this session, skip the API call
+      if (sessionStorage.getItem(ONBOARDING_COMPLETE_KEY) === "true") {
         setChecked(true);
         return;
       }
@@ -35,11 +43,14 @@ export function OnboardingCheck({ children }: { children: React.ReactNode }) {
           return;
         }
 
+        // Cache the result for this session so we don't re-check on every navigation
+        sessionStorage.setItem(ONBOARDING_COMPLETE_KEY, "true");
         setChecked(true);
       } catch (err) {
-        // If API fails, redirect to onboarding to be safe
+        // API failure should NOT redirect to onboarding — let the user through
+        // This prevents cold-start / network hiccup false redirects
         console.error("Onboarding check failed:", err);
-        router.push("/onboarding");
+        setChecked(true);
       }
     }
 

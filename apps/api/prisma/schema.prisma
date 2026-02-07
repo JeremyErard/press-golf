@@ -77,6 +77,7 @@ model User {
   @@index([clerkId])
   @@index([email])
   @@index([stripeCustomerId])
+  @@index([subscriptionStatus])
 }
 
 // ===================
@@ -280,6 +281,8 @@ model Round {
   @@index([inviteCode])
   @@index([status])
   @@index([groupId])
+  @@index([status, date])
+  @@index([createdById, status])
 }
 
 enum RoundStatus {
@@ -290,16 +293,18 @@ enum RoundStatus {
 
 // Tee time groups for rounds with multiple groups (up to 4 groups / 16 players)
 model TeeTimeGroup {
-  id          String   @id @default(cuid())
-  roundId     String
-  groupNumber Int      // 1, 2, 3, or 4
-  teeTime     DateTime // The actual tee time for this group
+  id           String   @id @default(cuid())
+  roundId      String
+  groupNumber  Int      // 1, 2, 3, or 4
+  teeTime      DateTime // The actual tee time for this group
+  reminderSent Boolean  @default(false)
 
   round   Round         @relation(fields: [roundId], references: [id], onDelete: Cascade)
   players RoundPlayer[]
 
   @@unique([roundId, groupNumber])
   @@index([roundId])
+  @@index([teeTime, reminderSent])
 }
 
 model RoundPlayer {
@@ -474,6 +479,7 @@ model Press {
 
   @@index([gameId])
   @@index([parentPressId])
+  @@index([status])
 }
 
 enum PressSegment {
@@ -528,6 +534,9 @@ model Settlement {
   @@index([fromUserId])
   @@index([toUserId])
   @@index([status])
+  @@index([toUserId, status])
+  @@index([fromUserId, status])
+  @@index([roundId, status])
 }
 
 enum SettlementStatus {
@@ -708,6 +717,8 @@ model Challenge {
   @@index([status])
   @@index([courseId])
   @@index([roundId])
+  @@index([challengerId, status])
+  @@index([challengedId, status])
 }
 
 enum ChallengeStatus {

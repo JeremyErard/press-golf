@@ -6,7 +6,7 @@ import { requireAuth, getUser } from '../lib/auth.js';
 import { badRequest, notFound, forbidden, sendError, ErrorCodes } from '../lib/errors.js';
 import { emitScoreUpdate, emitPlayerJoined } from './realtime.js';
 import { uploadScorecardPhoto, validateImage } from '../lib/blob.js';
-import { notifyScoreUpdate } from '../lib/notifications.js';
+import { notifyScoreUpdate, notifyRoundInvite } from '../lib/notifications.js';
 import { dotsRoutes } from './dots.js';
 
 const anthropic = new Anthropic({
@@ -120,6 +120,80 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
     return {
       success: true,
       data: rounds,
+    };
+  });
+
+  // =====================
+  // GET /api/rounds/with-earnings
+  // List user's rounds with pre-calculated earnings (avoids N+1 on dashboard)
+  // =====================
+  app.get('/with-earnings', {
+    preHandler: requireAuth,
+  }, async (request, reply) => {
+    const user = getUser(request);
+    const userId = user.id as string;
+
+    const rounds = await prisma.round.findMany({
+      where: {
+        players: {
+          some: { userId },
+        },
+      },
+      include: {
+        course: true,
+        tee: true,
+        players: {
+          include: {
+            user: {
+              select: { id: true, displayName: true, firstName: true, avatarUrl: true },
+            },
+          },
+          orderBy: { position: 'asc' },
+        },
+        games: {
+          select: { type: true, betAmount: true },
+        },
+        _count: {
+          select: { players: true },
+        },
+      },
+      orderBy: { date: 'desc' },
+    });
+
+    // Batch-fetch settlements for all completed rounds
+    const completedRoundIds = rounds.filter(r => r.status === 'COMPLETED').map(r => r.id);
+
+    let settlementsByRound: Record<string, number> = {};
+    if (completedRoundIds.length > 0) {
+      const settlements = await prisma.settlement.findMany({
+        where: {
+          roundId: { in: completedRoundIds },
+          OR: [
+            { fromUserId: userId },
+            { toUserId: userId },
+          ],
+        },
+        select: { roundId: true, fromUserId: true, toUserId: true, amount: true },
+      });
+
+      for (const s of settlements) {
+        if (!settlementsByRound[s.roundId]) settlementsByRound[s.roundId] = 0;
+        if (s.toUserId === userId) {
+          settlementsByRound[s.roundId] += Number(s.amount);
+        } else if (s.fromUserId === userId) {
+          settlementsByRound[s.roundId] -= Number(s.amount);
+        }
+      }
+    }
+
+    const roundsWithEarnings = rounds.map(round => ({
+      ...round,
+      earnings: round.status === 'COMPLETED' ? (settlementsByRound[round.id] || 0) : undefined,
+    }));
+
+    return {
+      success: true,
+      data: roundsWithEarnings,
     };
   });
 
@@ -1026,6 +1100,7 @@ Confidence should be: high, medium, or low`,
       where: { id: roundId },
       include: {
         tee: true,
+        course: { select: { name: true } },
         players: true,
       },
     });
@@ -1089,6 +1164,11 @@ Confidence should be: high, medium, or low`,
 
     // Emit player joined event
     emitPlayerJoined(roundId, buddyUserId, buddyUser.displayName || buddyUser.firstName || null);
+
+    // Notify the added buddy that they've been invited to the round
+    const inviterName = (user.displayName as string) || (user.firstName as string) || "A golfer";
+    notifyRoundInvite(buddyUserId, inviterName, round.course.name, roundId)
+      .catch((err) => request.log.error(err, "Failed to send round invite notification"));
 
     return reply.send({
       success: true,

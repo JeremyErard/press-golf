@@ -3,7 +3,7 @@
 import { useEffect, useReducer, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { Check, ChevronLeft } from "lucide-react";
+import { ChevronLeft, Trophy } from "lucide-react";
 import { Button, Skeleton } from "@/components/ui";
 import { api, type RoundDetail, type PressStatus, type PressSegment, type GameLiveStatus, type DotsType, type DotsAchievement } from "@/lib/api";
 import { ScorecardGrid } from "@/components/scorecard/scorecard-grid";
@@ -40,6 +40,7 @@ interface ScorecardState {
   gameLiveStatus: GameLiveStatus[];
   isPressing: boolean;
   isFinishing: boolean;
+  showFinishConfirm: boolean;
   scoreModalOpen: boolean;
   selectedScore: SelectedScore | null;
   localScores: Record<string, Record<number, number>>;
@@ -53,6 +54,7 @@ type ScorecardAction =
   | { type: "SET_GAME_STATUS"; payload: { pressStatus: PressStatus[]; gameLiveStatus: GameLiveStatus[] } }
   | { type: "SET_PRESSING"; payload: boolean }
   | { type: "SET_FINISHING"; payload: boolean }
+  | { type: "SHOW_FINISH_CONFIRM"; payload: boolean }
   | { type: "OPEN_SCORE_MODAL"; payload: SelectedScore }
   | { type: "CLOSE_SCORE_MODAL" }
   | { type: "INIT_LOCAL_SCORES"; payload: Record<string, Record<number, number>> }
@@ -68,6 +70,7 @@ const initialState: ScorecardState = {
   gameLiveStatus: [],
   isPressing: false,
   isFinishing: false,
+  showFinishConfirm: false,
   scoreModalOpen: false,
   selectedScore: null,
   localScores: {},
@@ -88,6 +91,8 @@ function scorecardReducer(state: ScorecardState, action: ScorecardAction): Score
       return { ...state, isPressing: action.payload };
     case "SET_FINISHING":
       return { ...state, isFinishing: action.payload };
+    case "SHOW_FINISH_CONFIRM":
+      return { ...state, showFinishConfirm: action.payload };
     case "OPEN_SCORE_MODAL":
       return { ...state, scoreModalOpen: true, selectedScore: action.payload };
     case "CLOSE_SCORE_MODAL":
@@ -130,6 +135,7 @@ export default function ScorecardPage() {
     gameLiveStatus,
     isPressing,
     isFinishing,
+    showFinishConfirm,
     scoreModalOpen,
     selectedScore,
     localScores,
@@ -434,6 +440,18 @@ export default function ScorecardPage() {
     }) ?? false;
   }, [round?.players, localScores]);
 
+  // Count how many holes have at least one score entered
+  const holesWithScores = useMemo(() => {
+    if (!round) return 0;
+    let count = 0;
+    for (let hole = 1; hole <= 18; hole++) {
+      if (round.players.some(p => localScores[p.id]?.[hole])) {
+        count++;
+      }
+    }
+    return count;
+  }, [round, localScores]);
+
   // Get hole data from round (memoized to prevent re-renders)
   const holes = useMemo((): HoleData[] => {
     if (!round?.course?.holes) {
@@ -464,6 +482,30 @@ export default function ScorecardPage() {
       courseHandicap: player.courseHandicap ?? undefined,
     }));
   }, [round]);
+
+  // Player round totals for finish confirmation
+  const playerTotals = useMemo(() => {
+    if (!round) return [];
+    const totalPar = holes.reduce((s, h) => s + h.par, 0);
+
+    return round.players.map(p => {
+      let total = 0;
+      let holesPlayed = 0;
+      for (let hole = 1; hole <= 18; hole++) {
+        const score = localScores[p.id]?.[hole];
+        if (score) {
+          total += score;
+          holesPlayed++;
+        }
+      }
+      return {
+        name: p.user.displayName || p.user.firstName || "Player",
+        total,
+        holesPlayed,
+        toPar: holesPlayed === 18 ? total - totalPar : null,
+      };
+    });
+  }, [round, localScores, holes]);
 
   // Find current player
   const currentPlayer = round?.players.find(p => p.userId === userId);
@@ -521,7 +563,7 @@ export default function ScorecardPage() {
   }[connectionStatus];
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background pb-nav">
       {/* Header with Hero Image */}
       <header className="sticky top-0 z-50 h-16">
         {/* Hero image background */}
@@ -605,18 +647,104 @@ export default function ScorecardPage() {
 
       </div>
 
-      {/* Finish Round Button - Only shown when all scores are complete */}
-      {allScoresComplete && (
-        <div className="fixed bottom-16 left-0 right-0 z-40 glass border-t border-border">
+      {/* Complete Round Button - visible once scoring has started */}
+      {holesWithScores > 0 && round.status === "ACTIVE" && (
+        <div className="fixed bottom-nav left-0 right-0 z-40 glass border-t border-border">
           <div className="p-4 max-w-lg mx-auto">
             <Button
-              onClick={handleFinishRound}
+              onClick={() => dispatch({ type: "SHOW_FINISH_CONFIRM", payload: true })}
               disabled={isFinishing}
+              variant={allScoresComplete ? "default" : "outline"}
               className="w-full"
             >
-              <Check className="h-4 w-4 mr-2" />
-              {isFinishing ? "Finishing..." : "Finish Round"}
+              <Trophy className="h-4 w-4 mr-2" />
+              Complete Round
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Complete Round Confirmation Overlay */}
+      {showFinishConfirm && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-background rounded-t-2xl border-t border-border p-6 space-y-5 animate-in slide-in-from-bottom duration-200">
+            <div className="text-center">
+              <div className="w-14 h-14 rounded-full bg-brand/20 flex items-center justify-center mx-auto mb-3">
+                <Trophy className="w-7 h-7 text-brand" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">Complete Round?</h2>
+              <p className="text-sm text-muted mt-1">
+                This will finalize scores and calculate game results.
+              </p>
+            </div>
+
+            {/* Round Summary */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-surface/50">
+                    <th className="text-left py-2 px-3 text-xs text-muted font-medium">PLAYER</th>
+                    <th className="text-center py-2 px-2 text-xs text-muted font-medium">HOLES</th>
+                    <th className="text-center py-2 px-2 text-xs text-muted font-medium">SCORE</th>
+                    <th className="text-center py-2 px-2 text-xs text-muted font-medium">+/-</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {playerTotals.map((p) => (
+                    <tr key={p.name} className="border-b border-border/20 last:border-0">
+                      <td className="py-2 px-3 font-medium">{p.name.split(" ")[0]}</td>
+                      <td className="text-center py-2 px-2 text-muted">{p.holesPlayed}/18</td>
+                      <td className="text-center py-2 px-2 font-bold">{p.total || "-"}</td>
+                      <td className={cn(
+                        "text-center py-2 px-2 font-semibold",
+                        p.toPar !== null && p.toPar < 0 && "text-brand",
+                        p.toPar !== null && p.toPar === 0 && "text-foreground",
+                        p.toPar !== null && p.toPar > 0 && "text-error",
+                      )}>
+                        {p.toPar !== null
+                          ? p.toPar === 0 ? "E" : p.toPar > 0 ? `+${p.toPar}` : p.toPar
+                          : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Games count */}
+            {gameLiveStatus.length > 0 && (
+              <p className="text-sm text-muted text-center">
+                {gameLiveStatus.length} game{gameLiveStatus.length !== 1 ? "s" : ""} will be settled
+              </p>
+            )}
+
+            {!allScoresComplete && (
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-3">
+                <p className="text-sm text-amber-400">
+                  Not all scores have been entered. Missing holes will use par for settlement calculations.
+                </p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => dispatch({ type: "SHOW_FINISH_CONFIRM", payload: false })}
+              >
+                Keep Playing
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={() => {
+                  dispatch({ type: "SHOW_FINISH_CONFIRM", payload: false });
+                  handleFinishRound();
+                }}
+                disabled={isFinishing}
+              >
+                {isFinishing ? "Finishing..." : "Complete Round"}
+              </Button>
+            </div>
           </div>
         </div>
       )}

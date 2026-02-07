@@ -110,18 +110,30 @@ export default function OnboardingPage() {
 
     checkStatus();
 
-    // If returning from checkout success, poll for subscription status
+    // If returning from checkout success, poll with exponential backoff
     if (checkoutSuccess) {
-      pollInterval = setInterval(checkStatus, 1500);
-      // Stop polling after 15 seconds max
-      setTimeout(() => {
-        if (pollInterval) clearInterval(pollInterval);
-        setCheckingSubscription(false);
-      }, 15000);
+      let delay = 2000;
+      const maxDelay = 5000;
+      const deadline = Date.now() + 15000;
+      const cancelled = false;
+
+      const poll = () => {
+        if (cancelled || Date.now() >= deadline) {
+          setCheckingSubscription(false);
+          return;
+        }
+        pollInterval = setTimeout(() => {
+          checkStatus().then(() => {
+            delay = Math.min(delay * 1.5, maxDelay);
+            poll();
+          });
+        }, delay) as unknown as ReturnType<typeof setInterval>;
+      };
+      poll();
     }
 
     return () => {
-      if (pollInterval) clearInterval(pollInterval);
+      if (pollInterval) clearTimeout(pollInterval as unknown as ReturnType<typeof setTimeout>);
     };
   }, [getToken, clerkUser, checkoutSuccess, router]);
 
@@ -224,6 +236,7 @@ export default function OnboardingPage() {
       } else if (currentStep === 6) {
         // Mark onboarding complete and go to dashboard
         await api.completeOnboarding(token);
+        sessionStorage.setItem("press_onboarding_complete", "true");
         router.push("/dashboard");
       }
     } catch (err) {

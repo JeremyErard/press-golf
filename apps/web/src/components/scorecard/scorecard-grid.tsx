@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui";
 import { Target, CircleDot } from "lucide-react";
@@ -45,16 +45,34 @@ export function ScorecardGrid({
 }: ScorecardGridProps) {
   const [activeTab, setActiveTab] = useState<"front" | "back">("front");
 
+  // Pre-compute lookups to avoid O(n) scans on every cell render
+  const playerMap = useMemo(
+    () => new Map(players.map(p => [p.id, p])),
+    [players]
+  );
+
+  const minHandicap = useMemo(
+    () => Math.min(...players.map(p => p.courseHandicap ?? 0)),
+    [players]
+  );
+
+  const dotsMap = useMemo(() => {
+    const map = new Map<string, DotsType[]>();
+    for (const d of dots) {
+      const key = `${d.userId}-${d.holeNumber}`;
+      const arr = map.get(key);
+      if (arr) arr.push(d.type);
+      else map.set(key, [d.type]);
+    }
+    return map;
+  }, [dots]);
+
   // Helper to get dots for a player on a specific hole
   const getDotsForPlayerHole = (playerId: string, holeNumber: number): DotsType[] => {
-    // Find the player's userId (dots use userId, not roundPlayer id)
-    const player = players.find(p => p.id === playerId);
+    const player = playerMap.get(playerId);
     const userId = player?.userId;
     if (!userId) return [];
-
-    return dots
-      .filter(d => d.userId === userId && d.holeNumber === holeNumber)
-      .map(d => d.type);
+    return dotsMap.get(`${userId}-${holeNumber}`) ?? [];
   };
 
   // Render dots icons
@@ -94,13 +112,9 @@ export function ScorecardGrid({
 
   // Get strokes given on a hole for a player based on handicap
   const getStrokesGiven = (playerId: string, holeHandicapRank: number): number => {
-    const player = players.find((p) => p.id === playerId);
+    const player = playerMap.get(playerId);
     if (!player?.courseHandicap) return 0;
 
-    // Find minimum course handicap among all players
-    const minHandicap = Math.min(
-      ...players.map((p) => p.courseHandicap ?? 0)
-    );
     const handicapDiff = (player.courseHandicap ?? 0) - minHandicap;
 
     // Player gets a stroke if the hole's handicap rank is within their difference
@@ -142,75 +156,80 @@ export function ScorecardGrid({
     const yardageTotal = calculateYardageTotal(holeList);
 
     return (
-      <div className="overflow-x-auto -mx-4 px-4">
-        <table className="w-full min-w-[400px] border-collapse">
+      <div className="-mx-4">
+        <table className="w-full border-collapse table-fixed">
+          <colgroup>
+            <col className="w-14" />
+            {holeList.map((h) => (
+              <col key={h.holeNumber} />
+            ))}
+            <col className="w-10" />
+          </colgroup>
           {/* Header rows */}
           <thead>
             {/* Hole numbers */}
-            <tr className="border-b border-border/50">
-              <th className="sticky left-0 z-10 bg-background w-20 text-left py-2 px-2">
-                <span className="text-xs text-muted font-medium">HOLE</span>
+            <tr className="border-b border-border">
+              <th className="sticky left-0 z-10 bg-elevated text-left py-2 px-1.5">
+                <span className="text-[11px] text-foreground/70 font-semibold">HOLE</span>
               </th>
               {holeList.map((hole) => (
                 <th
                   key={hole.holeNumber}
-                  className="text-center py-2 px-1 min-w-[40px]"
+                  className="text-center py-2 px-0.5 bg-elevated"
                 >
-                  <span className="text-xs text-muted font-medium">
+                  <span className="text-[11px] text-foreground/70 font-semibold">
                     {hole.holeNumber}
                   </span>
                 </th>
               ))}
-              <th className="text-center py-2 px-2 min-w-[50px] border-l border-border/50">
-                <span className="text-xs text-muted font-medium">
+              <th className="text-center py-2 px-1 border-l border-border bg-elevated">
+                <span className="text-[11px] text-foreground/70 font-semibold">
                   {isFront ? "OUT" : "IN"}
                 </span>
               </th>
             </tr>
 
             {/* Par row */}
-            <tr className="border-b border-border/50 bg-surface/50">
-              <td className="sticky left-0 z-10 bg-surface/50 py-1.5 px-2">
-                <span className="text-xs text-muted">PAR</span>
+            <tr className="border-b border-border bg-surface">
+              <td className="sticky left-0 z-10 bg-surface py-1.5 px-1.5">
+                <span className="text-[11px] text-foreground/60 font-medium">PAR</span>
               </td>
               {holeList.map((hole) => (
-                <td key={hole.holeNumber} className="text-center py-1.5 px-1">
-                  <span className="text-xs font-medium">{hole.par}</span>
+                <td key={hole.holeNumber} className="text-center py-1.5 px-0.5">
+                  <span className="text-xs font-semibold text-foreground/80">{hole.par}</span>
                 </td>
               ))}
-              <td className="text-center py-1.5 px-2 border-l border-border/50">
-                <span className="text-xs font-semibold">{parTotal}</span>
+              <td className="text-center py-1.5 px-1 border-l border-border">
+                <span className="text-xs font-bold text-foreground/80">{parTotal}</span>
               </td>
             </tr>
 
             {/* Handicap rank row */}
-            <tr className="border-b border-border/50">
-              <td className="sticky left-0 z-10 bg-background py-1.5 px-2">
-                <span className="text-xs text-muted">HCP</span>
+            <tr className="border-b border-border/60">
+              <td className="sticky left-0 z-10 bg-background py-1 px-1.5">
+                <span className="text-[10px] text-foreground/40 font-medium">HCP</span>
               </td>
               {holeList.map((hole) => (
-                <td key={hole.holeNumber} className="text-center py-1.5 px-1">
-                  <span className="text-xs text-muted">{hole.handicapRank}</span>
+                <td key={hole.holeNumber} className="text-center py-1 px-0.5">
+                  <span className="text-[10px] text-foreground/40">{hole.handicapRank}</span>
                 </td>
               ))}
-              <td className="text-center py-1.5 px-2 border-l border-border/50">
-                <span className="text-xs text-muted"></span>
-              </td>
+              <td className="text-center py-1 px-1 border-l border-border/60" />
             </tr>
 
             {/* Yardage row (if available) */}
             {holeList.some((h) => h.yardage) && (
-              <tr className="border-b border-border">
-                <td className="sticky left-0 z-10 bg-background py-1.5 px-2">
-                  <span className="text-xs text-muted">YDS</span>
+              <tr className="border-b border-border/60">
+                <td className="sticky left-0 z-10 bg-background py-1 px-1.5">
+                  <span className="text-[10px] text-foreground/40 font-medium">YDS</span>
                 </td>
                 {holeList.map((hole) => (
-                  <td key={hole.holeNumber} className="text-center py-1.5 px-1">
-                    <span className="text-xs text-muted">{hole.yardage || "-"}</span>
+                  <td key={hole.holeNumber} className="text-center py-1 px-0.5">
+                    <span className="text-[10px] text-foreground/40">{hole.yardage || "-"}</span>
                   </td>
                 ))}
-                <td className="text-center py-1.5 px-2 border-l border-border/50">
-                  <span className="text-xs text-muted">{yardageTotal || ""}</span>
+                <td className="text-center py-1 px-1 border-l border-border/60">
+                  <span className="text-[10px] text-foreground/40">{yardageTotal || ""}</span>
                 </td>
               </tr>
             )}
@@ -226,22 +245,23 @@ export function ScorecardGrid({
                 <tr
                   key={player.id}
                   className={cn(
-                    "border-b border-border/30",
-                    isCurrentPlayer && "bg-brand/5"
+                    "border-b border-border/40",
+                    isCurrentPlayer && "bg-brand/8"
                   )}
                 >
                   {/* Player name cell */}
-                  <td className="sticky left-0 z-10 py-2 px-2 bg-background">
-                    <div className={cn(isCurrentPlayer && "bg-brand/5")}>
-                      <span className="text-sm font-medium truncate block max-w-[70px]">
-                        {player.name.split(" ")[0]}
+                  <td className={cn(
+                    "sticky left-0 z-10 py-1.5 px-1.5",
+                    isCurrentPlayer ? "bg-brand/8" : "bg-background"
+                  )}>
+                    <span className="text-xs font-semibold truncate block max-w-[52px] text-foreground">
+                      {player.name.split(" ")[0]}
+                    </span>
+                    {player.courseHandicap !== undefined && (
+                      <span className="text-[10px] text-foreground/50">
+                        ({player.courseHandicap})
                       </span>
-                      {player.courseHandicap !== undefined && (
-                        <span className="text-xs text-muted">
-                          ({player.courseHandicap})
-                        </span>
-                      )}
-                    </div>
+                    )}
                   </td>
 
                   {/* Score cells */}
@@ -253,7 +273,7 @@ export function ScorecardGrid({
                     return (
                       <td
                         key={hole.holeNumber}
-                        className="text-center py-2 px-1"
+                        className="text-center py-1.5 px-0"
                         onClick={() =>
                           onScoreClick?.(player.id, hole.holeNumber, score || 0)
                         }
@@ -261,7 +281,7 @@ export function ScorecardGrid({
                         <div className="relative flex items-center justify-center">
                           <span
                             className={cn(
-                              "inline-flex items-center justify-center w-8 h-8 text-sm cursor-pointer hover:bg-surface rounded transition-colors",
+                              "inline-flex items-center justify-center w-7 h-7 text-xs font-medium cursor-pointer hover:bg-surface/80 rounded transition-colors",
                               getScoreStyle(score, hole.par),
                               score && getScoreDecoration(score, hole.par)
                             )}
@@ -287,8 +307,8 @@ export function ScorecardGrid({
                   })}
 
                   {/* Total cell */}
-                  <td className="text-center py-2 px-2 border-l border-border/50">
-                    <span className="text-sm font-semibold">
+                  <td className="text-center py-1.5 px-1 border-l border-border">
+                    <span className="text-xs font-bold text-foreground">
                       {total || "-"}
                     </span>
                   </td>
@@ -300,6 +320,13 @@ export function ScorecardGrid({
       </div>
     );
   };
+
+  // Calculate round totals for the summary bar
+  const frontHoleNumbers = frontNine.map((h) => h.holeNumber);
+  const backHoleNumbers = backNine.map((h) => h.holeNumber);
+  const frontPar = calculateParTotal(frontNine);
+  const backPar = calculateParTotal(backNine);
+  const totalPar = frontPar + backPar;
 
   return (
     <div className="space-y-4">
@@ -332,6 +359,101 @@ export function ScorecardGrid({
           {renderGrid(backNine, false)}
         </TabsContent>
       </Tabs>
+
+      {/* Round Totals Summary */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-border bg-surface/50">
+              <th className="text-left py-2 px-3 w-24">
+                <span className="text-xs text-muted font-medium">PLAYER</span>
+              </th>
+              <th className="text-center py-2 px-2">
+                <span className="text-xs text-muted font-medium">OUT</span>
+              </th>
+              <th className="text-center py-2 px-2">
+                <span className="text-xs text-muted font-medium">IN</span>
+              </th>
+              <th className="text-center py-2 px-2">
+                <span className="text-xs text-muted font-medium">TOT</span>
+              </th>
+              <th className="text-center py-2 px-2">
+                <span className="text-xs text-muted font-medium">+/-</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* Par row */}
+            <tr className="border-b border-border/30">
+              <td className="py-1.5 px-3">
+                <span className="text-xs text-muted">PAR</span>
+              </td>
+              <td className="text-center py-1.5 px-2">
+                <span className="text-xs text-muted">{frontPar}</span>
+              </td>
+              <td className="text-center py-1.5 px-2">
+                <span className="text-xs text-muted">{backPar}</span>
+              </td>
+              <td className="text-center py-1.5 px-2">
+                <span className="text-xs font-medium text-muted">{totalPar}</span>
+              </td>
+              <td className="text-center py-1.5 px-2">
+                <span className="text-xs text-muted">E</span>
+              </td>
+            </tr>
+            {players.map((player) => {
+              const front = calculateTotal(player.id, frontHoleNumbers);
+              const back = calculateTotal(player.id, backHoleNumbers);
+              const total = front + back;
+              const toPar = total - totalPar;
+              const isCurrentPlayer = player.id === currentPlayerId;
+              const hasAllScores = frontHoleNumbers.every(h => scores[player.id]?.[h]) &&
+                backHoleNumbers.every(h => scores[player.id]?.[h]);
+
+              return (
+                <tr
+                  key={player.id}
+                  className={cn(
+                    "border-b border-border/20 last:border-0",
+                    isCurrentPlayer && "bg-brand/5"
+                  )}
+                >
+                  <td className="py-2 px-3">
+                    <span className="text-sm font-medium truncate block max-w-[80px]">
+                      {player.name.split(" ")[0]}
+                    </span>
+                  </td>
+                  <td className="text-center py-2 px-2">
+                    <span className="text-sm">{front || "-"}</span>
+                  </td>
+                  <td className="text-center py-2 px-2">
+                    <span className="text-sm">{back || "-"}</span>
+                  </td>
+                  <td className="text-center py-2 px-2">
+                    <span className="text-sm font-bold">{total || "-"}</span>
+                  </td>
+                  <td className="text-center py-2 px-2">
+                    {hasAllScores && total > 0 ? (
+                      <span
+                        className={cn(
+                          "text-sm font-semibold",
+                          toPar < 0 && "text-brand",
+                          toPar === 0 && "text-foreground",
+                          toPar > 0 && "text-error"
+                        )}
+                      >
+                        {toPar === 0 ? "E" : toPar > 0 ? `+${toPar}` : toPar}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted">-</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

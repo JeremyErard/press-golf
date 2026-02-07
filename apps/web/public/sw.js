@@ -372,6 +372,12 @@ self.addEventListener('push', (event) => {
         { action: 'view', title: 'View Settlement' },
       ];
       break;
+    case 'challenge':
+      options.actions = [
+        { action: 'view', title: 'View Challenge' },
+        { action: 'dismiss', title: 'Dismiss' },
+      ];
+      break;
   }
 
   event.waitUntil(

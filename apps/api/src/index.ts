@@ -19,6 +19,7 @@ import { realtimeRoutes } from './routes/realtime.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { prisma } from './lib/prisma.js';
 import { registerRateLimiting } from './middleware/rate-limit.js';
+import { startTeeTimeScheduler } from './lib/tee-time-scheduler.js';
 
 // Simple in-memory metrics
 const metrics = {
@@ -233,6 +234,9 @@ const start = async () => {
     const host = process.env.HOST || '0.0.0.0';
 
     await app.listen({ port, host });
+
+    // Start background schedulers
+    startTeeTimeScheduler();
 
     console.log(`
     ⛳️ Press API Server running!

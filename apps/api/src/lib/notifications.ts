@@ -92,32 +92,37 @@ export async function sendNotificationToUser(
   let sent = 0;
   let failed = 0;
 
-  // Send to all subscriptions
-  for (const sub of subscriptions) {
-    try {
-      await webpush.sendNotification(
-        {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth,
+  // Send to all subscriptions in parallel
+  const results = await Promise.allSettled(
+    subscriptions.map(async (sub) => {
+      try {
+        await webpush.sendNotification(
+          {
+            endpoint: sub.endpoint,
+            keys: {
+              p256dh: sub.p256dh,
+              auth: sub.auth,
+            },
           },
-        },
-        JSON.stringify(payload)
-      );
-      sent++;
-    } catch (error: unknown) {
-      failed++;
-      const webPushError = error as { statusCode?: number };
-
-      // If subscription is expired or invalid, remove it
-      if (webPushError.statusCode === 410 || webPushError.statusCode === 404) {
-        console.log(`[Notifications] Removing expired subscription ${sub.id}`);
-        await prisma.pushSubscription.delete({ where: { id: sub.id } });
-      } else {
-        console.error(`[Notifications] Failed to send to subscription ${sub.id}:`, error);
+          JSON.stringify(payload)
+        );
+        return true;
+      } catch (error: unknown) {
+        const webPushError = error as { statusCode?: number };
+        if (webPushError.statusCode === 410 || webPushError.statusCode === 404) {
+          console.log(`[Notifications] Removing expired subscription ${sub.id}`);
+          await prisma.pushSubscription.delete({ where: { id: sub.id } });
+        } else {
+          console.error(`[Notifications] Failed to send to subscription ${sub.id}:`, error);
+        }
+        return false;
       }
-    }
+    })
+  );
+
+  for (const result of results) {
+    if (result.status === 'fulfilled' && result.value) sent++;
+    else failed++;
   }
 
   return { sent, failed };
@@ -131,10 +136,17 @@ export async function sendNotificationToUsers(
   let totalSent = 0;
   let totalFailed = 0;
 
-  for (const userId of userIds) {
-    const result = await sendNotificationToUser(userId, payload);
-    totalSent += result.sent;
-    totalFailed += result.failed;
+  const results = await Promise.allSettled(
+    userIds.map(userId => sendNotificationToUser(userId, payload))
+  );
+
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      totalSent += result.value.sent;
+      totalFailed += result.value.failed;
+    } else {
+      totalFailed++;
+    }
   }
 
   return { sent: totalSent, failed: totalFailed };
@@ -155,7 +167,7 @@ export async function notifyRoundInvite(
     title: "Round Invite",
     body: `${inviterName} invited you to play at ${courseName}`,
     data: {
-      url: `/round/${roundId}`,
+      url: `/rounds/${roundId}`,
       roundId,
     },
   });
@@ -173,7 +185,7 @@ export async function notifyGameInvite(
     title: "Game Challenge",
     body: `${creatorName} started a ${gameType} game`,
     data: {
-      url: `/round/${roundId}`,
+      url: `/rounds/${roundId}`,
       roundId,
       gameId,
     },
@@ -192,7 +204,7 @@ export async function notifyScoreUpdate(
     body: `${updaterName} scored on hole ${holeNumber}`,
     tag: `score-${roundId}-${holeNumber}`, // Group by hole to prevent spam
     data: {
-      url: `/round/${roundId}/play`,
+      url: `/rounds/${roundId}/scorecard`,
       roundId,
     },
   });
@@ -214,7 +226,7 @@ export async function notifyTeeTimeReminder(
     title: "Tee Time Reminder",
     body: `Your round at ${courseName} starts at ${timeStr}`,
     data: {
-      url: `/round/${roundId}`,
+      url: `/rounds/${roundId}`,
       roundId,
     },
   });
@@ -291,7 +303,7 @@ export async function notifyChallengeReceived(
     title: "New Challenge!",
     body: `${challengerName} challenged you to ${gameType} for $${betAmount}`,
     data: {
-      url: `/challenges`,
+      url: `/buddies`,
       challengeId,
     },
   });
@@ -308,7 +320,7 @@ export async function notifyChallengeAccepted(
     title: "Challenge Accepted!",
     body: `${challengedName} accepted your ${gameType} challenge`,
     data: {
-      url: `/challenges`,
+      url: `/buddies`,
       challengeId,
     },
   });
@@ -325,7 +337,7 @@ export async function notifyChallengeDeclined(
     title: "Challenge Declined",
     body: `${challengedName} declined your ${gameType} challenge`,
     data: {
-      url: `/challenges`,
+      url: `/buddies`,
       challengeId,
     },
   });
