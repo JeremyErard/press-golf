@@ -48,7 +48,7 @@ export function ListItem({
 
       {/* Text Content */}
       <div className="flex-1 min-w-0 text-left">
-        <p className="text-body font-medium text-white truncate">{title}</p>
+        <p className="text-body font-medium text-foreground truncate">{title}</p>
         {subtitle && (
           <p className="text-caption text-muted truncate">{subtitle}</p>
         )}

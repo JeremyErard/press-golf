@@ -5,7 +5,14 @@ import { usePathname } from "next/navigation";
 import { Home, Flag, MapPin, User, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const navItems = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof Home;
+  badge?: number;
+}
+
+const navItems: NavItem[] = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/rounds", label: "Rounds", icon: Flag },
   { href: "/buddies", label: "Buddies", icon: Users },
@@ -37,7 +44,7 @@ export function BottomNav() {
               )}
             >
               <div className={cn(
-                "p-2.5 rounded-xl transition-all",
+                "relative p-2.5 rounded-xl transition-all",
                 isActive && "bg-brand/10"
               )}>
                 <Icon
@@ -48,6 +55,11 @@ export function BottomNav() {
                   )}
                   strokeWidth={isActive ? 2.5 : 2}
                 />
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold px-1 border-2 border-[#0a0f1a]">
+                    {item.badge > 99 ? "99+" : item.badge}
+                  </span>
+                )}
               </div>
               <span className={cn(
                 "text-[11px] font-medium mt-1 transition-colors",

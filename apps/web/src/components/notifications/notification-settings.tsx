@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Bell, BellOff, Loader2 } from "lucide-react";
 import { usePushNotifications } from "@/hooks/use-push-notifications";
+import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/lib/utils";
 
 interface NotificationSettingsProps {
@@ -26,11 +27,11 @@ export function NotificationSettings({ className, compact = false }: Notificatio
 
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const handleToggleSubscription = async () => {
-    if (isSubscribed) {
-      await unsubscribe();
-    } else {
+  const handleToggleSubscription = async (enabled: boolean) => {
+    if (enabled) {
       await subscribe();
+    } else {
+      await unsubscribe();
     }
   };
 
@@ -70,13 +71,13 @@ export function NotificationSettings({ className, compact = false }: Notificatio
   if (compact) {
     return (
       <button
-        onClick={handleToggleSubscription}
+        onClick={() => handleToggleSubscription(!isSubscribed)}
         disabled={isLoading || permission === "denied"}
         className={cn(
           "flex items-center gap-2 px-3 py-2 rounded-lg transition-colors",
           isSubscribed
             ? "bg-brand/10 text-brand"
-            : "bg-muted/50 text-muted-foreground hover:bg-muted",
+            : "bg-muted/50 text-muted hover:bg-muted",
           (isLoading || permission === "denied") && "opacity-50 cursor-not-allowed",
           className
         )}
@@ -106,16 +107,16 @@ export function NotificationSettings({ className, compact = false }: Notificatio
             isSubscribed ? "bg-brand/10" : "bg-muted"
           )}>
             {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+              <Loader2 className="w-5 h-5 animate-spin text-muted" />
             ) : isSubscribed ? (
               <Bell className="w-5 h-5 text-brand" />
             ) : (
-              <BellOff className="w-5 h-5 text-muted-foreground" />
+              <BellOff className="w-5 h-5 text-muted" />
             )}
           </div>
           <div>
             <p className="font-medium">Push Notifications</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted">
               {permission === "denied"
                 ? "Blocked in browser settings"
                 : isSubscribed
@@ -125,22 +126,12 @@ export function NotificationSettings({ className, compact = false }: Notificatio
             </p>
           </div>
         </div>
-        <button
-          onClick={handleToggleSubscription}
+        <Toggle
+          checked={isSubscribed}
+          onChange={handleToggleSubscription}
           disabled={isLoading || permission === "denied"}
-          className={cn(
-            "relative w-12 h-6 rounded-full transition-colors",
-            isSubscribed ? "bg-brand" : "bg-muted-foreground/20",
-            (isLoading || permission === "denied") && "opacity-50 cursor-not-allowed"
-          )}
-        >
-          <span
-            className={cn(
-              "absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm",
-              isSubscribed && "translate-x-6"
-            )}
-          />
-        </button>
+          size="md"
+        />
       </div>
 
       {error && (
@@ -150,7 +141,7 @@ export function NotificationSettings({ className, compact = false }: Notificatio
       {/* Preference toggles - only show when subscribed */}
       {isSubscribed && preferences && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground px-1">Notification Types</p>
+          <p className="text-sm font-medium text-muted px-1">Notification Types</p>
           <div className="bg-card rounded-xl border border-border divide-y divide-border">
             <PreferenceRow
               label="Round Invites"
@@ -207,24 +198,14 @@ function PreferenceRow({ label, description, checked, disabled, onChange }: Pref
     <div className="flex items-center justify-between p-4">
       <div>
         <p className="font-medium text-sm">{label}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
+        <p className="text-xs text-muted">{description}</p>
       </div>
-      <button
-        onClick={() => onChange(!checked)}
+      <Toggle
+        checked={checked}
+        onChange={onChange}
         disabled={disabled}
-        className={cn(
-          "relative w-10 h-5 rounded-full transition-colors",
-          checked ? "bg-brand" : "bg-muted-foreground/20",
-          disabled && "opacity-50 cursor-not-allowed"
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm",
-            checked && "translate-x-5"
-          )}
-        />
-      </button>
+        size="sm"
+      />
     </div>
   );
 }

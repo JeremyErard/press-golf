@@ -91,7 +91,7 @@ const gridFeatures = [
 
 export function FeaturesSection() {
   return (
-    <section id="features" className="py-20 px-6">
+    <section id="features" aria-label="Features" className="py-20 px-6">
       <div className="max-w-6xl mx-auto">
         {/* Section Header */}
         <div className="text-center mb-16">
@@ -177,7 +177,7 @@ export function FeaturesSection() {
                   <Icon className={`w-5 h-5 ${feature.color}`} />
                 </div>
                 <h3 className="text-white font-semibold text-sm mb-1">{feature.title}</h3>
-                <p className="text-white/50 text-xs">{feature.description}</p>
+                <p className="text-white/65 text-xs">{feature.description}</p>
               </div>
             );
           })}

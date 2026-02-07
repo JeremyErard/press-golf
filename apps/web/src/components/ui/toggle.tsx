@@ -42,7 +42,7 @@ export function Toggle({
       className={cn(
         "relative rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-2 focus:ring-offset-background",
         track,
-        checked ? "bg-brand" : "bg-muted-foreground/20",
+        checked ? "bg-brand" : "bg-muted/20",
         disabled && "opacity-50 cursor-not-allowed",
         className
       )}

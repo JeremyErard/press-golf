@@ -63,7 +63,6 @@ export default function AppLayout({
             alt=""
             fill
             className="object-cover opacity-[0.15]"
-            priority
             quality={70}
           />
           {/* Soft gradient overlay - lets texture show through */}

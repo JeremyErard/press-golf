@@ -52,9 +52,9 @@ export function SubscriptionStatusCard({
         ? `Access until ${new Date(endsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
         : "Subscription canceled",
       icon: Crown,
-      bgClass: "bg-muted-foreground/10 border-muted-foreground/30",
-      iconClass: "text-muted-foreground",
-      titleClass: "text-muted-foreground",
+      bgClass: "bg-muted/10 border-muted/30",
+      iconClass: "text-muted",
+      titleClass: "text-muted",
     },
     FREE: {
       title: "Free Plan",
@@ -90,9 +90,9 @@ export function SubscriptionStatusCard({
       </div>
       <div className="flex-1 min-w-0">
         <p className={cn("font-semibold", titleClass)}>{title}</p>
-        <p className="text-sm text-muted-foreground truncate">{subtitle}</p>
+        <p className="text-sm text-muted truncate">{subtitle}</p>
       </div>
-      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+      <ChevronRight className="w-5 h-5 text-muted flex-shrink-0" />
     </button>
   );
 }

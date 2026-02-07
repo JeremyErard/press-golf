@@ -14,29 +14,12 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, Skeleton, EmptyState } from "@/components/ui";
-import { api, type PlayerStats, type GameType, type HandicapHistoryEntry } from "@/lib/api";
+import { api, type PlayerStats, type HandicapHistoryEntry } from "@/lib/api";
+import { formatMoney } from "@/lib/utils";
+import { gameTypeLabels as GAME_TYPE_LABELS } from "@/lib/game-types";
 import { HandicapChart } from "@/components/stats/handicap-chart";
 import { GameTypeStats } from "@/components/stats/game-type-stats";
 import { useRouter } from "next/navigation";
-
-const GAME_TYPE_LABELS: Record<GameType, string> = {
-  NASSAU: "Nassau",
-  SKINS: "Skins",
-  MATCH_PLAY: "Match Play",
-  WOLF: "Wolf",
-  NINES: "Nines",
-  STABLEFORD: "Stableford",
-  BINGO_BANGO_BONGO: "Bingo Bango Bongo",
-  VEGAS: "Vegas",
-  SNAKE: "Snake",
-  BANKER: "Banker",
-};
-
-function formatMoney(amount: number): string {
-  if (amount === 0) return "$0";
-  const sign = amount >= 0 ? "+" : "";
-  return `${sign}$${Math.abs(amount).toFixed(0)}`;
-}
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);

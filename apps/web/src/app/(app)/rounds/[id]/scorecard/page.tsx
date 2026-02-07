@@ -614,6 +614,16 @@ export default function ScorecardPage() {
                 {connectionStatus}
               </span>
             </button>
+            {/* Complete Round - always accessible via header */}
+            {round.status === "ACTIVE" && holesWithScores > 0 && holesWithScores < 14 && (
+              <button
+                onClick={() => dispatch({ type: "SHOW_FINISH_CONFIRM", payload: true })}
+                className="flex items-center gap-1.5 bg-black/30 rounded-full px-2 py-1 hover:bg-black/50"
+              >
+                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                <span className="text-xs text-white/90">Finish</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -647,8 +657,8 @@ export default function ScorecardPage() {
 
       </div>
 
-      {/* Complete Round Button - visible once scoring has started */}
-      {holesWithScores > 0 && round.status === "ACTIVE" && (
+      {/* Complete Round Button - visible once at least 14 holes have scores */}
+      {holesWithScores >= 14 && round.status === "ACTIVE" && (
         <div className="fixed bottom-nav left-0 right-0 z-40 glass border-t border-border">
           <div className="p-4 max-w-lg mx-auto">
             <Button

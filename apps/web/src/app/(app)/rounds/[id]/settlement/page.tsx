@@ -15,22 +15,10 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
-import { api, type RoundDetail, type GameType, type ApiSettlement, type PaymentMethodType, type DotsData } from "@/lib/api";
+import { api, type RoundDetail, type ApiSettlement, type PaymentMethodType, type DotsData } from "@/lib/api";
 import { formatMoney, cn } from "@/lib/utils";
+import { gameTypeLabels } from "@/lib/game-types";
 import { toast } from "@/components/ui/sonner";
-
-const gameTypeLabels: Record<GameType, string> = {
-  NASSAU: "Nassau",
-  SKINS: "Skins",
-  MATCH_PLAY: "Match Play",
-  WOLF: "Wolf",
-  NINES: "Nines",
-  STABLEFORD: "Stableford",
-  BINGO_BANGO_BONGO: "Bingo Bango Bongo",
-  VEGAS: "Vegas",
-  SNAKE: "Snake",
-  BANKER: "Banker",
-};
 
 export default function SettlementPage() {
   const params = useParams();

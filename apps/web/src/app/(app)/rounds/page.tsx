@@ -9,7 +9,7 @@ import { Header } from "@/components/layout/header";
 import { TabHelpSheet } from "@/components/onboarding/tab-help-sheet";
 import { HelpButton } from "@/components/onboarding/help-button";
 import { api, type Round } from "@/lib/api";
-import { formatDate, formatCourseName } from "@/lib/utils";
+import { formatDate, formatCourseName, formatMoney } from "@/lib/utils";
 
 const statusBadgeVariant = {
   SETUP: "warning" as const,
@@ -27,12 +27,6 @@ interface RoundWithDetails extends Round {
   courseName?: string;
   myEarnings?: number;
   gameTypes?: string[];
-}
-
-function formatMoney(amount: number): string {
-  if (amount === 0) return "$0";
-  const sign = amount >= 0 ? "+" : "";
-  return `${sign}$${Math.abs(amount).toFixed(0)}`;
 }
 
 function getMonthYear(dateString: string): string {

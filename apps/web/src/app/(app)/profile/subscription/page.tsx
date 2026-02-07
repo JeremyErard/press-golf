@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { ArrowLeft, Crown, Check, ExternalLink, Loader2 } from "lucide-react";
+import { Crown, Check, ExternalLink, Loader2 } from "lucide-react";
+import { Header } from "@/components/layout/header";
 import { api, BillingStatus } from "@/lib/api";
 
 export default function SubscriptionPage() {
@@ -98,19 +99,7 @@ export default function SubscriptionPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border">
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1 text-muted hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-lg font-semibold text-foreground">Subscription</h1>
-          <div className="w-5" />
-        </div>
-      </div>
+      <Header title="Subscription" showBack />
 
       <div className="p-4 space-y-6">
         {error && (

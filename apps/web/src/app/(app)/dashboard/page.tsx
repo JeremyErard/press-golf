@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronRight, Play, UserPlus, Flag } from "lucide-react";
+import { ChevronRight, Play, UserPlus, Flag, BarChart3 } from "lucide-react";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton, SectionHeader } from "@/components/ui";
 import { PendingApprovals } from "@/components/handicap/pending-approvals";
 import { FirstLaunchExplainer } from "@/components/onboarding/first-launch-explainer";
@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [activeRoundDetail, setActiveRoundDetail] = useState<RoundDetail | null>(null);
   const [activeRoundResults, setActiveRoundResults] = useState<CalculateResultsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const { showExplainer, markExplainerSeen } = useFirstLaunch();
 
@@ -52,8 +53,9 @@ export default function DashboardPage() {
           // Results might not be available yet
         }
       }
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+      setError(true);
     } finally {
       setIsLoading(false);
     }
@@ -173,6 +175,7 @@ export default function DashboardPage() {
       )}
 
       <div className="min-h-screen pb-24">
+        <div className="safe-area-top" />
         {/* Logo Header */}
         <div className="px-5 pt-6 pb-2">
           <div className="flex items-center justify-between">
@@ -201,6 +204,19 @@ export default function DashboardPage() {
           </div>
         </div>
 
+      {/* Loading Skeleton */}
+      {isLoading ? (
+        <div className="px-5 space-y-5 pt-4">
+          {/* Greeting banner skeleton */}
+          <Skeleton className="h-28 w-full rounded-2xl" />
+          {/* Career earnings skeleton */}
+          <Skeleton className="h-36 w-full rounded-2xl" />
+          {/* Round card skeletons */}
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-20 w-full rounded-xl" />
+        </div>
+      ) : (
+      <>
       {/* Greeting Section with Time-Based Image */}
       <div className="px-5 pb-4">
         <div className="relative overflow-hidden rounded-2xl">
@@ -233,44 +249,77 @@ export default function DashboardPage() {
         {/* Pending Handicap Approvals (for round creators) */}
         <PendingApprovals />
 
-        {/* Career Earnings Card */}
-        <div className={`relative overflow-hidden rounded-2xl shadow-xl ${careerEarnings >= 0 ? "shadow-green-900/20" : "shadow-red-900/20"}`}>
-          {/* Conditional Background Image */}
-          <div className="absolute inset-0">
-            <Image
-              src={careerEarnings >= 0
-                ? "/images/golf-trophy.jpg"
-                : "https://i0.wp.com/efe.com/wp-content/uploads/2024/04/rss-efe6d24dff7e3f5149dfef214769b347848fdc6af6fw.jpg?fit=1920%2C1346&ssl=1"
-              }
-              alt={careerEarnings >= 0 ? "Winning golfer" : "Disappointed golfer"}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 50vw"
-            />
-            {/* Gradient overlay for text readability */}
-            <div className={`absolute inset-0 ${careerEarnings >= 0
-              ? "bg-gradient-to-r from-black/80 via-black/60 to-black/40"
-              : "bg-gradient-to-r from-black/80 via-black/60 to-black/40"}`}
-            />
-          </div>
+        {/* Error Card */}
+        {error && !isLoading && (
+          <Card className="glass-card border border-red-500/30">
+            <CardContent className="p-5 text-center">
+              <p className="text-white font-semibold mb-1">Couldn&apos;t load your data</p>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="mt-2"
+                onClick={() => { setError(false); fetchData(); }}
+              >
+                Tap to retry
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
-          {/* Content */}
-          <div className="relative z-10 p-5">
-            <p className="text-muted text-sm font-medium mb-1">Career Earnings</p>
-            <p className={`text-[3.5rem] font-bold leading-none tracking-tight ${careerEarnings >= 0 ? "text-green-400" : "text-red-400"}`}>
-              {formatMoney(careerEarnings)}
-            </p>
-            <div className="mt-4">
-              <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ${
-                careerEarnings >= 0
-                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                  : "bg-red-500/20 text-red-400 border border-red-500/30"
-              }`}>
-                Career Net
-              </span>
+        {/* Career Earnings Card */}
+        {!hasAnyRounds ? (
+          <Link href="/rounds/new">
+            <Card className="glass-card-hover overflow-hidden">
+              <CardContent className="p-5 text-center">
+                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-brand/20 flex items-center justify-center">
+                  <Flag className="w-6 h-6 text-brand" />
+                </div>
+                <p className="text-white font-semibold">Play your first round to start tracking earnings</p>
+                <p className="text-brand text-sm font-medium mt-2">Start a Round &rarr;</p>
+              </CardContent>
+            </Card>
+          </Link>
+        ) : (
+          <Link href="/stats">
+            <div className={`relative overflow-hidden rounded-2xl shadow-xl ${careerEarnings >= 0 ? "shadow-green-900/20" : "shadow-red-900/20"}`}>
+              {/* Conditional Background Image */}
+              <div className="absolute inset-0">
+                <Image
+                  src={careerEarnings >= 0
+                    ? "/images/golf-trophy.jpg"
+                    : "https://i0.wp.com/efe.com/wp-content/uploads/2024/04/rss-efe6d24dff7e3f5149dfef214769b347848fdc6af6fw.jpg?fit=1920%2C1346&ssl=1"
+                  }
+                  alt={careerEarnings >= 0 ? "Winning golfer" : "Disappointed golfer"}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+                {/* Gradient overlay for text readability */}
+                <div className={`absolute inset-0 ${careerEarnings >= 0
+                  ? "bg-gradient-to-r from-black/80 via-black/60 to-black/40"
+                  : "bg-gradient-to-r from-black/80 via-black/60 to-black/40"}`}
+                />
+              </div>
+
+              {/* Content */}
+              <div className="relative z-10 p-5">
+                <p className="text-muted text-sm font-medium mb-1">Career Earnings</p>
+                <p className={`text-[3.5rem] font-bold leading-none tracking-tight ${careerEarnings >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  {formatMoney(careerEarnings)}
+                </p>
+                <div className="mt-4">
+                  <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold ${
+                    careerEarnings >= 0
+                      ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                      : "bg-red-500/20 text-red-400 border border-red-500/30"
+                  }`}>
+                    Career Net
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </Link>
+        )}
 
         {/* Active Round Card (if exists) */}
         {activeRound && activeRoundStatus && (
@@ -348,9 +397,12 @@ export default function DashboardPage() {
         {/* Setup Rounds Section - Rounds waiting to start */}
         {setupRounds.length > 0 && (
           <div className="pt-2">
-            <SectionHeader title="Rounds in Setup" />
+            <SectionHeader
+              title="Rounds in Setup"
+              {...(setupRounds.length > 5 ? { seeAllHref: "/rounds", count: setupRounds.length } : {})}
+            />
             <div className="space-y-3">
-              {setupRounds.map((round, index) => (
+              {setupRounds.slice(0, 5).map((round, index) => (
                 <Link key={round.id} href={`/rounds/${round.id}`}>
                   <Card
                     className="glass-card-hover border-l-4 border-l-amber-500 animate-fade-in-up"
@@ -390,13 +442,7 @@ export default function DashboardPage() {
         <div className="pt-2">
           <SectionHeader title="Recent Rounds" seeAllHref="/rounds" />
 
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2].map((i) => (
-                <Skeleton key={i} className="h-20 w-full rounded-xl" />
-              ))}
-            </div>
-          ) : recentRounds.length > 0 ? (
+          {recentRounds.length > 0 ? (
             <div className="space-y-3">
               {recentRounds.map((round, index) => (
                 <Link key={round.id} href={`/rounds/${round.id}`}>
@@ -477,27 +523,44 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-4 pt-2">
-          <Link href="/rounds/new">
-            <Button
-              variant="secondary"
-              className="w-full h-14 bg-brand/10 hover:bg-brand/20 border border-brand/20 text-brand font-semibold"
-            >
-              <Play className="w-4 h-4 mr-2" />
-              New Round
-            </Button>
-          </Link>
-          <Link href="/buddies">
-            <Button
-              variant="secondary"
-              className="w-full h-14 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold"
-            >
-              <UserPlus className="w-4 h-4 mr-2" />
-              Invite Buddy
-            </Button>
-          </Link>
+        <div className="pt-2">
+          <SectionHeader title="Quick Actions" />
+          <div className="grid grid-cols-2 gap-4">
+            {!activeRound ? (
+              <Link href="/stats">
+                <Button
+                  variant="secondary"
+                  className="w-full h-14 bg-brand/10 hover:bg-brand/20 border border-brand/20 text-brand font-semibold"
+                >
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  View Stats
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/rounds/new">
+                <Button
+                  variant="secondary"
+                  className="w-full h-14 bg-brand/10 hover:bg-brand/20 border border-brand/20 text-brand font-semibold"
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  New Round
+                </Button>
+              </Link>
+            )}
+            <Link href="/buddies">
+              <Button
+                variant="secondary"
+                className="w-full h-14 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Invite Buddy
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Tab Help Sheet */}
       <TabHelpSheet

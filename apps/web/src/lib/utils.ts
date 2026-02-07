@@ -5,14 +5,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatMoney(amount: number): string {
+export function formatMoney(amount: number, decimals?: number): string {
   const isNegative = amount < 0;
   const absAmount = Math.abs(amount);
+  const minDecimals = decimals ?? 0;
+  const maxDecimals = decimals ?? 2;
   const formatted = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: minDecimals,
+    maximumFractionDigits: maxDecimals,
   }).format(absAmount);
 
   // Don't add +/- prefix for zero

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth, useUser } from "@clerk/nextjs";
 import {
@@ -14,11 +14,14 @@ import {
   Loader2,
   ArrowLeft,
   Download,
+  RefreshCw,
 } from "lucide-react";
 import { api } from "@/lib/api";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 type PaymentType = "VENMO" | "ZELLE" | "CASHAPP" | "APPLE_PAY";
+
+const FORM_STORAGE_KEY = "press_onboarding_form";
 
 const steps = [
   { id: 1, name: "Subscribe", icon: Crown },
@@ -38,11 +41,21 @@ export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
   const [checkingSubscription, setCheckingSubscription] = useState(true);
+  const [checkoutPending, setCheckoutPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
 
-  const checkoutSuccess = searchParams.get("checkout") === "success";
+  const checkoutSuccess =
+    searchParams.get("checkout") === "success" ||
+    (typeof window !== "undefined" && sessionStorage.getItem("press_checkout_success") === "true");
+
+  // Persist checkout=success in sessionStorage so a refresh doesn't lose it
+  useEffect(() => {
+    if (searchParams.get("checkout") === "success") {
+      sessionStorage.setItem("press_checkout_success", "true");
+    }
+  }, [searchParams]);
 
   // Step 2: Profile
   const [firstName, setFirstName] = useState("");
@@ -56,6 +69,86 @@ export default function OnboardingPage() {
   // Step 4: Payment
   const [paymentType, setPaymentType] = useState<PaymentType>("VENMO");
   const [paymentHandle, setPaymentHandle] = useState("");
+
+  // Hydrate form data from sessionStorage on mount
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
+    try {
+      const saved = sessionStorage.getItem(FORM_STORAGE_KEY);
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (data.firstName) setFirstName(data.firstName);
+        if (data.lastName) setLastName(data.lastName);
+        if (data.phone) setPhone(data.phone);
+        if (data.handicapIndex) setHandicapIndex(data.handicapIndex);
+        if (data.ghinNumber) setGhinNumber(data.ghinNumber);
+        if (data.paymentType) setPaymentType(data.paymentType);
+        if (data.paymentHandle) setPaymentHandle(data.paymentHandle);
+        if (data.currentStep && data.currentStep >= 2) setCurrentStep(data.currentStep as Step);
+      }
+    } catch {
+      // ignore corrupt storage
+    }
+  }, []);
+
+  // Debounced persist form data to sessionStorage
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      try {
+        sessionStorage.setItem(
+          FORM_STORAGE_KEY,
+          JSON.stringify({
+            firstName,
+            lastName,
+            phone,
+            handicapIndex,
+            ghinNumber,
+            paymentType,
+            paymentHandle,
+            currentStep,
+          })
+        );
+      } catch {
+        // storage full or unavailable
+      }
+    }, 300);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [firstName, lastName, phone, handicapIndex, ghinNumber, paymentType, paymentHandle, currentStep]);
+
+  // Re-run subscription check (used by "Check Again" button)
+  const recheckSubscription = useCallback(async () => {
+    setCheckingSubscription(true);
+    setCheckoutPending(false);
+    try {
+      const token = await getToken();
+      if (!token) {
+        setCheckingSubscription(false);
+        setCheckoutPending(true);
+        return;
+      }
+      const status = await api.getBillingStatus(token);
+      if (status.status === "ACTIVE" || status.status === "FOUNDING" || status.isFoundingMember) {
+        sessionStorage.removeItem("press_checkout_success");
+        setCurrentStep(2);
+        setFirstName(clerkUser?.firstName || "");
+        setLastName(clerkUser?.lastName || "");
+        setCheckingSubscription(false);
+        router.replace("/onboarding");
+      } else {
+        setCheckingSubscription(false);
+        setCheckoutPending(true);
+      }
+    } catch {
+      setCheckingSubscription(false);
+      setCheckoutPending(true);
+    }
+  }, [getToken, clerkUser, router]);
 
   // Check subscription status and PWA install prompt
   useEffect(() => {
@@ -75,6 +168,7 @@ export default function OnboardingPage() {
         // If already subscribed or founding member, skip to profile
         if (status.status === "ACTIVE" || status.status === "FOUNDING" || status.isFoundingMember) {
           if (pollInterval) clearInterval(pollInterval);
+          sessionStorage.removeItem("press_checkout_success");
 
           // Check if there's a stored redirect from invite flow
           if (checkoutSuccess) {
@@ -114,12 +208,14 @@ export default function OnboardingPage() {
     if (checkoutSuccess) {
       let delay = 2000;
       const maxDelay = 5000;
-      const deadline = Date.now() + 15000;
+      const deadline = Date.now() + 30000;
       const cancelled = false;
 
       const poll = () => {
         if (cancelled || Date.now() >= deadline) {
+          // Polling timed out after checkout success — show pending state
           setCheckingSubscription(false);
+          setCheckoutPending(true);
           return;
         }
         pollInterval = setTimeout(() => {
@@ -236,6 +332,8 @@ export default function OnboardingPage() {
       } else if (currentStep === 6) {
         // Mark onboarding complete and go to dashboard
         await api.completeOnboarding(token);
+        sessionStorage.removeItem(FORM_STORAGE_KEY);
+        sessionStorage.removeItem("press_checkout_success");
         sessionStorage.setItem("press_onboarding_complete", "true");
         router.push("/dashboard");
       }
@@ -289,6 +387,34 @@ export default function OnboardingPage() {
     );
   }
 
+  // Checkout completed but subscription not yet confirmed after polling timeout
+  if (checkoutPending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="w-full max-w-sm text-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto">
+            <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Your payment is being processed</h2>
+            <p className="text-sm text-muted mt-2">
+              This usually takes just a moment. If it persists, try refreshing the page.
+            </p>
+          </div>
+          <button
+            onClick={recheckSubscription}
+            className="w-full py-4 px-4 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            <RefreshCw className="w-5 h-5" />
+            Check Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const currentStepName = steps.find((s) => s.id === currentStep)?.name ?? "";
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -309,7 +435,7 @@ export default function OnboardingPage() {
               ? "Join Press"
               : currentStep === 6
               ? "You're all set!"
-              : "Set up your profile"}
+              : currentStepName}
           </h1>
           <div className="w-5" />
         </div>
@@ -324,16 +450,25 @@ export default function OnboardingPage() {
               const isCompleted = step.id < currentStep;
 
               return (
-                <div key={step.id} className="flex items-center">
-                  <div
-                    className={`w-2 h-2 rounded-full transition-all ${
-                      isCompleted
-                        ? "bg-brand"
-                        : isActive
-                        ? "bg-brand w-4"
-                        : "bg-border"
-                    }`}
-                  />
+                <div key={step.id} className="flex items-center gap-1">
+                  <div className="flex flex-col items-center gap-1">
+                    <div
+                      className={`w-3 h-3 rounded-full transition-all ${
+                        isCompleted
+                          ? "bg-brand"
+                          : isActive
+                          ? "bg-brand w-5"
+                          : "bg-border"
+                      }`}
+                    />
+                    <span
+                      className={`text-[10px] leading-none ${
+                        isCompleted || isActive ? "text-brand" : "text-muted"
+                      }`}
+                    >
+                      {step.name}
+                    </span>
+                  </div>
                   {idx < steps.length - 2 && <div className="w-4" />}
                 </div>
               );
@@ -352,7 +487,7 @@ export default function OnboardingPage() {
 
         {/* Step 1: Subscribe */}
         {currentStep === 1 && (
-          <div className="space-y-6">
+          <div className="animate-fade-in space-y-6">
             <div className="text-center mb-8 pt-8">
               <div className="w-20 h-20 rounded-full bg-brand/20 flex items-center justify-center mx-auto mb-6">
                 <Crown className="w-10 h-10 text-brand" />
@@ -391,7 +526,7 @@ export default function OnboardingPage() {
 
         {/* Step 2: Profile */}
         {currentStep === 2 && (
-          <div className="space-y-6">
+          <div className="animate-fade-in space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-foreground">Your Profile</h2>
               <p className="text-muted mt-2">How your buddies will see you</p>
@@ -445,10 +580,11 @@ export default function OnboardingPage() {
 
         {/* Step 3: Handicap */}
         {currentStep === 3 && (
-          <div className="space-y-6">
+          <div className="animate-fade-in space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-foreground">Your Handicap</h2>
               <p className="text-muted mt-2">Used for calculating strokes</p>
+              <p className="text-xs text-muted mt-1">You can set this up later from your profile.</p>
             </div>
 
             <div className="space-y-4">
@@ -484,10 +620,11 @@ export default function OnboardingPage() {
 
         {/* Step 4: Settlement Payment */}
         {currentStep === 4 && (
-          <div className="space-y-6">
+          <div className="animate-fade-in space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold text-foreground">Settlement Method</h2>
               <p className="text-muted mt-2">How you'll pay and get paid</p>
+              <p className="text-xs text-muted mt-1">You can set this up later from your profile.</p>
             </div>
 
             <div className="space-y-4">
@@ -499,7 +636,10 @@ export default function OnboardingPage() {
                   {(["VENMO", "ZELLE", "CASHAPP", "APPLE_PAY"] as PaymentType[]).map((type) => (
                     <button
                       key={type}
-                      onClick={() => setPaymentType(type)}
+                      onClick={() => {
+                        if (type !== paymentType) setPaymentHandle("");
+                        setPaymentType(type);
+                      }}
                       className={`p-3 rounded-xl border text-sm font-medium transition-all ${
                         paymentType === type
                           ? "bg-brand/20 border-brand text-brand"
@@ -544,13 +684,14 @@ export default function OnboardingPage() {
 
         {/* Step 5: Install PWA */}
         {currentStep === 5 && (
-          <div className="space-y-6">
+          <div className="animate-fade-in space-y-6">
             <div className="text-center mb-8 pt-4">
               <div className="w-20 h-20 rounded-full bg-brand/20 flex items-center justify-center mx-auto mb-6">
                 <Smartphone className="w-10 h-10 text-brand" />
               </div>
               <h2 className="text-2xl font-bold text-foreground">Add to Home Screen</h2>
               <p className="text-muted mt-2">Get the full app experience</p>
+              <p className="text-xs text-muted mt-1">You can set this up later from your profile.</p>
             </div>
 
             {isInstalled ? (
@@ -574,13 +715,13 @@ export default function OnboardingPage() {
                 <div className="bg-surface rounded-xl p-4 space-y-3 text-sm">
                   <p className="text-foreground font-medium">On iPhone/iPad:</p>
                   <p className="text-muted">
-                    Tap the Share button, then "Add to Home Screen"
+                    Tap the Share button, then &quot;Add to Home Screen&quot;
                   </p>
                 </div>
                 <div className="bg-surface rounded-xl p-4 space-y-3 text-sm">
                   <p className="text-foreground font-medium">On Android:</p>
                   <p className="text-muted">
-                    Tap the menu (⋮), then "Add to Home Screen"
+                    Tap the menu (&bull;&bull;&bull;), then &quot;Add to Home Screen&quot;
                   </p>
                 </div>
               </div>
@@ -590,11 +731,11 @@ export default function OnboardingPage() {
 
         {/* Step 6: Complete */}
         {currentStep === 6 && (
-          <div className="text-center py-8">
+          <div className="animate-fade-in text-center py-8">
             <div className="w-20 h-20 rounded-full bg-brand/20 flex items-center justify-center mx-auto mb-6">
               <Check className="w-10 h-10 text-brand" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">You're all set!</h2>
+            <h2 className="text-2xl font-bold text-foreground mb-2">You&apos;re all set!</h2>
             <p className="text-muted mb-8">
               Start a round or join one with your buddies.
             </p>
@@ -610,7 +751,7 @@ export default function OnboardingPage() {
               onClick={handleSkip}
               className="flex-1 py-4 px-4 rounded-xl bg-surface border border-border text-muted font-medium"
             >
-              Skip
+              Skip for now
             </button>
           )}
 

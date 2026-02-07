@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import Image from "next/image";
-import { ChevronRight, ChevronDown, Check, Crown, Users, Swords, Target, CircleDot } from "lucide-react";
+import { ChevronRight, ChevronDown, ChevronLeft, Check, Crown, Users, Swords, Target, CircleDot } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Skeleton, Input } from "@/components/ui";
 import { Toggle } from "@/components/ui/toggle";
@@ -56,6 +56,7 @@ export default function NewRoundPage() {
   const [selectedTee, setSelectedTee] = useState<Tee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [showAlternateTees, setShowAlternateTees] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
@@ -169,6 +170,7 @@ export default function NewRoundPage() {
     if (!course || !selectedTee) return;
 
     setIsCreating(true);
+    setError(null);
     try {
       const token = await getToken();
       if (!token) return;
@@ -184,8 +186,10 @@ export default function NewRoundPage() {
       });
 
       router.push(`/rounds/${round.id}`);
-    } catch (error) {
-      console.error("Failed to create round:", error);
+    } catch (err) {
+      console.error("Failed to create round:", err);
+      const apiError = err as { message?: string };
+      setError(apiError?.message || "Failed to create round. Please try again.");
     } finally {
       setIsCreating(false);
     }
@@ -522,6 +526,22 @@ export default function NewRoundPage() {
                 >
                   <Check className="h-5 w-5 mr-2" />
                   Create Round
+                </Button>
+
+                {/* Error banner */}
+                {error && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                    <p className="text-sm text-red-400">{error}</p>
+                  </div>
+                )}
+
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => { setStep("tee"); setError(null); }}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Change Tee
                 </Button>
               </div>
             )}

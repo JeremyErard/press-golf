@@ -11,7 +11,8 @@ import {
   Dice5,
   Circle,
   Banknote,
-  Gamepad2
+  Gamepad2,
+  HelpCircle
 } from "lucide-react";
 
 const games = [
@@ -96,7 +97,7 @@ export function GamesShowcaseSection() {
   const otherGames = games.filter(g => !g.popular);
 
   return (
-    <section className="py-20 px-6 relative">
+    <section aria-label="Games showcase" className="py-20 px-6 relative">
       {/* Background pattern */}
       <div className="absolute inset-0 -z-10 opacity-30">
         <div className="absolute top-20 right-20 w-64 h-64 bg-brand/10 rounded-full blur-3xl" />
@@ -164,7 +165,7 @@ export function GamesShowcaseSection() {
         <div className="mt-12 text-center">
           <div className="inline-flex items-center gap-3 px-6 py-4 rounded-2xl glass-card">
             <div className="w-10 h-10 rounded-xl bg-brand/20 flex items-center justify-center">
-              <span className="text-brand text-lg">?</span>
+              <HelpCircle className="w-5 h-5 text-brand" />
             </div>
             <div className="text-left">
               <p className="text-white font-medium">Don&apos;t know the rules?</p>

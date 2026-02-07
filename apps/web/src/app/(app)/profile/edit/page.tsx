@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { Header } from "@/components/layout/header";
 import { api } from "@/lib/api";
 import { toast } from "@/components/ui/sonner";
 import { Input } from "@/components/ui/input";
@@ -149,16 +150,10 @@ export default function EditProfilePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border">
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1 text-muted hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-lg font-semibold text-foreground">Personal Info</h1>
+      <Header
+        title="Edit Profile"
+        showBack
+        rightAction={
           <button
             onClick={handleSave}
             disabled={saving}
@@ -166,10 +161,10 @@ export default function EditProfilePage() {
           >
             {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save"}
           </button>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="p-4 space-y-6">
+      <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="p-4 space-y-6">
         <div className="space-y-4">
           <Input
             label="First Name"
@@ -228,7 +223,7 @@ export default function EditProfilePage() {
             </p>
           </div>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

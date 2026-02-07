@@ -80,7 +80,7 @@ interface SheetTitleProps {
 
 export function SheetTitle({ children, className }: SheetTitleProps) {
   return (
-    <h2 className={cn("text-xl font-semibold text-white", className)}>
+    <h2 className={cn("text-xl font-semibold text-foreground", className)}>
       {children}
     </h2>
   );

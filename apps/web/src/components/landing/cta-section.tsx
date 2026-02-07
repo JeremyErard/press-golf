@@ -24,7 +24,7 @@ export function CtaSection() {
   const userState = useUserState();
 
   return (
-    <section className="py-24 px-6 relative overflow-hidden">
+    <section aria-label="Call to action" className="py-24 px-6 relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 -z-10">
         <Image
@@ -125,7 +125,7 @@ export function CtaSection() {
               </div>
 
               {userState !== "authenticated" && (
-                <p className="text-sm text-white/40 mt-4">
+                <p className="text-sm text-white/60 mt-4">
                   $2.49/month or $19.99/year • Cancel anytime
                 </p>
               )}

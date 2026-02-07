@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { ArrowLeft, Plus, Trash2, Star, Loader2, Check } from "lucide-react";
+import { Plus, Trash2, Star, Loader2, Check, CreditCard } from "lucide-react";
+import { Header } from "@/components/layout/header";
+import { EmptyState } from "@/components/ui";
 import { api, PaymentMethod, PaymentMethodType } from "@/lib/api";
 
 const PAYMENT_TYPES: { type: PaymentMethodType; label: string; placeholder: string; prefix: string }[] = [
@@ -14,13 +15,13 @@ const PAYMENT_TYPES: { type: PaymentMethodType; label: string; placeholder: stri
 ];
 
 export default function PaymentMethodsPage() {
-  const router = useRouter();
   const { getToken } = useAuth();
 
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -133,19 +134,7 @@ export default function PaymentMethodsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border">
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-1 text-muted hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-lg font-semibold text-foreground">Payment Methods</h1>
-          <div className="w-5" />
-        </div>
-      </div>
+      <Header title="Payment Methods" showBack />
 
       <div className="p-4 space-y-6">
         {error && (
@@ -165,56 +154,93 @@ export default function PaymentMethodsPage() {
           Add your payment apps so other players can settle up with you easily.
         </p>
 
+        {/* Empty State */}
+        {methods.length === 0 && !showAddForm && (
+          <EmptyState
+            icon={<CreditCard className="w-full h-full" />}
+            title="No payment methods yet"
+            description="Add Venmo, Cash App, Zelle, or Apple Cash so friends can settle up with you"
+            action={{
+              label: "Add Payment Method",
+              onClick: () => setShowAddForm(true),
+              icon: <Plus className="w-4 h-4 mr-1" />,
+            }}
+          />
+        )}
+
         {/* Existing Methods */}
         <div className="space-y-3">
           {methods.map((method) => {
             const config = getTypeConfig(method.type);
             return (
-              <div
-                key={method.id}
-                className="bg-card border border-border rounded-xl p-4 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-elevated flex items-center justify-center">
-                    <span className="text-sm font-semibold text-foreground">
-                      {config.label.charAt(0)}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-foreground">{config.label}</p>
-                      {method.isPreferred && (
-                        <span className="text-xs bg-brand/20 text-brand px-2 py-0.5 rounded-full">
-                          Preferred
-                        </span>
-                      )}
+              <div key={method.id}>
+                <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-elevated flex items-center justify-center">
+                      <span className="text-sm font-semibold text-foreground">
+                        {config.label.charAt(0)}
+                      </span>
                     </div>
-                    <p className="text-sm text-muted">{method.handle}</p>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-foreground">{config.label}</p>
+                        {method.isPreferred && (
+                          <span className="text-xs bg-brand/20 text-brand px-2 py-0.5 rounded-full">
+                            Preferred
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted">{method.handle}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {!method.isPreferred && (
+                      <button
+                        onClick={() => handleSetPreferred(method.id)}
+                        className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-elevated transition-colors"
+                        title="Set as preferred"
+                      >
+                        <Star className="w-4 h-4 text-muted" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setDeleteConfirmId(method.id)}
+                      disabled={deletingId === method.id}
+                      className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-red-500/10 text-red-400 transition-colors disabled:opacity-50"
+                    >
+                      {deletingId === method.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {!method.isPreferred && (
-                    <button
-                      onClick={() => handleSetPreferred(method.id)}
-                      className="p-2 rounded-lg hover:bg-elevated transition-colors"
-                      title="Set as preferred"
-                    >
-                      <Star className="w-4 h-4 text-muted" />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(method.id)}
-                    disabled={deletingId === method.id}
-                    className="p-2 rounded-lg hover:bg-red-500/10 text-red-400 transition-colors disabled:opacity-50"
-                  >
-                    {deletingId === method.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
+                {/* Delete Confirmation */}
+                {deleteConfirmId === method.id && (
+                  <div className="mt-3 p-3 rounded-lg bg-red-500/5 border border-red-500/20 flex items-center justify-between">
+                    <p className="text-sm text-red-400">Remove this payment method?</p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setDeleteConfirmId(null)}
+                        className="px-3 py-1.5 text-sm rounded-lg bg-elevated border border-border text-foreground hover:bg-surface transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDeleteConfirmId(null);
+                          handleDelete(method.id);
+                        }}
+                        className="px-3 py-1.5 text-sm rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -277,7 +303,7 @@ export default function PaymentMethodsPage() {
               </button>
             </div>
           </div>
-        ) : (
+        ) : methods.length > 0 ? (
           <button
             onClick={() => setShowAddForm(true)}
             className="w-full py-3 px-4 rounded-xl border-2 border-dashed border-border text-muted hover:border-brand hover:text-brand transition-colors flex items-center justify-center gap-2"
@@ -285,7 +311,7 @@ export default function PaymentMethodsPage() {
             <Plus className="w-5 h-5" />
             Add Payment Method
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   );

@@ -35,6 +35,11 @@ export default function AuthLayout({
           </div>
         </div>
 
+        {/* Value proposition bar - mobile */}
+        <div className="text-white/70 text-sm text-center py-3 md:hidden">
+          10 game types &middot; Instant settlement &middot; $2.49/mo
+        </div>
+
         {children}
 
         {/* Add to Home Screen */}

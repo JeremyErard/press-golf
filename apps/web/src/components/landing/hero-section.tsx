@@ -9,7 +9,7 @@ import { useUserState } from "@/hooks/use-user-state";
 export function HeroSection() {
   const userState = useUserState();
   return (
-    <section className="min-h-screen relative flex flex-col overflow-hidden">
+    <section aria-label="Hero" className="min-h-screen relative flex flex-col overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 z-0">
         <Image
@@ -42,7 +42,7 @@ export function HeroSection() {
               <h1 className="text-5xl lg:text-7xl font-black tracking-tight text-white drop-shadow-2xl mb-3">
                 PRESS
               </h1>
-              <p className="text-white/50 text-xs uppercase tracking-[0.25em] font-medium mb-6">
+              <p className="text-white/65 text-xs uppercase tracking-[0.25em] font-medium mb-6">
                 Your Side Games Managed For You
               </p>
 
@@ -103,7 +103,7 @@ export function HeroSection() {
                         size="lg"
                       >
                         <Crown className="h-5 w-5 mr-2" />
-                        Get Started - $2.49/month
+                        Get Started - $2.49/mo
                       </Button>
                     </Link>
                     <Link href="#features">
@@ -121,7 +121,7 @@ export function HeroSection() {
               </div>
 
               {userState !== "authenticated" && (
-                <p className="text-xs text-white/40 mt-4">Cancel anytime • No commitment</p>
+                <p className="text-xs text-white/60 mt-4">Cancel anytime • No commitment</p>
               )}
             </div>
 
@@ -176,7 +176,7 @@ export function HeroSection() {
 
         {/* Bottom spacing with scroll indicator */}
         <div className="flex-1 min-h-[15vh] flex flex-col items-center justify-end pb-8">
-          <a href="#features" className="text-white/50 hover:text-white/70 transition-colors animate-bounce">
+          <a href="#features" className="text-white/65 hover:text-white/70 transition-colors animate-bounce" aria-label="Scroll to features">
             <ChevronDown className="h-8 w-8" />
           </a>
         </div>

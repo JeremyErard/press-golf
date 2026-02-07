@@ -28,7 +28,13 @@ export function Header({ title, showBack = false, rightAction, className }: Head
         <div className="w-11">
           {showBack && (
             <button
-              onClick={() => router.back()}
+              onClick={() => {
+                if (typeof window !== "undefined" && window.history.length > 1) {
+                  router.back();
+                } else {
+                  router.push("/dashboard");
+                }
+              }}
               className="flex items-center justify-center w-11 h-11 -ml-2 rounded-full hover:bg-surface active:bg-elevated active:scale-95 transition-all"
               aria-label="Go back"
             >

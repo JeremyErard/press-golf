@@ -1,27 +1,16 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import Link from "next/link";
+import Image from "next/image";
 import { Flag, Users, Calendar, Loader2, Crown, Check, Radio, Dog, Calculator, DollarSign, UsersRound } from "lucide-react";
 import { Button, Card, CardContent, Avatar, Badge, Skeleton } from "@/components/ui";
-import { api, type InviteDetails, type GameType, type BillingStatus } from "@/lib/api";
+import { api, type InviteDetails, type BillingStatus } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
+import { gameTypeLabels } from "@/lib/game-types";
 import { getInstallInstructions, showInstallPrompt } from "@/lib/pwa";
-
-const gameTypeLabels: Record<GameType, string> = {
-  NASSAU: "Nassau",
-  SKINS: "Skins",
-  MATCH_PLAY: "Match Play",
-  WOLF: "Wolf",
-  NINES: "Nines",
-  STABLEFORD: "Stableford",
-  BINGO_BANGO_BONGO: "Bingo Bango Bongo",
-  VEGAS: "Vegas",
-  SNAKE: "Snake",
-  BANKER: "Banker",
-};
 
 const features = [
   {
@@ -64,6 +53,7 @@ export default function InviteLandingPage() {
   const [showInstallGuide, setShowInstallGuide] = useState(false);
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
   const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
+  const hasAutoJoined = useRef(false);
 
   const instructions = getInstallInstructions();
   const isPWAInstalled = instructions.platform === "installed";
@@ -185,7 +175,9 @@ export default function InviteLandingPage() {
 
   // Auto-join if user is signed in, subscribed, and PWA is installed (returning after sign-up/subscription)
   useEffect(() => {
+    if (hasAutoJoined.current) return;
     if (isSignedIn && isPWAInstalled && !isJoining && !error && !showSubscriptionPrompt && invite) {
+      hasAutoJoined.current = true;
       if (invite.round?.id) {
         handleJoinRound();
       } else {
@@ -228,10 +220,12 @@ export default function InviteLandingPage() {
       <div className="min-h-screen relative">
         {/* Background */}
         <div className="fixed inset-0 -z-10">
-          <img
+          <Image
             src="/images/golf-hero.jpg"
             alt="Golf course"
-            className="w-full h-full object-cover"
+            fill
+            sizes="100vw"
+            className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
         </div>
@@ -249,10 +243,12 @@ export default function InviteLandingPage() {
       <div className="min-h-screen relative">
         {/* Background */}
         <div className="fixed inset-0 -z-10">
-          <img
+          <Image
             src="/images/golf-hero.jpg"
             alt="Golf course"
-            className="w-full h-full object-cover"
+            fill
+            sizes="100vw"
+            className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
         </div>
@@ -280,10 +276,12 @@ export default function InviteLandingPage() {
       <div className="min-h-screen relative">
         {/* Background */}
         <div className="fixed inset-0 -z-10">
-          <img
+          <Image
             src="/images/golf-hero.jpg"
             alt="Golf course"
-            className="w-full h-full object-cover"
+            fill
+            sizes="100vw"
+            className="object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
         </div>
@@ -294,7 +292,7 @@ export default function InviteLandingPage() {
             <h1 className="text-4xl font-black tracking-tight text-white drop-shadow-2xl">
               PRESS
             </h1>
-            <p className="text-white/50 text-[10px] uppercase tracking-[0.2em] font-medium mt-1">
+            <p className="text-white/65 text-[10px] uppercase tracking-[0.2em] font-medium mt-1">
               Your Side Games Managed For You
             </p>
           </div>
@@ -309,7 +307,7 @@ export default function InviteLandingPage() {
                   size="md"
                 />
                 <div>
-                  <p className="text-[10px] text-white/50 uppercase tracking-wide">Invited by</p>
+                  <p className="text-[10px] text-white/65 uppercase tracking-wide">Invited by</p>
                   <p className="text-base font-semibold text-white">{invite.inviter.displayName}</p>
                 </div>
               </div>
@@ -318,7 +316,7 @@ export default function InviteLandingPage() {
                   <Flag className="h-4 w-4 text-brand" />
                   <div>
                     <p className="font-medium text-white text-sm">{invite.round.course.name}</p>
-                    <p className="text-[10px] text-white/40">{formatDate(invite.round.date)}</p>
+                    <p className="text-[10px] text-white/60">{formatDate(invite.round.date)}</p>
                   </div>
                 </div>
               )}
@@ -333,14 +331,14 @@ export default function InviteLandingPage() {
               onClick={() => router.push(`/profile/subscription?redirect=/join/${code}`)}
             >
               <Crown className="h-4 w-4 mr-2" />
-              {isBuddyInvite ? "Get Started for $2.49/month" : "Join the Round for $2.49/month"}
+              {isBuddyInvite ? "Get Started for $2.49/mo" : "Join the Round for $2.49/mo"}
             </Button>
-            <p className="text-[10px] text-white/40 mt-2 text-center">Cancel anytime</p>
+            <p className="text-[10px] text-white/60 mt-2 text-center">Cancel anytime</p>
           </div>
 
           {/* Features Section */}
           <div className="mt-5 animate-fade-in-up" style={{ animationDelay: "150ms" }}>
-            <h2 className="text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-2 text-center">
+            <h2 className="text-[10px] font-semibold text-white/60 uppercase tracking-wider mb-2 text-center">
               What you get with Press
             </h2>
             <Card className="glass-card">
@@ -355,7 +353,7 @@ export default function InviteLandingPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-white text-xs">{feature.title}</p>
-                      <p className="text-[10px] text-white/40">{feature.description}</p>
+                      <p className="text-[10px] text-white/60">{feature.description}</p>
                     </div>
                     <Check className="w-5 h-5 text-brand/60 flex-shrink-0" />
                   </div>
@@ -386,7 +384,7 @@ export default function InviteLandingPage() {
           <h1 className="text-4xl font-black tracking-tight text-white drop-shadow-2xl">
             PRESS
           </h1>
-          <p className="text-white/50 text-[10px] uppercase tracking-[0.2em] font-medium mt-1">
+          <p className="text-white/65 text-[10px] uppercase tracking-[0.2em] font-medium mt-1">
             Your Side Games Managed For You
           </p>
           <p className="text-base text-white/90 mt-4 font-medium">
@@ -405,7 +403,7 @@ export default function InviteLandingPage() {
                 size="md"
               />
               <div>
-                <p className="text-[10px] text-white/50 uppercase tracking-wide">Invited by</p>
+                <p className="text-[10px] text-white/65 uppercase tracking-wide">Invited by</p>
                 <p className="text-base font-semibold text-white">
                   {invite.inviter.displayName}
                 </p>
@@ -431,7 +429,7 @@ export default function InviteLandingPage() {
                   <p className="text-sm font-semibold text-white">
                     {invite.round.course.name}
                   </p>
-                  <p className="text-xs text-white/50">
+                  <p className="text-xs text-white/65">
                     {[invite.round.course.city, invite.round.course.state]
                       .filter(Boolean)
                       .join(", ")}
@@ -447,7 +445,7 @@ export default function InviteLandingPage() {
                     <p className="text-xs font-medium text-white">
                       {formatDate(invite.round.date)}
                     </p>
-                    <p className="text-[10px] text-white/40">Date</p>
+                    <p className="text-[10px] text-white/60">Date</p>
                   </div>
                 </div>
                 <div className="flex-1 flex items-center gap-2 p-2.5 rounded-lg bg-white/5">
@@ -456,7 +454,7 @@ export default function InviteLandingPage() {
                     <p className="text-xs font-medium text-white">
                       {invite.round.playerCount} player{invite.round.playerCount !== 1 ? "s" : ""}
                     </p>
-                    <p className="text-[10px] text-white/40">Joined</p>
+                    <p className="text-[10px] text-white/60">Joined</p>
                   </div>
                 </div>
               </div>
@@ -464,7 +462,7 @@ export default function InviteLandingPage() {
               {/* Games */}
               {invite.round.games.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-white/40 uppercase tracking-wide mb-1.5">Games</p>
+                  <p className="text-[10px] text-white/60 uppercase tracking-wide mb-1.5">Games</p>
                   <div className="flex flex-wrap gap-1.5">
                     {invite.round.games.map((game, i) => (
                       <Badge key={i} variant="brand">
@@ -497,17 +495,17 @@ export default function InviteLandingPage() {
               ) : (
                 <>
                   <Crown className="h-4 w-4 mr-2" />
-                  {isBuddyInvite ? "Get Started for $2.49/month" : "Join the Round for $2.49/month"}
+                  {isBuddyInvite ? "Get Started for $2.49/mo" : "Join the Round for $2.49/mo"}
                 </>
               )
             ) : (
               <>
                 <Crown className="h-4 w-4 mr-2" />
-                {isBuddyInvite ? "Get Started for $2.49/month" : "Join the Round for $2.49/month"}
+                {isBuddyInvite ? "Get Started for $2.49/mo" : "Join the Round for $2.49/mo"}
               </>
             )}
           </Button>
-          <p className="text-[10px] text-white/40 mt-2 text-center">
+          <p className="text-[10px] text-white/60 mt-2 text-center">
             Cancel anytime
           </p>
         </div>
@@ -529,7 +527,7 @@ export default function InviteLandingPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-white text-xs">{feature.title}</p>
-                    <p className="text-[10px] text-white/40">{feature.description}</p>
+                    <p className="text-[10px] text-white/60">{feature.description}</p>
                   </div>
                   <Check className="w-5 h-5 text-brand/60 flex-shrink-0" />
                 </div>

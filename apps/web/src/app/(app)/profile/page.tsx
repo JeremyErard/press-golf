@@ -9,9 +9,7 @@ import {
   CreditCard,
   LogOut,
   Crown,
-  Bell,
   Settings,
-  Loader2,
   CheckCircle,
   AlertTriangle,
   BarChart3,
@@ -20,10 +18,8 @@ import { Header } from "@/components/layout/header";
 import { TabHelpSheet } from "@/components/onboarding/tab-help-sheet";
 import { HelpButton } from "@/components/onboarding/help-button";
 import { Card, CardContent, Button, Badge, ListItem, ListItemGroup, SectionHeader } from "@/components/ui";
-import { Toggle } from "@/components/ui/toggle";
 import { SubscriptionStatusCard } from "@/components/profile/subscription-status-card";
 import { AvatarEditor } from "@/components/profile/avatar-editor";
-import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { api, type BillingStatus, type User as ApiUser, type HandicapStatusResponse } from "@/lib/api";
 
 export default function ProfilePage() {
@@ -38,16 +34,6 @@ export default function ProfilePage() {
   const [handicapStatus, setHandicapStatus] = useState<HandicapStatusResponse | null>(null);
   const [buddiesCount, setBuddiesCount] = useState<number | null>(null);
   const [paymentMethodsCount, setPaymentMethodsCount] = useState<number | null>(null);
-
-  const {
-    isSupported: notificationsSupported,
-    isAvailable: notificationsAvailable,
-    isSubscribed,
-    isLoading: notificationsLoading,
-    permission: notificationPermission,
-    subscribe,
-    unsubscribe,
-  } = usePushNotifications();
 
   const fetchUserData = useCallback(async () => {
     try {
@@ -79,14 +65,6 @@ export default function ProfilePage() {
   const handleAvatarUpdated = useCallback((newUrl: string) => {
     setApiUser((prev) => (prev ? { ...prev, avatarUrl: newUrl } : null));
   }, []);
-
-  const handleNotificationToggle = async (enabled: boolean) => {
-    if (enabled) {
-      await subscribe();
-    } else {
-      await unsubscribe();
-    }
-  };
 
   if (!isLoaded) {
     return (
@@ -208,7 +186,7 @@ export default function ProfilePage() {
               subtitle="Manage your golf buddies"
               trailing={
                 buddiesCount !== null ? (
-                  <span className="text-sm text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+                  <span className="text-sm text-muted bg-muted/50 px-2 py-0.5 rounded-full">
                     {buddiesCount}
                   </span>
                 ) : null
@@ -221,7 +199,7 @@ export default function ProfilePage() {
               subtitle="Venmo, Cash App, Zelle, Apple Cash"
               trailing={
                 paymentMethodsCount !== null ? (
-                  <span className="text-sm text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+                  <span className="text-sm text-muted bg-muted/50 px-2 py-0.5 rounded-full">
                     {paymentMethodsCount}
                   </span>
                 ) : null
@@ -234,35 +212,6 @@ export default function ProfilePage() {
         <div>
           <SectionHeader title="Preferences" />
           <ListItemGroup>
-            {/* Inline Push Notifications Toggle */}
-            {notificationsSupported && notificationsAvailable && (
-              <div className="flex items-center gap-3 p-4">
-                <div className="w-11 h-11 rounded-full bg-elevated flex items-center justify-center shrink-0">
-                  <Bell className="h-5 w-5 text-muted" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-body font-medium text-white">Push Notifications</p>
-                  <p className="text-caption text-muted truncate">
-                    {notificationPermission === "denied"
-                      ? "Blocked in browser"
-                      : isSubscribed
-                      ? "Enabled for this device"
-                      : "Get notified about rounds"}
-                  </p>
-                </div>
-                {notificationsLoading ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-muted" />
-                ) : (
-                  <Toggle
-                    checked={isSubscribed}
-                    onChange={handleNotificationToggle}
-                    disabled={notificationPermission === "denied"}
-                    size="sm"
-                  />
-                )}
-              </div>
-            )}
-            {/* Notification Settings drill-down */}
             <ListItem
               href="/profile/notifications"
               icon={<Settings className="h-5 w-5 text-muted" />}

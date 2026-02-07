@@ -10,3 +10,4 @@ export { EmptyState } from "./empty-state";
 export { SectionHeader } from "./section-header";
 export { ListItem, ListItemGroup } from "./list-item";
 export { FAB } from "./fab";
+export { Toggle } from "./toggle";

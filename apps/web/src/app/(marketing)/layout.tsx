@@ -46,6 +46,7 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "https://pressbet.golf",
   },
+  themeColor: "#0a1628",
 };
 
 export default function MarketingLayout({

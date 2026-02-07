@@ -24,7 +24,7 @@ export function SectionHeader({
   return (
     <div className={cn("flex items-center justify-between mb-3", className)}>
       <div className="flex items-center gap-2">
-        <h2 className="text-h3 font-semibold text-white">{title}</h2>
+        <h2 className="text-h3 font-semibold text-foreground">{title}</h2>
         {count !== undefined && (
           <span className="text-caption text-muted">({count})</span>
         )}

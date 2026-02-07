@@ -47,7 +47,7 @@ export function EmptyState({
       )}
 
       {/* Title */}
-      <p className="text-lg font-semibold text-white">{title}</p>
+      <p className="text-lg font-semibold text-foreground">{title}</p>
 
       {/* Description */}
       {description && (

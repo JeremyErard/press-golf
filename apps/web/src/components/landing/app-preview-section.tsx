@@ -43,7 +43,7 @@ export function AppPreviewSection() {
   };
 
   return (
-    <section className="py-20 px-6 relative overflow-hidden">
+    <section aria-label="App preview" className="py-20 px-6 relative overflow-hidden">
       {/* Background glow */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-brand/10 rounded-full blur-3xl" />
@@ -82,12 +82,14 @@ export function AppPreviewSection() {
             {/* Navigation arrows - mobile */}
             <button
               onClick={prevSlide}
+              aria-label="Previous screenshot"
               className="lg:hidden absolute left-0 top-1/2 -translate-y-1/2 -translate-x-12 w-10 h-10 rounded-full glass-card flex items-center justify-center text-white/70 hover:text-white z-10"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
             <button
               onClick={nextSlide}
+              aria-label="Next screenshot"
               className="lg:hidden absolute right-0 top-1/2 -translate-y-1/2 translate-x-12 w-10 h-10 rounded-full glass-card flex items-center justify-center text-white/70 hover:text-white z-10"
             >
               <ChevronRight className="w-5 h-5" />
@@ -105,7 +107,6 @@ export function AppPreviewSection() {
                   alt={screenshots[activeIndex].alt}
                   fill
                   className="object-cover object-top transition-opacity duration-300"
-                  priority
                   sizes="300px"
                 />
               </div>
@@ -114,12 +115,14 @@ export function AppPreviewSection() {
             {/* Navigation arrows - desktop */}
             <button
               onClick={prevSlide}
+              aria-label="Previous screenshot"
               className="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-16 w-12 h-12 rounded-full glass-card items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all z-10"
             >
               <ChevronLeft className="w-6 h-6" />
             </button>
             <button
               onClick={nextSlide}
+              aria-label="Next screenshot"
               className="hidden lg:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-16 w-12 h-12 rounded-full glass-card items-center justify-center text-white/70 hover:text-white hover:bg-white/10 transition-all z-10"
             >
               <ChevronRight className="w-6 h-6" />
@@ -140,6 +143,7 @@ export function AppPreviewSection() {
                 <button
                   key={index}
                   onClick={() => setActiveIndex(index)}
+                  aria-current={index === activeIndex}
                   className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                     index === activeIndex
                       ? "bg-brand text-white shadow-lg shadow-brand/30"

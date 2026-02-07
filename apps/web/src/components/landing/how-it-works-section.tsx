@@ -43,7 +43,7 @@ const steps = [
 
 export function HowItWorksSection() {
   return (
-    <section className="py-20 px-6 relative overflow-hidden">
+    <section aria-label="How it works" className="py-20 px-6 relative overflow-hidden">
       {/* Background accent */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-brand/5 rounded-full blur-3xl" />
