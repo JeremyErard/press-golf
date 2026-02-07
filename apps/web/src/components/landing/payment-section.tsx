@@ -4,7 +4,7 @@ const paymentMethods = [
   { name: "Venmo", color: "#3D95CE" },
   { name: "Cash App", color: "#00D632" },
   { name: "Zelle", color: "#6D1ED4" },
-  { name: "Apple Pay", color: "#FFFFFF" },
+  { name: "Apple Cash", color: "#FFFFFF" },
 ];
 
 export function PaymentSection() {

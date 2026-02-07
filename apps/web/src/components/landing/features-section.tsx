@@ -35,7 +35,7 @@ const heroFeatures = [
   },
   {
     title: "Instant Settlement",
-    description: "When the round ends, Press calculates exactly who owes who. Pay or get paid with one tap via Venmo, Cash App, or Zelle.",
+    description: "When the round ends, Press calculates exactly who owes who. Pay or get paid with one tap via Venmo, Cash App, Zelle, or Apple Cash.",
     icon: CreditCard,
     image: "/images/golf-dusk.jpg",
     accent: "green",

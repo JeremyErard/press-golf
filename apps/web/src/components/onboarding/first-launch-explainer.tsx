@@ -22,7 +22,7 @@ const screens = [
     backgroundImage: "/images/golf-daybreak.jpg",
     title: "Set Up Your Profile",
     subtitle: "Get ready to play.",
-    description: "Add your handicap and connect Venmo so you're ready to settle up.",
+    description: "Add your handicap and connect your payment app so you're ready to settle up.",
     cta: "Next",
     screenshot: "/images/Screenshot 2026-01-16 at 5.10.07 PM.png",
   },

@@ -98,7 +98,7 @@ export const tabHelpContent: Record<string, TabHelpContent> = {
       },
       {
         title: "Payment Methods",
-        description: "Add Venmo, Zelle, or Cash App for easy settlement",
+        description: "Add Venmo, Zelle, Cash App, or Apple Cash for easy settlement",
       },
       {
         title: "Stats",

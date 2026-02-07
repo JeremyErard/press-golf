@@ -18,7 +18,7 @@ import {
 import { api } from "@/lib/api";
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
-type PaymentType = "VENMO" | "ZELLE" | "CASHAPP";
+type PaymentType = "VENMO" | "ZELLE" | "CASHAPP" | "APPLE_PAY";
 
 const steps = [
   { id: 1, name: "Subscribe", icon: Crown },
@@ -495,8 +495,8 @@ export default function OnboardingPage() {
                 <label className="block text-sm font-medium text-muted mb-2">
                   Payment App
                 </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {(["VENMO", "ZELLE", "CASHAPP"] as PaymentType[]).map((type) => (
+                <div className="grid grid-cols-2 gap-3">
+                  {(["VENMO", "ZELLE", "CASHAPP", "APPLE_PAY"] as PaymentType[]).map((type) => (
                     <button
                       key={type}
                       onClick={() => setPaymentType(type)}
@@ -506,7 +506,7 @@ export default function OnboardingPage() {
                           : "bg-card border-border text-muted hover:border-brand/50"
                       }`}
                     >
-                      {type === "CASHAPP" ? "Cash App" : type.charAt(0) + type.slice(1).toLowerCase()}
+                      {type === "CASHAPP" ? "Cash App" : type === "APPLE_PAY" ? "Apple Cash" : type.charAt(0) + type.slice(1).toLowerCase()}
                     </button>
                   ))}
                 </div>
@@ -518,6 +518,8 @@ export default function OnboardingPage() {
                     ? "Venmo Username"
                     : paymentType === "ZELLE"
                     ? "Zelle Email or Phone"
+                    : paymentType === "APPLE_PAY"
+                    ? "Phone Number"
                     : "Cash App $Cashtag"}
                 </label>
                 <input
@@ -529,6 +531,8 @@ export default function OnboardingPage() {
                       ? "@username"
                       : paymentType === "ZELLE"
                       ? "email@example.com"
+                      : paymentType === "APPLE_PAY"
+                      ? "+1 (555) 123-4567"
                       : "$cashtag"
                   }
                   className="w-full px-4 py-3 rounded-xl bg-card border border-border text-foreground placeholder:text-muted focus:outline-none focus:border-brand"

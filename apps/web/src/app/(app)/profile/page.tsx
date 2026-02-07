@@ -218,7 +218,7 @@ export default function ProfilePage() {
               href="/profile/payment-methods"
               icon={<CreditCard className="h-5 w-5 text-muted" />}
               title="Payment Methods"
-              subtitle="Venmo, CashApp, Zelle"
+              subtitle="Venmo, Cash App, Zelle, Apple Cash"
               trailing={
                 paymentMethodsCount !== null ? (
                   <span className="text-sm text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
