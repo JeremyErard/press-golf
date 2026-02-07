@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import Image from "next/image";
@@ -25,43 +25,54 @@ export default function DashboardPage() {
   const [showHelp, setShowHelp] = useState(false);
   const { showExplainer, markExplainerSeen } = useFirstLaunch();
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const token = await getToken();
-        if (!token) return;
+  const fetchData = useCallback(async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
 
-        // Fetch user profile and rounds with earnings in parallel (single query each)
-        const [userData, roundsData] = await Promise.all([
-          api.getMe(token),
-          api.getRoundsWithEarnings(token),
-        ]);
-        setApiUser(userData);
-        setRounds(roundsData);
+      // Fetch user profile and rounds with earnings in parallel (single query each)
+      const [userData, roundsData] = await Promise.all([
+        api.getMe(token),
+        api.getRoundsWithEarnings(token),
+      ]);
+      setApiUser(userData);
+      setRounds(roundsData);
 
-        // For active round, fetch detail and results (only 1 active round max)
-        const activeRound = roundsData.find(r => r.status === "ACTIVE");
-        if (activeRound) {
-          try {
-            const [detail, results] = await Promise.all([
-              api.getRound(token, activeRound.id),
-              api.calculateResults(token, activeRound.id),
-            ]);
-            setActiveRoundDetail(detail);
-            setActiveRoundResults(results);
-          } catch {
-            // Results might not be available yet
-          }
+      // For active round, fetch detail and results (only 1 active round max)
+      const activeRound = roundsData.find(r => r.status === "ACTIVE");
+      if (activeRound) {
+        try {
+          const [detail, results] = await Promise.all([
+            api.getRound(token, activeRound.id),
+            api.calculateResults(token, activeRound.id),
+          ]);
+          setActiveRoundDetail(detail);
+          setActiveRoundResults(results);
+        } catch {
+          // Results might not be available yet
         }
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-      } finally {
-        setIsLoading(false);
       }
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+    } finally {
+      setIsLoading(false);
     }
-
-    fetchData();
   }, [getToken]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Re-fetch when tab becomes visible (picks up new invites)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchData();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [fetchData]);
 
   const activeRound = rounds.find((r) => r.status === "ACTIVE");
   const setupRounds = rounds.filter((r) => r.status === "SETUP");
@@ -356,6 +367,11 @@ export default function DashboardPage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
+                          {round.createdById !== apiUser?.id && (
+                            <Badge className="bg-brand/20 text-brand border-brand/30 animate-pulse">
+                              NEW
+                            </Badge>
+                          )}
                           <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30">
                             Setup
                           </Badge>

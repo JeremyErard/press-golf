@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { OnboardingCheck } from "@/components/handicap/onboarding-check";
@@ -16,6 +16,7 @@ export default function AppLayout({
 }) {
   const { isLoaded } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const isOnboarding = pathname?.startsWith("/onboarding");
 
   useEffect(() => {
@@ -23,6 +24,22 @@ export default function AppLayout({
     registerServiceWorker();
     setupInstallPrompt();
   }, []);
+
+  // Listen for NOTIFICATION_CLICK messages from service worker
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === "NOTIFICATION_CLICK" && event.data?.url) {
+        router.push(event.data.url);
+      }
+    };
+
+    navigator.serviceWorker.addEventListener("message", handler);
+    return () => {
+      navigator.serviceWorker.removeEventListener("message", handler);
+    };
+  }, [router]);
 
   if (!isLoaded) {
     return (
