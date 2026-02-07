@@ -662,6 +662,12 @@ Extract as much data as you can see. If some fields are not visible, omit them b
           // Track used tee names to avoid duplicates (male/female tees may have same name)
           const usedTeeNames = new Set<string>();
 
+          // Fetch holes ONCE before the loop (instead of once per tee)
+          const holes = await prisma.hole.findMany({
+            where: { courseId: course.id },
+            orderBy: { holeNumber: 'asc' },
+          });
+
           for (const tee of allTees) {
             // Handle duplicate tee names by appending a number
             let teeName = tee.tee_name;
@@ -684,11 +690,6 @@ Extract as much data as you can see. If some fields are not visible, omit them b
 
             // Create hole yardages for this tee
             if (tee.holes?.length) {
-              const holes = await prisma.hole.findMany({
-                where: { courseId: course.id },
-                orderBy: { holeNumber: 'asc' },
-              });
-
               await prisma.holeYardage.createMany({
                 data: holes.map((hole, index) => ({
                   holeId: hole.id,

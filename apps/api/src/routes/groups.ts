@@ -524,89 +524,87 @@ export default async function groupRoutes(fastify: FastifyInstance) {
 
       const roundIds = groupRounds.map((r) => r.id);
 
-      // Calculate stats for each member
-      const memberStats = await Promise.all(
-        group.members.map(async (member) => {
-          const memberId = member.userId;
+      const memberUserIds = group.members.map((m) => m.userId);
 
-          // Get settlements where this user received money (won) in group rounds
-          const received = await prisma.settlement.aggregate({
-            where: {
-              roundId: { in: roundIds },
-              toUserId: memberId,
-              status: "PAID",
-            },
-            _sum: { amount: true },
-          });
+      if (roundIds.length === 0) {
+        const memberStats = group.members.map((member) => ({
+          userId: member.userId,
+          displayName: member.user.displayName || member.user.firstName || "Unknown",
+          avatarUrl: member.user.avatarUrl,
+          roundsPlayed: 0,
+          netEarnings: 0,
+          wins: 0,
+          losses: 0,
+        }));
+        memberStats.sort((a, b) => b.netEarnings - a.netEarnings);
+        return reply.send({ success: true, data: { groupId: id, members: memberStats } });
+      }
 
-          // Get settlements where this user paid (lost) in group rounds
-          const paid = await prisma.settlement.aggregate({
-            where: {
-              roundId: { in: roundIds },
-              fromUserId: memberId,
-              status: "PAID",
-            },
-            _sum: { amount: true },
-          });
+      // Fetch ALL settlements and round counts in bulk (3 queries instead of ~550)
+      const [allSettlements, roundPlayerCounts] = await Promise.all([
+        prisma.settlement.findMany({
+          where: { roundId: { in: roundIds }, status: "PAID" },
+          select: { fromUserId: true, toUserId: true, amount: true, roundId: true },
+        }),
+        prisma.roundPlayer.groupBy({
+          by: ["userId"],
+          where: { roundId: { in: roundIds }, userId: { in: memberUserIds } },
+          _count: true,
+        }),
+      ]);
 
-          const netEarnings =
-            (received._sum.amount ? Number(received._sum.amount) : 0) -
-            (paid._sum.amount ? Number(paid._sum.amount) : 0);
+      // Build lookup maps in-memory
+      const roundsPlayedMap = new Map<string, number>();
+      for (const rpc of roundPlayerCounts) {
+        roundsPlayedMap.set(rpc.userId, rpc._count);
+      }
 
-          // Count rounds played in this group
-          const roundsPlayed = await prisma.roundPlayer.count({
-            where: {
-              userId: memberId,
-              round: {
-                groupId: id,
-                status: "COMPLETED",
-              },
-            },
-          });
+      const totalWonMap = new Map<string, number>();
+      const totalLostMap = new Map<string, number>();
+      const userRoundNetMap = new Map<string, Map<string, number>>();
 
-          // Count wins (rounds where net was positive)
-          const roundsWithEarnings = await prisma.settlement.groupBy({
-            by: ["roundId"],
-            where: {
-              roundId: { in: roundIds },
-              OR: [{ toUserId: memberId }, { fromUserId: memberId }],
-            },
-          });
+      for (const s of allSettlements) {
+        const amount = Number(s.amount);
+        totalWonMap.set(s.toUserId, (totalWonMap.get(s.toUserId) || 0) + amount);
+        totalLostMap.set(s.fromUserId, (totalLostMap.get(s.fromUserId) || 0) + amount);
 
-          let wins = 0;
-          let losses = 0;
+        if (!userRoundNetMap.has(s.toUserId)) userRoundNetMap.set(s.toUserId, new Map());
+        const toMap = userRoundNetMap.get(s.toUserId)!;
+        toMap.set(s.roundId, (toMap.get(s.roundId) || 0) + amount);
 
-          for (const roundGroup of roundsWithEarnings) {
-            const [received, paid] = await Promise.all([
-              prisma.settlement.aggregate({
-                where: { roundId: roundGroup.roundId, toUserId: memberId },
-                _sum: { amount: true },
-              }),
-              prisma.settlement.aggregate({
-                where: { roundId: roundGroup.roundId, fromUserId: memberId },
-                _sum: { amount: true },
-              }),
-            ]);
+        if (!userRoundNetMap.has(s.fromUserId)) userRoundNetMap.set(s.fromUserId, new Map());
+        const fromMap = userRoundNetMap.get(s.fromUserId)!;
+        fromMap.set(s.roundId, (fromMap.get(s.roundId) || 0) - amount);
+      }
 
-            const roundNet =
-              (received._sum.amount ? Number(received._sum.amount) : 0) -
-              (paid._sum.amount ? Number(paid._sum.amount) : 0);
+      // Calculate stats for each member in-memory
+      const memberStats = group.members.map((member) => {
+        const memberId = member.userId;
+        const totalWon = totalWonMap.get(memberId) || 0;
+        const totalLost = totalLostMap.get(memberId) || 0;
+        const netEarnings = totalWon - totalLost;
+        const roundsPlayed = roundsPlayedMap.get(memberId) || 0;
 
+        let wins = 0;
+        let losses = 0;
+        const roundNetMap = userRoundNetMap.get(memberId);
+        if (roundNetMap) {
+          for (const roundNet of roundNetMap.values()) {
             if (roundNet > 0) wins++;
             else if (roundNet < 0) losses++;
           }
+        }
 
-          return {
-            userId: memberId,
-            displayName: member.user.displayName || member.user.firstName || "Unknown",
-            avatarUrl: member.user.avatarUrl,
-            roundsPlayed,
-            netEarnings,
-            wins,
-            losses,
-          };
-        })
-      );
+        return {
+          userId: memberId,
+          displayName: member.user.displayName || member.user.firstName || "Unknown",
+          avatarUrl: member.user.avatarUrl,
+          roundsPlayed,
+          netEarnings,
+          wins,
+          losses,
+        };
+      });
 
       // Sort by net earnings descending
       memberStats.sort((a, b) => b.netEarnings - a.netEarnings);

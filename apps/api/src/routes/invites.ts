@@ -458,43 +458,13 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
 
             const creatorId = roundById.players[0]?.userId;
             if (creatorId && creatorId !== userId) {
-              const existingBuddy1 = await prisma.buddy.findUnique({
-                where: {
-                  userId_buddyUserId: {
-                    userId: creatorId,
-                    buddyUserId: userId,
-                  },
-                },
+              await prisma.buddy.createMany({
+                data: [
+                  { userId: creatorId, buddyUserId: userId, sourceType: "ROUND" },
+                  { userId: userId, buddyUserId: creatorId, sourceType: "ROUND" },
+                ],
+                skipDuplicates: true,
               });
-
-              if (!existingBuddy1) {
-                await prisma.buddy.create({
-                  data: {
-                    userId: creatorId,
-                    buddyUserId: userId,
-                    sourceType: "ROUND",
-                  },
-                });
-              }
-
-              const existingBuddy2 = await prisma.buddy.findUnique({
-                where: {
-                  userId_buddyUserId: {
-                    userId: userId,
-                    buddyUserId: creatorId,
-                  },
-                },
-              });
-
-              if (!existingBuddy2) {
-                await prisma.buddy.create({
-                  data: {
-                    userId: userId,
-                    buddyUserId: creatorId,
-                    sourceType: "ROUND",
-                  },
-                });
-              }
             }
 
             // Notify round creator that someone joined
@@ -560,45 +530,13 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
         // Create buddy relationship with round creator
         const creatorId = round.players[0]?.userId;
         if (creatorId && creatorId !== userId) {
-          // Creator adds accepter as buddy
-          const existingBuddy1 = await prisma.buddy.findUnique({
-            where: {
-              userId_buddyUserId: {
-                userId: creatorId,
-                buddyUserId: userId,
-              },
-            },
+          await prisma.buddy.createMany({
+            data: [
+              { userId: creatorId, buddyUserId: userId, sourceType: "ROUND" },
+              { userId: userId, buddyUserId: creatorId, sourceType: "ROUND" },
+            ],
+            skipDuplicates: true,
           });
-
-          if (!existingBuddy1) {
-            await prisma.buddy.create({
-              data: {
-                userId: creatorId,
-                buddyUserId: userId,
-                sourceType: "ROUND",
-              },
-            });
-          }
-
-          // Accepter adds creator as buddy
-          const existingBuddy2 = await prisma.buddy.findUnique({
-            where: {
-              userId_buddyUserId: {
-                userId: userId,
-                buddyUserId: creatorId,
-              },
-            },
-          });
-
-          if (!existingBuddy2) {
-            await prisma.buddy.create({
-              data: {
-                userId: userId,
-                buddyUserId: creatorId,
-                sourceType: "ROUND",
-              },
-            });
-          }
         }
 
         // Notify round creator that someone joined
@@ -640,47 +578,13 @@ export default async function inviteRoutes(fastify: FastifyInstance) {
       });
 
       // Create mutual buddy relationships
-      // 1. Inviter adds accepter as buddy
-      const existingBuddy1 = await prisma.buddy.findUnique({
-        where: {
-          userId_buddyUserId: {
-            userId: invite.inviterId,
-            buddyUserId: userId,
-          },
-        },
+      await prisma.buddy.createMany({
+        data: [
+          { userId: invite.inviterId, buddyUserId: userId, sourceType: "INVITE", sourceInviteId: invite.id },
+          { userId: userId, buddyUserId: invite.inviterId, sourceType: "INVITE", sourceInviteId: invite.id },
+        ],
+        skipDuplicates: true,
       });
-
-      if (!existingBuddy1) {
-        await prisma.buddy.create({
-          data: {
-            userId: invite.inviterId,
-            buddyUserId: userId,
-            sourceType: "INVITE",
-            sourceInviteId: invite.id,
-          },
-        });
-      }
-
-      // 2. Accepter adds inviter as buddy
-      const existingBuddy2 = await prisma.buddy.findUnique({
-        where: {
-          userId_buddyUserId: {
-            userId: userId,
-            buddyUserId: invite.inviterId,
-          },
-        },
-      });
-
-      if (!existingBuddy2) {
-        await prisma.buddy.create({
-          data: {
-            userId: userId,
-            buddyUserId: invite.inviterId,
-            sourceType: "INVITE",
-            sourceInviteId: invite.id,
-          },
-        });
-      }
 
       // If round specified, add user to round
       if (invite.roundId && invite.round) {

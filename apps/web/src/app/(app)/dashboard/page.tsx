@@ -11,14 +11,8 @@ import { FirstLaunchExplainer } from "@/components/onboarding/first-launch-expla
 import { TabHelpSheet } from "@/components/onboarding/tab-help-sheet";
 import { HelpButton } from "@/components/onboarding/help-button";
 import { useFirstLaunch } from "@/hooks/use-first-launch";
-import { api, type Round, type RoundDetail, type CalculateResultsResponse, type User as ApiUser } from "@/lib/api";
+import { api, type RoundWithEarnings, type RoundDetail, type CalculateResultsResponse, type User as ApiUser } from "@/lib/api";
 import { formatDate, formatMoney, formatCourseName } from "@/lib/utils";
-
-interface RoundWithEarnings extends Round {
-  earnings?: number;
-  courseName?: string;
-  games?: { type: string; betAmount: number }[];
-}
 
 export default function DashboardPage() {
   const { getToken } = useAuth();
@@ -37,112 +31,28 @@ export default function DashboardPage() {
         const token = await getToken();
         if (!token) return;
 
-        // Fetch user profile and rounds in parallel
+        // Fetch user profile and rounds with earnings in parallel (single query each)
         const [userData, roundsData] = await Promise.all([
           api.getMe(token),
-          api.getRounds(token),
+          api.getRoundsWithEarnings(token),
         ]);
         setApiUser(userData);
+        setRounds(roundsData);
 
-        // For completed rounds, calculate earnings
-        const roundsWithEarnings: RoundWithEarnings[] = [];
-        for (const round of roundsData) {
-          const roundWithEarnings: RoundWithEarnings = { ...round };
-
-          if (round.status === "COMPLETED") {
-            try {
-              // Get round details for course name
-              const detail = await api.getRound(token, round.id);
-              roundWithEarnings.courseName = detail.course.name;
-              roundWithEarnings.games = detail.games.map(g => ({ type: g.type, betAmount: Number(g.betAmount) }));
-
-              // Calculate results for this round
-              const resultsResponse = await api.calculateResults(token, round.id);
-
-              // Find current user's player in this round and sum their earnings from all games
-              const currentPlayer = detail.players.find(p => p.user.id === userData.id);
-              if (currentPlayer && resultsResponse.results) {
-                let earnings = 0;
-
-                // Sum up money from each game type's standings
-                const { results } = resultsResponse;
-                if (results.nassau) {
-                  const betAmount = results.nassau.betAmount || 0;
-                  // Calculate Nassau earnings based on wins
-                  if (results.nassau.front?.winnerId === currentPlayer.userId) earnings += betAmount;
-                  else if (results.nassau.front?.winnerId) earnings -= betAmount;
-                  if (results.nassau.back?.winnerId === currentPlayer.userId) earnings += betAmount;
-                  else if (results.nassau.back?.winnerId) earnings -= betAmount;
-                  if (results.nassau.overall?.winnerId === currentPlayer.userId) earnings += betAmount;
-                  else if (results.nassau.overall?.winnerId) earnings -= betAmount;
-                }
-                if (results.matchPlay?.standings) {
-                  const standing = results.matchPlay.standings.find(s => s.userId === currentPlayer.userId);
-                  if (standing) earnings += standing.money;
-                }
-                if (results.skins?.skins) {
-                  earnings += results.skins.skins
-                    .filter(s => s.winnerId === currentPlayer.userId)
-                    .reduce((sum, s) => sum + s.value, 0);
-                }
-                if (results.wolf?.standings) {
-                  const standing = results.wolf.standings.find(s => s.userId === currentPlayer.userId);
-                  if (standing) earnings += standing.points;
-                }
-                if (results.nines?.standings) {
-                  const standing = results.nines.standings.find(s => s.userId === currentPlayer.userId);
-                  if (standing) earnings += standing.totalMoney;
-                }
-                if (results.stableford?.standings) {
-                  const standing = results.stableford.standings.find(s => s.userId === currentPlayer.userId);
-                  if (standing) earnings += standing.money;
-                }
-                if (results.bingoBangoBongo?.standings) {
-                  const standing = results.bingoBangoBongo.standings.find(s => s.userId === currentPlayer.userId);
-                  if (standing) earnings += standing.money;
-                }
-                if (results.snake?.standings) {
-                  const standing = results.snake.standings.find(s => s.userId === currentPlayer.userId);
-                  if (standing) earnings += standing.money;
-                }
-                if (results.banker?.standings) {
-                  const standing = results.banker.standings.find(s => s.userId === currentPlayer.userId);
-                  if (standing) earnings += standing.money;
-                }
-
-                roundWithEarnings.earnings = earnings;
-              }
-            } catch {
-              // Skip if we can't get results for this round
-            }
-          } else if (round.status === "ACTIVE") {
-            // Get active round details
-            try {
-              const detail = await api.getRound(token, round.id);
-              setActiveRoundDetail(detail);
-              roundWithEarnings.courseName = detail.course.name;
-              roundWithEarnings.games = detail.games.map(g => ({ type: g.type, betAmount: Number(g.betAmount) }));
-
-              // Try to get current results
-              const results = await api.calculateResults(token, round.id);
-              setActiveRoundResults(results);
-            } catch {
-              // Results might not be available yet
-            }
-          } else if (round.status === "SETUP") {
-            // Get setup round details for course name
-            try {
-              const detail = await api.getRound(token, round.id);
-              roundWithEarnings.courseName = detail.course.name;
-            } catch {
-              // Ignore errors for setup rounds
-            }
+        // For active round, fetch detail and results (only 1 active round max)
+        const activeRound = roundsData.find(r => r.status === "ACTIVE");
+        if (activeRound) {
+          try {
+            const [detail, results] = await Promise.all([
+              api.getRound(token, activeRound.id),
+              api.calculateResults(token, activeRound.id),
+            ]);
+            setActiveRoundDetail(detail);
+            setActiveRoundResults(results);
+          } catch {
+            // Results might not be available yet
           }
-
-          roundsWithEarnings.push(roundWithEarnings);
         }
-
-        setRounds(roundsWithEarnings);
       } catch (error) {
         console.error("Failed to fetch data:", error);
       } finally {
@@ -439,7 +349,7 @@ export default function DashboardPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-white font-semibold">
-                            {round.courseName ? formatCourseName(round.courseName) : "Round Setup"}
+                            {round.course?.name ? formatCourseName(round.course.name) : "Round Setup"}
                           </p>
                           <p className="text-sm text-muted mt-0.5">
                             {formatDate(round.date)} • {round._count?.players || 0} player{(round._count?.players || 0) !== 1 ? "s" : ""}
@@ -482,7 +392,7 @@ export default function DashboardPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-white font-semibold">
-                            {round.courseName ? formatCourseName(round.courseName) : formatDate(round.date)}
+                            {round.course?.name ? formatCourseName(round.course.name) : formatDate(round.date)}
                           </p>
                           <p className="text-sm text-muted mt-0.5">
                             {formatDate(round.date)} • {round._count?.players || 0} player{(round._count?.players || 0) !== 1 ? "s" : ""}

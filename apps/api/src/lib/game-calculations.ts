@@ -20,6 +20,19 @@ function safeMin(values: number[]): number | null {
   return Math.min(...values);
 }
 
+// Build O(1) lookup maps for holes and scores (replaces repeated .find() in loops)
+function buildHoleMap(holes: Hole[]): Map<number, Hole> {
+  return new Map(holes.map(h => [h.holeNumber, h]));
+}
+
+type ScoreEntry = { holeNumber: number; strokes: number | null; putts?: number | null };
+function buildScoreMaps<T extends { userId: string; scores: ScoreEntry[] }>(players: T[]): Map<string, Map<number, ScoreEntry>> {
+  return new Map(players.map(p => [
+    p.userId,
+    new Map(p.scores.map(s => [s.holeNumber, s])),
+  ]));
+}
+
 // Validate that all players have handicaps when required
 function validateHandicaps(players: Array<{ courseHandicap: number | null }>, requireHandicaps: boolean = false): void {
   if (!requireHandicaps) return;
@@ -90,17 +103,18 @@ export function calculateNassau(
   }
 
   const [p1, p2] = players;
+  const holeMap = buildHoleMap(holes);
+  const scoreMaps = buildScoreMaps(players);
+  const minHandicap = Math.min(p1.courseHandicap || 0, p2.courseHandicap || 0);
 
   // Calculate net scores per hole
   const getNetScore = (player: typeof p1, holeNum: number) => {
-    const score = player.scores.find(s => s.holeNumber === holeNum);
+    const score = scoreMaps.get(player.userId)?.get(holeNum);
     if (!score?.strokes) return null;
 
-    const hole = holes.find(h => h.holeNumber === holeNum);
+    const hole = holeMap.get(holeNum);
     if (!hole) return score.strokes;
 
-    // Calculate strokes given based on handicap
-    const minHandicap = Math.min(p1.courseHandicap || 0, p2.courseHandicap || 0);
     const handicapDiff = (player.courseHandicap || 0) - minHandicap;
     const strokesOnThisHole = hole.handicapRank <= handicapDiff ? 1 : 0;
 
@@ -166,14 +180,16 @@ export function calculateSkins(
 
   // Calculate minimum handicap for net scoring
   const minHandicap = safeMin(players.map(p => p.courseHandicap || 0)) ?? 0;
+  const holeMap = buildHoleMap(holes);
+  const scoreMaps = buildScoreMaps(players);
 
   for (let h = 1; h <= 18; h++) {
-    const hole = holes.find(hole => hole.holeNumber === h);
+    const hole = holeMap.get(h);
     const skinValue = betAmount + carryover;
 
     // Get net scores for all players on this hole
     const scores: Array<{ userId: string; netScore: number | null }> = players.map(player => {
-      const score = player.scores.find(s => s.holeNumber === h);
+      const score = scoreMaps.get(player.userId)?.get(h);
       if (!score?.strokes) return { userId: player.userId, netScore: null };
 
       // Calculate strokes given
@@ -245,16 +261,20 @@ export function calculateWolf(
   }
 
   const minHandicap = safeMin(players.map(p => p.courseHandicap || 0)) ?? 0;
+  const holeMap = buildHoleMap(holes);
+  const scoreMaps = buildScoreMaps(players);
+  const playerMap = new Map(players.map(p => [p.userId, p]));
+  const decisionMap = new Map(wolfDecisions.map(d => [d.holeNumber, d]));
 
   // Get net score for a player on a hole
   const getNetScore = (userId: string, holeNum: number): number | null => {
-    const player = players.find(p => p.userId === userId);
+    const player = playerMap.get(userId);
     if (!player) return null;
 
-    const score = player.scores.find(s => s.holeNumber === holeNum);
+    const score = scoreMaps.get(userId)?.get(holeNum);
     if (!score?.strokes) return null;
 
-    const hole = holes.find(h => h.holeNumber === holeNum);
+    const hole = holeMap.get(holeNum);
     const handicapDiff = (player.courseHandicap || 0) - minHandicap;
     const strokesOnThisHole = hole && hole.handicapRank <= handicapDiff ? 1 : 0;
 
@@ -262,7 +282,7 @@ export function calculateWolf(
   };
 
   for (let h = 1; h <= 18; h++) {
-    const decision = wolfDecisions.find(d => d.holeNumber === h);
+    const decision = decisionMap.get(h);
 
     // Default wolf rotation if no decision recorded
     const wolfIndex = (h - 1) % players.length;
@@ -392,12 +412,14 @@ export function calculateWolf(
 
   return {
     holes: results,
-    standings: Object.entries(playerPoints).map(([userId, points]) => ({
-      userId,
-      points,
-      name: players.find(p => p.userId === userId)?.user?.displayName ||
-            players.find(p => p.userId === userId)?.user?.firstName || 'Unknown',
-    })).sort((a, b) => b.points - a.points),
+    standings: Object.entries(playerPoints).map(([userId, points]) => {
+      const player = playerMap.get(userId);
+      return {
+        userId,
+        points,
+        name: player?.user?.displayName || player?.user?.firstName || 'Unknown',
+      };
+    }).sort((a, b) => b.points - a.points),
     betAmount,
   };
 }
@@ -419,6 +441,8 @@ export function calculateNines(
   }
 
   const minHandicap = safeMin(players.map(p => p.courseHandicap || 0)) ?? 0;
+  const holeMap = buildHoleMap(holes);
+  const scoreMaps = buildScoreMaps(players);
 
   const playerPoints: Record<string, { front: number; back: number; total: number }> = {};
   players.forEach(p => playerPoints[p.userId] = { front: 0, back: 0, total: 0 });
@@ -429,11 +453,11 @@ export function calculateNines(
   }> = [];
 
   for (let h = 1; h <= 18; h++) {
-    const hole = holes.find(hole => hole.holeNumber === h);
+    const hole = holeMap.get(h);
 
     // Get net scores
     const scores = players.map(player => {
-      const score = player.scores.find(s => s.holeNumber === h);
+      const score = scoreMaps.get(player.userId)?.get(h);
       if (!score?.strokes) return { userId: player.userId, netScore: null, points: 0 };
 
       const handicapDiff = (player.courseHandicap || 0) - minHandicap;
@@ -526,8 +550,9 @@ export function calculateNines(
   }
 
   // Calculate standings with money
+  const ninesPlayerMap = new Map(players.map(p => [p.userId, p]));
   const standings = Object.entries(playerPoints).map(([userId, points]) => {
-    const player = players.find(p => p.userId === userId);
+    const player = ninesPlayerMap.get(userId);
     const frontDiff = points.front - (POINTS_PER_HOLE * 9 / numPlayers);
     const backDiff = points.back - (POINTS_PER_HOLE * 9 / numPlayers);
     const totalDiff = points.total - (POINTS_PER_HOLE * 18 / numPlayers);
@@ -565,15 +590,17 @@ export function calculateMatchPlay(
 
   const [p1, p2] = players;
   const minHandicap = Math.min(p1.courseHandicap || 0, p2.courseHandicap || 0);
+  const holeMap = buildHoleMap(holes);
+  const scoreMaps = buildScoreMaps(players);
 
   let p1Up = 0;
   let holesPlayed = 0;
   const holeResults: Array<{ hole: number; p1Net: number | null; p2Net: number | null; winner: string | null }> = [];
 
   for (let h = 1; h <= 18; h++) {
-    const hole = holes.find(hole => hole.holeNumber === h);
-    const p1Score = p1.scores.find(s => s.holeNumber === h);
-    const p2Score = p2.scores.find(s => s.holeNumber === h);
+    const hole = holeMap.get(h);
+    const p1Score = scoreMaps.get(p1.userId)?.get(h);
+    const p2Score = scoreMaps.get(p2.userId)?.get(h);
 
     if (!p1Score?.strokes || !p2Score?.strokes) {
       holeResults.push({ hole: h, p1Net: null, p2Net: null, winner: null });
@@ -644,6 +671,8 @@ export function calculateStableford(
   }
 
   const minHandicap = safeMin(players.map(p => p.courseHandicap || 0)) ?? 0;
+  const holeMap = buildHoleMap(holes);
+  const scoreMaps = buildScoreMaps(players);
 
   const playerPoints: Record<string, { front: number; back: number; total: number }> = {};
   players.forEach(p => playerPoints[p.userId] = { front: 0, back: 0, total: 0 });
@@ -654,11 +683,11 @@ export function calculateStableford(
   }> = [];
 
   for (let h = 1; h <= 18; h++) {
-    const hole = holes.find(hole => hole.holeNumber === h);
+    const hole = holeMap.get(h);
     const par = hole?.par || 4;
 
     const scores = players.map(player => {
-      const score = player.scores.find(s => s.holeNumber === h);
+      const score = scoreMaps.get(player.userId)?.get(h);
       if (!score?.strokes) {
         return { userId: player.userId, gross: null, net: null, points: 0 };
       }
@@ -695,9 +724,10 @@ export function calculateStableford(
   }
 
   // Calculate standings
+  const stablefordPlayerMap = new Map(players.map(p => [p.userId, p]));
   const avgPoints = Object.values(playerPoints).reduce((sum, p) => sum + p.total, 0) / players.length;
   const standings = Object.entries(playerPoints).map(([userId, points]) => {
-    const player = players.find(p => p.userId === userId);
+    const player = stablefordPlayerMap.get(userId);
     return {
       userId,
       name: player?.user?.displayName || player?.user?.firstName || 'Unknown',
@@ -728,10 +758,11 @@ export function calculateSnake(
 ) {
   let snakeHolder: string | null = null;
   const threePuttHistory: Array<{ hole: number; userId: string }> = [];
+  const snakeScoreMaps = new Map(players.map(p => [p.userId, new Map(p.scores.map(s => [s.holeNumber, s]))]));
 
   for (let h = 1; h <= 18; h++) {
     for (const player of players) {
-      const score = player.scores.find(s => s.holeNumber === h);
+      const score = snakeScoreMaps.get(player.userId)?.get(h);
       if (score?.putts && score.putts >= 3) {
         snakeHolder = player.userId;
         threePuttHistory.push({ hole: h, userId: player.userId });
@@ -750,8 +781,7 @@ export function calculateSnake(
   return {
     snakeHolder,
     snakeHolderName: snakeHolder
-      ? players.find(p => p.userId === snakeHolder)?.user?.displayName ||
-        players.find(p => p.userId === snakeHolder)?.user?.firstName || 'Unknown'
+      ? (() => { const p = players.find(p => p.userId === snakeHolder); return p?.user?.displayName || p?.user?.firstName || 'Unknown'; })()
       : null,
     threePuttHistory,
     standings,

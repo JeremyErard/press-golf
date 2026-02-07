@@ -11,10 +11,46 @@ declare module 'fastify' {
   }
 }
 
+// --- In-memory TTL cache for user DB lookups ---
+
+const userCache = new Map<string, { user: User; expiresAt: number }>();
+const USER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCachedUser(clerkId: string): User | null {
+  const cached = userCache.get(clerkId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.user;
+  }
+  userCache.delete(clerkId);
+  return null;
+}
+
+function setCachedUser(clerkId: string, user: User): void {
+  userCache.set(clerkId, { user, expiresAt: Date.now() + USER_CACHE_TTL });
+}
+
+export function clearUserCache(clerkId?: string): void {
+  if (clerkId) {
+    userCache.delete(clerkId);
+  } else {
+    userCache.clear();
+  }
+}
+
+// Clean up expired cache entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of userCache.entries()) {
+    if (value.expiresAt <= now) {
+      userCache.delete(key);
+    }
+  }
+}, 10 * 60 * 1000).unref();
+
 /**
  * Authentication middleware that:
  * 1. Validates the Clerk session token
- * 2. Finds or creates the user in our database
+ * 2. Finds or creates the user in our database (with in-memory caching)
  * 3. Attaches the user to the request
  */
 export async function requireAuth(
@@ -34,24 +70,29 @@ export async function requireAuth(
       });
     }
 
-    // Find existing user
-    let user = await prisma.user.findUnique({
-      where: { clerkId: auth.userId },
-    });
+    // Check the cache first to avoid a DB round-trip
+    let user = getCachedUser(auth.userId);
 
-    // If user doesn't exist in our DB, create them
     if (!user) {
-      // Get user details from Clerk
-      // Note: In production, you'd use Clerk's backend API or webhooks for this
-      // For now, we create a minimal user record
-      user = await prisma.user.create({
-        data: {
-          clerkId: auth.userId,
-          email: `${auth.userId}@placeholder.local`, // Will be updated via webhook or profile update
-        },
-      });
+      // Cache miss - query the database
+      user = await prisma.user.findUnique({
+        where: { clerkId: auth.userId },
+      }) as User | null;
 
-      request.log.info({ userId: user.id, clerkId: auth.userId }, 'Created new user from Clerk session');
+      // If user doesn't exist in our DB, create them
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            clerkId: auth.userId,
+            email: `${auth.userId}@placeholder.local`,
+          },
+        }) as User;
+
+        request.log.info({ userId: (user as any).id, clerkId: auth.userId }, 'Created new user from Clerk session');
+      }
+
+      // Store in cache for subsequent requests
+      setCachedUser(auth.userId, user);
     }
 
     // Attach user to request for use in route handlers

@@ -108,6 +108,8 @@ export const api = {
 
   // Rounds
   getRounds: (token: string) => apiRequest<Round[]>("/rounds", {}, token),
+  getRoundsWithEarnings: (token: string) =>
+    apiRequest<RoundWithEarnings[]>("/rounds/with-earnings", {}, token),
   getRound: (token: string, id: string) =>
     apiRequest<RoundDetail>(`/rounds/${id}`, {}, token),
   getRoundSummary: (token: string, id: string) =>
@@ -613,6 +615,14 @@ export interface Round {
   _count?: {
     players: number;
   };
+}
+
+export interface RoundWithEarnings extends Round {
+  earnings?: number;
+  course: { id: string; name: string; city?: string; state?: string };
+  tee: { id: string; name: string; color?: string };
+  players: RoundPlayer[];
+  games: { type: string; betAmount: number }[];
 }
 
 export interface RoundDetail extends Round {

@@ -11,7 +11,7 @@ import { toast } from "@/components/ui/sonner";
  * by refreshing the Clerk session whenever:
  * 1. The page becomes visible again (user returns to app)
  * 2. The app regains focus
- * 3. Periodically while the app is active (every 15 minutes)
+ * 3. Periodically while the app is active (every 45 minutes)
  *
  * This keeps the session cookie fresh and prevents unexpected logouts
  * during long golf rounds (4-6 hours).
@@ -19,7 +19,7 @@ import { toast } from "@/components/ui/sonner";
 export function SessionKeepAlive() {
   const { getToken, isSignedIn } = useAuth();
   const lastRefreshRef = useRef<number>(Date.now());
-  const REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes
+  const REFRESH_INTERVAL = 45 * 60 * 1000; // 45 minutes
 
   useEffect(() => {
     if (!isSignedIn) return;
