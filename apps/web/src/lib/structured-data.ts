@@ -14,7 +14,7 @@ export function generateAppJsonLd() {
       priceCurrency: "USD",
     },
     description:
-      "The #1 app for tracking golf side games with friends. Nassau, Skins, Wolf, and 7 more games. Live scoring and easy settlement via Venmo, Apple Pay & more.",
+      "The #1 app for tracking golf side games with friends. Nassau, Skins, Wolf, and 7 more games. Live scoring and easy settlement via Venmo, Apple Cash & more.",
     screenshot: "https://pressbet.golf/images/og-image.jpg",
     featureList: [
       "Nassau game tracking",
@@ -24,7 +24,7 @@ export function generateAppJsonLd() {
       "Live real-time updates",
       "Automatic settlement calculation",
       "Venmo integration",
-      "Apple Pay support",
+      "Apple Cash support",
       "Cash App integration",
       "Zelle support",
       "GHIN handicap import",

@@ -11,7 +11,9 @@ import {
   Target,
   Trophy,
   TrendingUp,
-  Zap
+  Zap,
+  Search,
+  Swords
 } from "lucide-react";
 
 const heroFeatures = [
@@ -25,7 +27,7 @@ const heroFeatures = [
     statLabel: "Game Types",
   },
   {
-    title: "Live Scoring",
+    title: "Live Scorecard",
     description: "See who's winning hole by hole. Real-time updates keep everyone in the loop, even if you're playing in different groups.",
     icon: Radio,
     image: "/images/golf-afternoon.jpg",
@@ -34,8 +36,8 @@ const heroFeatures = [
     statLabel: "Updates",
   },
   {
-    title: "Instant Settlement",
-    description: "When the round ends, Press calculates exactly who owes who. Pay or get paid with one tap via Venmo, Cash App, Zelle, or Apple Cash.",
+    title: "Easy Settlement",
+    description: "No cash, no IOUs. Pay and confirm through Venmo, Cash App, Zelle, or Apple Cash.",
     icon: CreditCard,
     image: "/images/golf-dusk.jpg",
     accent: "green",
@@ -60,21 +62,21 @@ const gridFeatures = [
     bg: "bg-amber-400/10",
   },
   {
-    title: "GHIN Integration",
-    description: "Import official handicaps.",
+    title: "GHIN Handicaps",
+    description: "Enter your GHIN number to verify your handicap.",
     icon: BadgeCheck,
     color: "text-blue-400",
     bg: "bg-blue-400/10",
   },
   {
-    title: "Dots & Extras",
-    description: "Track greenies and sandies.",
+    title: "Dots",
+    description: "Track greenies, sandies, and poleys.",
     icon: Target,
     color: "text-purple-400",
     bg: "bg-purple-400/10",
   },
   {
-    title: "Career Dashboard",
+    title: "Career Stats",
     description: "Track your all-time results.",
     icon: Trophy,
     color: "text-amber-400",
@@ -82,10 +84,24 @@ const gridFeatures = [
   },
   {
     title: "Quick Setup",
-    description: "Start a round in seconds.",
+    description: "Start a round in under a minute.",
     icon: Zap,
     color: "text-green-400",
     bg: "bg-green-400/10",
+  },
+  {
+    title: "Course Search",
+    description: "Browse and search courses with full scorecards and slope ratings.",
+    icon: Search,
+    color: "text-sky-400",
+    bg: "bg-sky-400/10",
+  },
+  {
+    title: "Groups & Challenges",
+    description: "Organize your regular crew and send 1v1 challenges.",
+    icon: Swords,
+    color: "text-rose-400",
+    bg: "bg-rose-400/10",
   },
 ];
 
@@ -164,7 +180,7 @@ export function FeaturesSection() {
         </div>
 
         {/* Grid Features - 6 smaller cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
           {gridFeatures.map((feature, index) => {
             const Icon = feature.icon;
             return (

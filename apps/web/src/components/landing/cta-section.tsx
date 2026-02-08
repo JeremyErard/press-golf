@@ -10,7 +10,7 @@ const benefits = [
   "10 game types included",
   "Unlimited rounds",
   "Auto-calculate results",
-  "Settle up instantly",
+  "Settle up easily",
 ];
 
 const paymentMethods = [
@@ -108,7 +108,7 @@ export function CtaSection() {
                         size="lg"
                       >
                         <Crown className="h-5 w-5 mr-2" />
-                        Get Started - $2.49/mo
+                        Get Press Pro - $2.49/mo
                       </Button>
                     </Link>
                     <Link href="/sign-in">
@@ -126,7 +126,7 @@ export function CtaSection() {
 
               {userState !== "authenticated" && (
                 <p className="text-sm text-white/60 mt-4">
-                  $2.49/month or $19.99/year • Cancel anytime
+                  Press Pro: $2.49/month or $19.99/year • Cancel anytime
                 </p>
               )}
             </div>
@@ -138,8 +138,8 @@ export function CtaSection() {
                   <CreditCard className="w-6 h-6 text-green-400" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-white">Settle Up Instantly</h3>
-                  <p className="text-white/60 text-sm">Pay or get paid with one tap</p>
+                  <h3 className="text-xl font-bold text-white">Easy Settlement</h3>
+                  <p className="text-white/60 text-sm">Pay or get paid easily</p>
                 </div>
               </div>
 

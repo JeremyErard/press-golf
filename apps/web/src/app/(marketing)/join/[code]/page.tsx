@@ -36,7 +36,7 @@ const features = [
   {
     icon: DollarSign,
     title: "Settle Up Easy",
-    description: "Pay via Apple Pay, Venmo, Cash App & more",
+    description: "Pay via Apple Cash, Venmo, Cash App & more",
   },
 ];
 

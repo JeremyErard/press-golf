@@ -83,7 +83,7 @@ export function HeroSection() {
                         Welcome Back - Sign In
                       </Button>
                     </Link>
-                    <Link href="#features">
+                    <Link href="#how-it-works">
                       <Button
                         variant="secondary"
                         className="w-full sm:w-auto h-14 px-8 text-base font-semibold bg-white/10 hover:bg-white/20 border border-white/20"
@@ -106,7 +106,7 @@ export function HeroSection() {
                         Get Started - $2.49/mo
                       </Button>
                     </Link>
-                    <Link href="#features">
+                    <Link href="#how-it-works">
                       <Button
                         variant="secondary"
                         className="w-full sm:w-auto h-14 px-8 text-base font-semibold bg-white/10 hover:bg-white/20 border border-white/20"

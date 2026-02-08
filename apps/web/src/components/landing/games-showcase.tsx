@@ -18,7 +18,7 @@ import {
 const games = [
   {
     name: "Nassau",
-    description: "Classic 3-match format: front 9, back 9, and overall",
+    description: "Classic 3-bet format: front 9, back 9, and overall",
     icon: Flag,
     color: "text-brand",
     bg: "bg-brand/10",
@@ -42,7 +42,7 @@ const games = [
   },
   {
     name: "Wolf",
-    description: "Rotating captain picks partners each hole.",
+    description: "Rotating captain picks partners or goes alone each hole.",
     icon: Dog,
     color: "text-purple-400",
     bg: "bg-purple-400/10",
@@ -50,7 +50,7 @@ const games = [
   },
   {
     name: "Nines",
-    description: "Three points per hole across three 6-hole matches.",
+    description: "Nine points split among players each hole based on score.",
     icon: Grid3X3,
     color: "text-green-400",
     bg: "bg-green-400/10",
@@ -64,7 +64,7 @@ const games = [
   },
   {
     name: "Bingo Bango Bongo",
-    description: "Three points per hole: first on, closest, first in.",
+    description: "Three points per hole: first on, closest to pin, first in.",
     icon: Trophy,
     color: "text-brand",
     bg: "bg-brand/10",
@@ -169,7 +169,7 @@ export function GamesShowcaseSection() {
             </div>
             <div className="text-left">
               <p className="text-white font-medium">Don&apos;t know the rules?</p>
-              <p className="text-white/60 text-sm">Press explains each game when you set up your round.</p>
+              <p className="text-white/60 text-sm">Press describes each game to help you choose.</p>
             </div>
           </div>
         </div>

@@ -31,7 +31,7 @@ export const gameTypeDescriptions: Record<GameType, string> = {
   SKINS: "Win the hole outright to take the skin",
   MATCH_PLAY: "Hole-by-hole competition, most holes wins",
   WOLF: "Rotating picker chooses partner or goes alone",
-  NINES: "Points per hole: 5-3-1 or 4-2-0 split",
+  NINES: "Nine points split among players each hole based on score",
   STABLEFORD: "Points based on score vs par",
   BINGO_BANGO_BONGO: "First on, closest to pin, first in",
   VEGAS: "Team score as 2-digit number",

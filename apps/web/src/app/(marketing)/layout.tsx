@@ -9,7 +9,7 @@ import {
 export const metadata: Metadata = {
   title: "Press - Golf Side Games App | Track Nassau, Skins & Wolf",
   description:
-    "The #1 app for tracking golf side games with friends. Nassau, Skins, Wolf, and 7 more games. Live scoring and easy settlement via Venmo, Apple Pay & more.",
+    "The #1 app for tracking golf side games with friends. Nassau, Skins, Wolf, and 7 more games. Live scoring and easy settlement via Venmo, Apple Cash & more.",
   keywords: [
     "golf side games app",
     "nassau golf game",
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     type: "website",
     title: "Press - Golf Side Games App | Track Nassau, Skins & Wolf",
     description:
-      "Track golf side games with your buddies. 10 game types including Nassau, Skins, Wolf. Easy settlement with Venmo, Apple Pay & more.",
+      "Track golf side games with your buddies. 10 game types including Nassau, Skins, Wolf. Easy settlement with Venmo, Apple Cash & more.",
     siteName: "Press",
     url: "https://pressbet.golf",
     images: [

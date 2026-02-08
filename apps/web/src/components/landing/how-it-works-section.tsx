@@ -24,7 +24,7 @@ const steps = [
   {
     number: 3,
     title: "Choose Your Games",
-    description: "Select from 10 game types. Set your stakes and press rules.",
+    description: "Select from 10 game types. Set your bets and press rules.",
     icon: Play,
     color: "text-blue-400",
     bg: "bg-blue-400/20",
@@ -43,7 +43,7 @@ const steps = [
 
 export function HowItWorksSection() {
   return (
-    <section aria-label="How it works" className="py-20 px-6 relative overflow-hidden">
+    <section id="how-it-works" aria-label="How it works" className="py-20 px-6 relative overflow-hidden">
       {/* Background accent */}
       <div className="absolute inset-0 -z-10">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-brand/5 rounded-full blur-3xl" />

@@ -455,7 +455,7 @@ export default function SettlementPage() {
                                 >
                                   <ExternalLink className="h-4 w-4 mr-1" />
                                   {method.type === "VENMO" ? "Venmo" :
-                                   method.type === "CASHAPP" ? "CashApp" :
+                                   method.type === "CASHAPP" ? "Cash App" :
                                    method.type === "ZELLE" ? "Zelle" :
                                    method.type === "APPLE_PAY" ? "Apple Cash" : method.type}
                                 </Button>

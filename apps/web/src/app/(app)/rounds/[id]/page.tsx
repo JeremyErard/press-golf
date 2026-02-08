@@ -54,8 +54,8 @@ const statusBadgeVariant = {
 };
 
 const statusLabel = {
-  SETUP: "Setting Up",
-  ACTIVE: "In Progress",
+  SETUP: "Setup",
+  ACTIVE: "Active",
   COMPLETED: "Completed",
 };
 
@@ -889,7 +889,7 @@ export default function RoundDetailPage() {
                 </div>
                 <p className="text-white font-semibold">No games added yet</p>
                 <p className="text-muted text-sm mt-2">
-                  Add games to start betting
+                  Add your side games
                 </p>
               </CardContent>
             </Card>
@@ -1014,7 +1014,7 @@ export default function RoundDetailPage() {
               <Link href={`/rounds/${round.id}/settlement`} className="block">
                 <Button className="w-full h-14" size="lg">
                   <DollarSign className="h-5 w-5 mr-2" />
-                  View Settlement
+                  Settle Up
                 </Button>
               </Link>
               <Link href={`/rounds/${round.id}/scorecard`} className="block">
