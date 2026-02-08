@@ -590,7 +590,21 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
 
     // Calculate all game results
     const settlements: Array<{ fromUserId: string; toUserId: string; amount: number }> = [];
+    const gameResultEntries: Array<{ gameId: string; userId: string; netAmount: number }> = [];
     const holes = round.course?.holes || [];
+
+    // Fetch game-specific data needed for Wolf, Vegas, BBB, Banker calculations
+    const wolfGame = round.games.find(g => g.type === 'WOLF');
+    const vegasGame = round.games.find(g => g.type === 'VEGAS');
+    const bbbGame = round.games.find(g => g.type === 'BINGO_BANGO_BONGO');
+    const bankerGame = round.games.find(g => g.type === 'BANKER');
+
+    const [wolfDecisions, vegasTeams, bbbPoints, bankerDecisions] = await Promise.all([
+      wolfGame ? prisma.wolfDecision.findMany({ where: { gameId: wolfGame.id }, orderBy: { holeNumber: 'asc' } }) : Promise.resolve([]),
+      vegasGame ? prisma.vegasTeam.findMany({ where: { gameId: vegasGame.id } }) : Promise.resolve([]),
+      bbbGame ? prisma.bingoBangoBongoPoint.findMany({ where: { gameId: bbbGame.id }, orderBy: { holeNumber: 'asc' } }) : Promise.resolve([]),
+      bankerGame ? prisma.bankerDecision.findMany({ where: { gameId: bankerGame.id }, orderBy: { holeNumber: 'asc' } }) : Promise.resolve([]),
+    ]);
 
     for (const game of round.games) {
       // Filter players by participantIds if specified, otherwise use all players
@@ -646,8 +660,36 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         };
       };
 
+      // Helper to generate settlements from standings with a money field
+      const generateStandingsSettlements = (
+        standings: Array<{ userId: string; money: number }>,
+      ) => {
+        const losers = standings.filter(s => s.money < 0);
+        const winners = standings.filter(s => s.money > 0);
+        const totalWinnings = winners.reduce((sum, w) => sum + w.money, 0);
+        if (totalWinnings > 0) {
+          for (const loser of losers) {
+            for (const winner of winners) {
+              const proportion = winner.money / totalWinnings;
+              const amount = Math.abs(loser.money) * proportion;
+              if (amount > 0) {
+                settlements.push({
+                  fromUserId: loser.userId,
+                  toUserId: winner.userId,
+                  amount: Math.round(amount * 100) / 100,
+                });
+              }
+            }
+          }
+        }
+      };
+
       if (game.type === 'NASSAU') {
         const nassauResult = calculateNassau(gamePlayers, holes, Number(game.betAmount));
+
+        // Track per-player net for GameResult
+        const nassauNet: Record<string, number> = {};
+        gamePlayers.forEach(p => nassauNet[p.userId] = 0);
 
         // Add settlements for each segment
         for (const segment of ['front', 'back', 'overall'] as const) {
@@ -661,6 +703,8 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
                 toUserId: result.winnerId,
                 amount: Number(game.betAmount),
               });
+              nassauNet[result.winnerId] += Number(game.betAmount);
+              nassauNet[loserId] -= Number(game.betAmount);
             }
           }
         }
@@ -674,12 +718,25 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
             Number(game.betAmount),
             segment
           );
+          for (const ps of pressSettlements) {
+            nassauNet[ps.toUserId] = (nassauNet[ps.toUserId] || 0) + ps.amount;
+            nassauNet[ps.fromUserId] = (nassauNet[ps.fromUserId] || 0) - ps.amount;
+          }
           settlements.push(...pressSettlements);
         }
+
+        // Record GameResult entries
+        for (const [userId, netAmount] of Object.entries(nassauNet)) {
+          gameResultEntries.push({ gameId: game.id, userId, netAmount });
+        }
+
       } else if (game.type === 'MATCH_PLAY') {
         // Handle Match Play with presses
         const matchResult = gameCalcPressResult(1, 18);
         const betAmount = Number(game.betAmount);
+
+        const matchNet: Record<string, number> = {};
+        gamePlayers.forEach(p => matchNet[p.userId] = 0);
 
         if (matchResult.winnerId && matchResult.loserId) {
           settlements.push({
@@ -687,6 +744,8 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
             toUserId: matchResult.winnerId,
             amount: betAmount,
           });
+          matchNet[matchResult.winnerId] += betAmount;
+          matchNet[matchResult.loserId] -= betAmount;
         }
 
         // Calculate press settlements for Match Play recursively (handles press-the-press)
@@ -697,10 +756,19 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
             betAmount,
             'MATCH'
           );
+          for (const ps of pressSettlements) {
+            matchNet[ps.toUserId] = (matchNet[ps.toUserId] || 0) + ps.amount;
+            matchNet[ps.fromUserId] = (matchNet[ps.fromUserId] || 0) - ps.amount;
+          }
           settlements.push(...pressSettlements);
         }
+
+        for (const [userId, netAmount] of Object.entries(matchNet)) {
+          gameResultEntries.push({ gameId: game.id, userId, netAmount });
+        }
+
       } else if (game.type === 'SKINS') {
-        const skinsResult = calculateSkins(gamePlayers, round.course?.holes || [], Number(game.betAmount));
+        const skinsResult = calculateSkins(gamePlayers, holes, Number(game.betAmount));
 
         // Aggregate skins winnings per player
         const skinsByPlayer: Record<string, number> = {};
@@ -743,6 +811,109 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
                 }
               }
             }
+          }
+        }
+
+        // Record GameResult entries for skins
+        for (const player of gamePlayers) {
+          const won = skinsByPlayer[player.userId] || 0;
+          const net = won - perPlayerShare;
+          gameResultEntries.push({ gameId: game.id, userId: player.userId, netAmount: Math.round(net * 100) / 100 });
+        }
+
+      } else if (game.type === 'WOLF') {
+        const wolfResult = calculateWolf(gamePlayers, holes, wolfDecisions, Number(game.betAmount));
+        if (wolfResult.standings) {
+          generateStandingsSettlements(wolfResult.standings.map(s => ({ userId: s.userId, money: s.points })));
+          for (const s of wolfResult.standings) {
+            gameResultEntries.push({ gameId: game.id, userId: s.userId, netAmount: s.points });
+          }
+        }
+
+      } else if (game.type === 'NINES') {
+        const ninesResult = calculateNines(gamePlayers, holes, Number(game.betAmount));
+        if (ninesResult.standings) {
+          generateStandingsSettlements(ninesResult.standings.map(s => ({ userId: s.userId, money: s.totalMoney })));
+          for (const s of ninesResult.standings) {
+            gameResultEntries.push({ gameId: game.id, userId: s.userId, netAmount: s.totalMoney });
+          }
+        }
+
+      } else if (game.type === 'STABLEFORD') {
+        const stablefordResult = calculateStableford(gamePlayers, holes, Number(game.betAmount));
+        if (stablefordResult.standings) {
+          generateStandingsSettlements(stablefordResult.standings);
+          for (const s of stablefordResult.standings) {
+            gameResultEntries.push({ gameId: game.id, userId: s.userId, netAmount: s.money });
+          }
+        }
+
+      } else if (game.type === 'SNAKE') {
+        const snakeResult = calculateSnake(gamePlayers, Number(game.betAmount));
+        if (snakeResult.standings) {
+          generateStandingsSettlements(snakeResult.standings);
+          for (const s of snakeResult.standings) {
+            gameResultEntries.push({ gameId: game.id, userId: s.userId, netAmount: s.money });
+          }
+        }
+
+      } else if (game.type === 'BINGO_BANGO_BONGO') {
+        const bbbResult = calculateBingoBangoBongo(gamePlayers, bbbPoints, Number(game.betAmount));
+        if (bbbResult.standings) {
+          generateStandingsSettlements(bbbResult.standings);
+          for (const s of bbbResult.standings) {
+            gameResultEntries.push({ gameId: game.id, userId: s.userId, netAmount: s.money });
+          }
+        }
+
+      } else if (game.type === 'VEGAS') {
+        const vegasResult = calculateVegas(gamePlayers, holes, vegasTeams, Number(game.betAmount));
+        if (vegasResult.teams && vegasResult.teams.length === 2) {
+          const [t1, t2] = vegasResult.teams;
+          if (t1.money !== 0) {
+            const team1Data = vegasTeams.find(t => t.teamNumber === 1);
+            const team2Data = vegasTeams.find(t => t.teamNumber === 2);
+            if (team1Data && team2Data) {
+              const losingTeam = t1.money < 0 ? team1Data : team2Data;
+              const winningTeam = t1.money < 0 ? team2Data : team1Data;
+              const totalAmount = Math.abs(t1.money);
+              // Each loser pays each winner 1/4 of total
+              const perPairAmount = Math.round(totalAmount / 4 * 100) / 100;
+              for (const loserId of [losingTeam.player1Id, losingTeam.player2Id]) {
+                for (const winnerId of [winningTeam.player1Id, winningTeam.player2Id]) {
+                  if (perPairAmount > 0) {
+                    settlements.push({
+                      fromUserId: loserId,
+                      toUserId: winnerId,
+                      amount: perPairAmount,
+                    });
+                  }
+                }
+              }
+              // GameResult: each player on losing team loses half, each on winning team wins half
+              const perPlayerLoss = Math.round(totalAmount / 2 * 100) / 100;
+              const perPlayerWin = Math.round(totalAmount / 2 * 100) / 100;
+              for (const id of [losingTeam.player1Id, losingTeam.player2Id]) {
+                gameResultEntries.push({ gameId: game.id, userId: id, netAmount: -perPlayerLoss });
+              }
+              for (const id of [winningTeam.player1Id, winningTeam.player2Id]) {
+                gameResultEntries.push({ gameId: game.id, userId: id, netAmount: perPlayerWin });
+              }
+            }
+          } else {
+            // Tie - all players net 0
+            for (const player of gamePlayers) {
+              gameResultEntries.push({ gameId: game.id, userId: player.userId, netAmount: 0 });
+            }
+          }
+        }
+
+      } else if (game.type === 'BANKER') {
+        const bankerResult = calculateBanker(gamePlayers, holes, bankerDecisions, Number(game.betAmount));
+        if (bankerResult.standings) {
+          generateStandingsSettlements(bankerResult.standings);
+          for (const s of bankerResult.standings) {
+            gameResultEntries.push({ gameId: game.id, userId: s.userId, netAmount: s.money });
           }
         }
       }
@@ -822,7 +993,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       const key = `${s.fromUserId}->${s.toUserId}`;
       const reverseKey = `${s.toUserId}->${s.fromUserId}`;
 
-      if (consolidated[reverseKey]) {
+      if (consolidated[reverseKey] !== undefined) {
         consolidated[reverseKey] -= s.amount;
       } else {
         consolidated[key] = (consolidated[key] || 0) + s.amount;
@@ -890,6 +1061,20 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
               },
             });
             settlements.push(settlement);
+          }
+        }
+
+        // Create GameResult records for career stats tracking
+        for (const entry of gameResultEntries) {
+          const roundPlayer = round.players.find(p => p.userId === entry.userId);
+          if (roundPlayer) {
+            await tx.gameResult.create({
+              data: {
+                gameId: entry.gameId,
+                roundPlayerId: roundPlayer.id,
+                netAmount: new Decimal(entry.netAmount),
+              },
+            });
           }
         }
 
