@@ -55,8 +55,8 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       return badRequest(reply, 'Round ID, type, and bet amount are required');
     }
 
-    if (betAmount < 0) {
-      return badRequest(reply, 'Bet amount must be positive');
+    if (betAmount <= 0) {
+      return badRequest(reply, 'Bet amount must be greater than zero');
     }
 
     if (betAmount > 10000) {
@@ -112,6 +112,9 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       'NINES': { min: 3, max: 4, message: 'Nines requires 3-4 players' },
       'SKINS': { min: 2, max: 16, message: 'Skins requires 2-16 players' },
       'STABLEFORD': { min: 1, max: 16, message: 'Stableford requires 1-16 players' },
+      'BINGO_BANGO_BONGO': { min: 3, max: 16, message: 'Bingo Bango Bongo requires 3-16 players' },
+      'SNAKE': { min: 2, max: 16, message: 'Snake requires 2-16 players' },
+      'BANKER': { min: 3, max: 16, message: 'Banker requires 3-16 players' },
     };
 
     const playerCount = gameParticipantIds.length;

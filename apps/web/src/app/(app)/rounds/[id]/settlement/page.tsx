@@ -30,6 +30,7 @@ export default function SettlementPage() {
   const [dotsData, setDotsData] = useState<DotsData | null>(null);
   const [apiUser, setApiUser] = useState<ApiUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
   const [confirmingPayment, setConfirmingPayment] = useState<string | null>(null);
 
@@ -60,7 +61,7 @@ export default function SettlementPage() {
         }
       } catch (error) {
         console.error("Failed to fetch data:", error);
-        toast.error("Failed to load settlement data");
+        setFetchError(true);
       } finally {
         setIsLoading(false);
       }
@@ -180,6 +181,32 @@ export default function SettlementPage() {
         <div className="p-lg space-y-lg">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-48 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div>
+        <Header title="Settlement" showBack />
+        <div className="p-lg">
+          <Card>
+            <CardContent className="p-xl text-center space-y-md">
+              <p className="text-muted">Failed to load settlement data</p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setFetchError(false);
+                  setIsLoading(true);
+                  window.location.reload();
+                }}
+              >
+                Tap to retry
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );

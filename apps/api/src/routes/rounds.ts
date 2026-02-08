@@ -177,7 +177,7 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
       });
 
       for (const s of settlements) {
-        if (!settlementsByRound[s.roundId]) settlementsByRound[s.roundId] = 0;
+        if (settlementsByRound[s.roundId] === undefined) settlementsByRound[s.roundId] = 0;
         if (s.toUserId === userId) {
           settlementsByRound[s.roundId] += Number(s.amount);
         } else if (s.fromUserId === userId) {
