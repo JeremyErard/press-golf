@@ -7,6 +7,7 @@ import Image from "next/image";
 import { ChevronRight, Play, UserPlus, Flag, BarChart3 } from "lucide-react";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton, SectionHeader } from "@/components/ui";
 import { PendingApprovals } from "@/components/handicap/pending-approvals";
+import { NotificationPrompt } from "@/components/notifications";
 import { FirstLaunchExplainer } from "@/components/onboarding/first-launch-explainer";
 import { TabHelpSheet } from "@/components/onboarding/tab-help-sheet";
 import { HelpButton } from "@/components/onboarding/help-button";
@@ -246,6 +247,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="px-5 space-y-5">
+        {/* Notification opt-in prompt */}
+        <NotificationPrompt />
+
         {/* Pending Handicap Approvals (for round creators) */}
         <PendingApprovals />
 

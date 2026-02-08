@@ -703,7 +703,8 @@ export const roundRoutes: FastifyPluginAsync = async (app) => {
         [scorer?.firstName, scorer?.lastName].filter(Boolean).join(" ") ||
         "A player";
 
-      notifyScoreUpdate(otherPlayerIds, scorerName, holeNumber, round.id);
+      notifyScoreUpdate(otherPlayerIds, scorerName, holeNumber, round.id)
+        .catch((err) => request.log.error(err, "Failed to send score update notification"));
     }
 
     return {
@@ -1073,7 +1074,8 @@ Confidence should be: high, medium, or low`,
 
       // Notify about the last hole scored
       const lastHole = Math.max(...scores.map(s => s.holeNumber));
-      notifyScoreUpdate(otherPlayerIds, scorerName, lastHole, roundId);
+      notifyScoreUpdate(otherPlayerIds, scorerName, lastHole, roundId)
+        .catch((err) => request.log.error(err, "Failed to send score update notification"));
     }
 
     return reply.send({

@@ -164,7 +164,8 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       // Format game type for display
       const gameTypeDisplay = type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 
-      notifyGameInvite(otherPlayerIds, creatorName, gameTypeDisplay, roundId, game.id);
+      notifyGameInvite(otherPlayerIds, creatorName, gameTypeDisplay, roundId, game.id)
+        .catch((err) => request.log.error(err, "Failed to send game invite notification"));
     }
 
     return {
