@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
 import {
   DollarSign,
   TrendingUp,
@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
-import { api, type RoundDetail, type ApiSettlement, type PaymentMethodType, type DotsData } from "@/lib/api";
+import { api, type RoundDetail, type ApiSettlement, type PaymentMethodType, type DotsData, type User as ApiUser } from "@/lib/api";
 import { formatMoney, cn } from "@/lib/utils";
 import { gameTypeLabels } from "@/lib/game-types";
 import { toast } from "@/components/ui/sonner";
@@ -23,12 +23,12 @@ import { toast } from "@/components/ui/sonner";
 export default function SettlementPage() {
   const params = useParams();
   const { getToken } = useAuth();
-  const { user } = useUser();
   const roundId = params.id as string;
 
   const [round, setRound] = useState<RoundDetail | null>(null);
   const [settlements, setSettlements] = useState<ApiSettlement[]>([]);
   const [dotsData, setDotsData] = useState<DotsData | null>(null);
+  const [apiUser, setApiUser] = useState<ApiUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [markingPaid, setMarkingPaid] = useState<string | null>(null);
   const [confirmingPayment, setConfirmingPayment] = useState<string | null>(null);
@@ -39,13 +39,15 @@ export default function SettlementPage() {
         const token = await getToken();
         if (!token) return;
 
-        const [roundData, settlementsData] = await Promise.all([
+        const [roundData, settlementsData, userData] = await Promise.all([
           api.getRound(token, roundId),
           api.getSettlements(token, roundId),
+          api.getMe(token),
         ]);
 
         setRound(roundData);
         setSettlements(settlementsData);
+        setApiUser(userData);
 
         // Fetch dots if enabled
         if (roundData.dotsEnabled) {
@@ -69,7 +71,7 @@ export default function SettlementPage() {
 
   // Calculate user's position and settlement summary
   const settlementSummary = useMemo(() => {
-    if (!user) return { net: 0, owed: 0, receivable: 0, settledCount: 0, pendingCount: 0, totalCount: 0 };
+    if (!apiUser) return { net: 0, owed: 0, receivable: 0, settledCount: 0, pendingCount: 0, totalCount: 0 };
 
     let owed = 0;        // Amount I still owe (not settled)
     let receivable = 0;  // Amount owed to me (not settled)
@@ -79,12 +81,12 @@ export default function SettlementPage() {
     settlements.forEach(s => {
       const isSettled = s.status === "SETTLED";
 
-      if (s.toUserId === user.id) {
+      if (s.toUserId === apiUser.id) {
         // I'm the recipient
         if (!isSettled) receivable += Number(s.amount);
         if (isSettled) settledCount++;
         else pendingCount++;
-      } else if (s.fromUserId === user.id) {
+      } else if (s.fromUserId === apiUser.id) {
         // I'm the payer
         if (!isSettled) owed += Number(s.amount);
         if (isSettled) settledCount++;
@@ -100,7 +102,7 @@ export default function SettlementPage() {
       pendingCount,
       totalCount: settledCount + pendingCount,
     };
-  }, [settlements, user]);
+  }, [settlements, apiUser]);
 
   const netPosition = settlementSummary.net;
 
@@ -348,8 +350,8 @@ export default function SettlementPage() {
 
           {settlements.length > 0 ? (
             <div className="space-y-md">
-              {settlements.map((settlement) => {
-                const isOwed = settlement.fromUserId === user?.id;
+              {settlements.filter(s => s.fromUserId === apiUser?.id || s.toUserId === apiUser?.id).map((settlement) => {
+                const isOwed = settlement.fromUserId === apiUser?.id;
                 const otherUser = isOwed ? settlement.toUser : settlement.fromUser;
                 const otherName = otherUser.displayName || otherUser.firstName || "Player";
 
