@@ -204,7 +204,7 @@ export default function SettlementPage() {
     <div>
       <Header title="Settlement" showBack />
 
-      <div className="p-lg space-y-lg">
+      <div className="p-lg pb-nav space-y-lg">
         {/* Net Position Card */}
         <div>
           <Card
