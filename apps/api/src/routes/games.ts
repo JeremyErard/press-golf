@@ -2077,6 +2077,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       type: string;
       betAmount: number;
       isAutoPress?: boolean;
+      participantNames?: string[];
       nassauStatus?: {
         front: { score: number; label: string; holesPlayed: number; holesRemaining: number };
         back: { score: number; label: string; holesPlayed: number; holesRemaining: number };
@@ -2122,6 +2123,7 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         type: game.type,
         betAmount,
         isAutoPress: game.isAutoPress,
+        participantNames: gamePlayers.map(p => p.user.displayName || p.user.firstName || 'Player'),
       };
 
       switch (game.type) {

@@ -989,6 +989,7 @@ export interface GameLiveStatus {
   type: string;
   betAmount: number;
   isAutoPress?: boolean;
+  participantNames?: string[];
   nassauStatus?: {
     front: { score: number; label: string; holesPlayed: number; holesRemaining: number };
     back: { score: number; label: string; holesPlayed: number; holesRemaining: number };
