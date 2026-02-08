@@ -12,7 +12,7 @@ import { FirstLaunchExplainer } from "@/components/onboarding/first-launch-expla
 import { TabHelpSheet } from "@/components/onboarding/tab-help-sheet";
 import { HelpButton } from "@/components/onboarding/help-button";
 import { useFirstLaunch } from "@/hooks/use-first-launch";
-import { api, type RoundWithEarnings, type RoundDetail, type CalculateResultsResponse, type User as ApiUser } from "@/lib/api";
+import { api, isSessionExpired, type RoundWithEarnings, type RoundDetail, type CalculateResultsResponse, type User as ApiUser } from "@/lib/api";
 import { formatDate, formatMoney, formatCourseName } from "@/lib/utils";
 
 export default function DashboardPage() {
@@ -55,6 +55,10 @@ export default function DashboardPage() {
         }
       }
     } catch (err) {
+      if (isSessionExpired(err)) {
+        window.location.href = '/sign-in';
+        return;
+      }
       console.error("Failed to fetch data:", err);
       setError(true);
     } finally {

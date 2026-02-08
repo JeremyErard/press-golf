@@ -65,6 +65,14 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Check if an error is a session expiration and redirect if so.
+ * Returns true if it was a session error (caller should stop processing).
+ */
+export function isSessionExpired(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'SESSION_EXPIRED';
+}
+
 // Auth-aware fetch that includes Clerk token
 export async function apiRequest<T>(
   endpoint: string,

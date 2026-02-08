@@ -41,6 +41,29 @@ interface GameLiveStatus {
   stablefordStatus?: {
     points: number;
   };
+  // Nines specific
+  ninesStatus?: {
+    standings: Array<{ userId: string; name: string; points: number; money: number }>;
+  };
+  // Snake specific
+  snakeStatus?: {
+    snakeHolderId: string | null;
+    snakeHolderName: string | null;
+    lastThreePuttHole: number | null;
+  };
+  // BBB specific
+  bbbStatus?: {
+    standings: Array<{ userId: string; name: string; bingos: number; bangos: number; bongos: number; total: number; money: number }>;
+  };
+  // Vegas specific
+  vegasStatus?: {
+    teams: Array<{ playerNames: string[]; combinedScore: number; money: number }>;
+  };
+  // Banker specific
+  bankerStatus?: {
+    standings: Array<{ userId: string; name: string; money: number }>;
+    currentBankerName?: string;
+  };
   // Generic
   description?: string;
 }
@@ -484,6 +507,238 @@ export function GamesSummary({
     );
   };
 
+  const renderNinesGame = (game: GameLiveStatus) => {
+    const status = game.ninesStatus;
+    if (!status) return renderGenericGame(game);
+
+    return (
+      <Card key={game.gameId}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">{game.name || "Nines"}</span>
+              <Badge variant="default" className="text-xs">
+                {formatBet(game.betAmount)}/pt
+              </Badge>
+            </div>
+          </div>
+          {game.participantNames && game.participantNames.length > 0 && (
+            <p className="text-xs text-muted mb-2">
+              {game.participantNames.join(", ")}
+            </p>
+          )}
+          <div className="space-y-1">
+            {status.standings.map((standing, index) => (
+              <div
+                key={standing.userId}
+                className={cn(
+                  "flex items-center justify-between py-1.5 px-3 rounded-lg",
+                  index === 0 && standing.money > 0 ? "bg-success/10" : "bg-surface"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{standing.name}</span>
+                  <span className="text-xs text-muted">{standing.points} pts</span>
+                </div>
+                <span className={cn(
+                  "font-bold text-sm",
+                  standing.money > 0 ? "text-success" : standing.money < 0 ? "text-error" : "text-muted"
+                )}>
+                  {standing.money >= 0 ? "+" : ""}{formatBet(standing.money)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderSnakeGame = (game: GameLiveStatus) => {
+    const status = game.snakeStatus;
+    if (!status) return renderGenericGame(game);
+
+    return (
+      <Card key={game.gameId}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">{game.name || "Snake"}</span>
+              <Badge variant="default" className="text-xs">
+                {formatBet(game.betAmount)}
+              </Badge>
+            </div>
+          </div>
+          {game.participantNames && game.participantNames.length > 0 && (
+            <p className="text-xs text-muted mb-2">
+              {game.participantNames.join(", ")}
+            </p>
+          )}
+          <div className="mt-2 p-3 rounded-lg bg-surface">
+            {status.snakeHolderId ? (
+              <div className="text-center">
+                <p className="text-sm text-muted mb-1">Snake Holder</p>
+                <p className="text-lg font-bold text-error">{status.snakeHolderName}</p>
+                {status.lastThreePuttHole && (
+                  <p className="text-xs text-muted mt-1">3-putt on hole {status.lastThreePuttHole}</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted text-center">No 3-putts yet</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderBBBGame = (game: GameLiveStatus) => {
+    const status = game.bbbStatus;
+    if (!status) return renderGenericGame(game);
+
+    return (
+      <Card key={game.gameId}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">{game.name || "Bingo Bango Bongo"}</span>
+              <Badge variant="default" className="text-xs">
+                {formatBet(game.betAmount)}/pt
+              </Badge>
+            </div>
+          </div>
+          {game.participantNames && game.participantNames.length > 0 && (
+            <p className="text-xs text-muted mb-2">
+              {game.participantNames.join(", ")}
+            </p>
+          )}
+          <div className="space-y-1">
+            {status.standings.map((standing, index) => (
+              <div
+                key={standing.userId}
+                className={cn(
+                  "flex items-center justify-between py-1.5 px-3 rounded-lg",
+                  index === 0 && standing.money > 0 ? "bg-success/10" : "bg-surface"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">{standing.name}</span>
+                  <div className="flex items-center gap-1 text-xs text-muted">
+                    <span>Bi:{standing.bingos}</span>
+                    <span>Ba:{standing.bangos}</span>
+                    <span>Bo:{standing.bongos}</span>
+                  </div>
+                </div>
+                <span className={cn(
+                  "font-bold text-sm",
+                  standing.money > 0 ? "text-success" : standing.money < 0 ? "text-error" : "text-muted"
+                )}>
+                  {standing.money >= 0 ? "+" : ""}{formatBet(standing.money)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderVegasGame = (game: GameLiveStatus) => {
+    const status = game.vegasStatus;
+    if (!status) return renderGenericGame(game);
+
+    return (
+      <Card key={game.gameId}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">{game.name || "Vegas"}</span>
+              <Badge variant="default" className="text-xs">
+                {formatBet(game.betAmount)}
+              </Badge>
+            </div>
+          </div>
+          {game.participantNames && game.participantNames.length > 0 && (
+            <p className="text-xs text-muted mb-2">
+              {game.participantNames.join(", ")}
+            </p>
+          )}
+          <div className="space-y-2">
+            {status.teams.map((team, index) => (
+              <div
+                key={index}
+                className={cn(
+                  "flex items-center justify-between py-2 px-3 rounded-lg",
+                  team.money > 0 ? "bg-success/10" : team.money < 0 ? "bg-error/10" : "bg-surface"
+                )}
+              >
+                <div>
+                  <span className="text-sm font-medium">{team.playerNames.join(" & ")}</span>
+                  <span className="text-xs text-muted ml-2">({team.combinedScore})</span>
+                </div>
+                <span className={cn(
+                  "font-bold text-sm",
+                  team.money > 0 ? "text-success" : team.money < 0 ? "text-error" : "text-muted"
+                )}>
+                  {team.money >= 0 ? "+" : ""}{formatBet(team.money)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderBankerGame = (game: GameLiveStatus) => {
+    const status = game.bankerStatus;
+    if (!status) return renderGenericGame(game);
+
+    return (
+      <Card key={game.gameId}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">{game.name || "Banker"}</span>
+              <Badge variant="default" className="text-xs">
+                {formatBet(game.betAmount)}
+              </Badge>
+            </div>
+            {status.currentBankerName && (
+              <span className="text-xs text-muted">
+                Banker: {status.currentBankerName}
+              </span>
+            )}
+          </div>
+          {game.participantNames && game.participantNames.length > 0 && (
+            <p className="text-xs text-muted mb-2">
+              {game.participantNames.join(", ")}
+            </p>
+          )}
+          <div className="space-y-1">
+            {status.standings.map((standing, index) => (
+              <div
+                key={standing.userId}
+                className={cn(
+                  "flex items-center justify-between py-1.5 px-3 rounded-lg",
+                  index === 0 && standing.money > 0 ? "bg-success/10" : "bg-surface"
+                )}
+              >
+                <span className="text-sm font-medium">{standing.name}</span>
+                <span className={cn(
+                  "font-bold text-sm",
+                  standing.money > 0 ? "text-success" : standing.money < 0 ? "text-error" : "text-muted"
+                )}>
+                  {standing.money >= 0 ? "+" : ""}{formatBet(standing.money)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   const renderGenericGame = (game: GameLiveStatus) => {
     // Map game type to display name
     const gameTypeDisplayNames: Record<string, string> = {
@@ -600,6 +855,16 @@ export function GamesSummary({
             return renderWolfGame(game);
           case "STABLEFORD":
             return renderStablefordGame(game);
+          case "NINES":
+            return renderNinesGame(game);
+          case "SNAKE":
+            return renderSnakeGame(game);
+          case "BINGO_BANGO_BONGO":
+            return renderBBBGame(game);
+          case "VEGAS":
+            return renderVegasGame(game);
+          case "BANKER":
+            return renderBankerGame(game);
           default:
             return renderGenericGame(game);
         }

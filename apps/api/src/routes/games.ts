@@ -594,6 +594,15 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
     // Calculate all game results
     const settlements: Array<{ fromUserId: string; toUserId: string; amount: number }> = [];
     const gameResultEntries: Array<{ gameId: string; userId: string; netAmount: number }> = [];
+
+    // Validate round has players and games
+    if (round.players.length === 0) {
+      return badRequest(reply, 'Cannot finalize a round with no players');
+    }
+    if (round.games.length === 0) {
+      return badRequest(reply, 'Cannot finalize a round with no games');
+    }
+
     const holes = round.course?.holes || [];
 
     // Fetch game-specific data needed for Wolf, Vegas, BBB, Banker calculations
@@ -1287,6 +1296,10 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       },
     });
 
+    if (!updated) {
+      return notFound(reply, 'Settlement not found after update');
+    }
+
     // Audit log: successful payment mark
     request.log.info({
       action: 'SETTLEMENT_MARKED_PAID',
@@ -1389,6 +1402,10 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
         },
       },
     });
+
+    if (!updated) {
+      return notFound(reply, 'Settlement not found after update');
+    }
 
     // Audit log: successful confirmation
     request.log.info({
@@ -1930,6 +1947,17 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
     const holes = round.course?.holes || [];
     const minHandicap = Math.min(...round.players.map(p => p.courseHandicap || 0));
 
+    // Fetch game-specific data for live status of additional game types
+    const bbbGameForStatus = round.games.find(g => g.type === 'BINGO_BANGO_BONGO');
+    const vegasGameForStatus = round.games.find(g => g.type === 'VEGAS');
+    const bankerGameForStatus = round.games.find(g => g.type === 'BANKER');
+
+    const [bbbPointsForStatus, vegasTeamsForStatus, bankerDecisionsForStatus] = await Promise.all([
+      bbbGameForStatus ? prisma.bingoBangoBongoPoint.findMany({ where: { gameId: bbbGameForStatus.id }, orderBy: { holeNumber: 'asc' } }) : Promise.resolve([]),
+      vegasGameForStatus ? prisma.vegasTeam.findMany({ where: { gameId: vegasGameForStatus.id } }) : Promise.resolve([]),
+      bankerGameForStatus ? prisma.bankerDecision.findMany({ where: { gameId: bankerGameForStatus.id }, orderBy: { holeNumber: 'asc' } }) : Promise.resolve([]),
+    ]);
+
     // Helper to calculate match status for Nassau/Match Play
     const calcMatchStatus = (gamePlayers: typeof round.players, startHole: number, endHole: number) => {
       if (gamePlayers.length !== 2) return { score: 0, holesPlayed: 0, holesRemaining: endHole - startHole + 1 };
@@ -2122,6 +2150,24 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       stablefordStatus?: {
         points: number;
       };
+      ninesStatus?: {
+        standings: Array<{ userId: string; name: string; points: number; money: number }>;
+      };
+      snakeStatus?: {
+        snakeHolderId: string | null;
+        snakeHolderName: string | null;
+        lastThreePuttHole: number | null;
+      };
+      bbbStatus?: {
+        standings: Array<{ userId: string; name: string; bingos: number; bangos: number; bongos: number; total: number; money: number }>;
+      };
+      vegasStatus?: {
+        teams: Array<{ playerNames: string[]; combinedScore: number; money: number }>;
+      };
+      bankerStatus?: {
+        standings: Array<{ userId: string; name: string; money: number }>;
+        currentBankerName?: string;
+      };
       description?: string;
     }> = [];
 
@@ -2216,8 +2262,253 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
           break;
         }
 
+        case 'NINES': {
+          // Calculate nines standings - each hole worth 9 points split by relative score
+          const ninesStandings: Array<{ userId: string; name: string; points: number; money: number }> = [];
+          const playerPoints: Record<string, number> = {};
+          gamePlayers.forEach(p => { playerPoints[p.userId] = 0; });
+
+          for (let h = 1; h <= 18; h++) {
+            const hole = holes.find(ho => ho.holeNumber === h);
+            if (!hole) continue;
+
+            const holeScores: Array<{ userId: string; netStrokes: number }> = [];
+            for (const p of gamePlayers) {
+              const score = p.scores.find(s => s.holeNumber === h);
+              if (!score?.strokes) continue;
+              const handicapDiff = (p.courseHandicap || 0) - minHandicap;
+              const strokesGiven = hole.handicapRank <= handicapDiff ? 1 : 0;
+              holeScores.push({ userId: p.userId, netStrokes: score.strokes - strokesGiven });
+            }
+
+            if (holeScores.length < 2) continue;
+
+            // Sort by net strokes (lowest first)
+            holeScores.sort((a, b) => a.netStrokes - b.netStrokes);
+
+            if (holeScores.length === 2) {
+              if (holeScores[0].netStrokes < holeScores[1].netStrokes) {
+                playerPoints[holeScores[0].userId] += 5;
+                playerPoints[holeScores[1].userId] += 4;
+              } else {
+                // Tie - split evenly
+                playerPoints[holeScores[0].userId] += 4.5;
+                playerPoints[holeScores[1].userId] += 4.5;
+              }
+            } else if (holeScores.length === 3) {
+              const allTied = holeScores[0].netStrokes === holeScores[2].netStrokes;
+              const twoTiedLow = holeScores[0].netStrokes === holeScores[1].netStrokes;
+              const twoTiedHigh = holeScores[1].netStrokes === holeScores[2].netStrokes;
+
+              if (allTied) {
+                holeScores.forEach(s => { playerPoints[s.userId] += 3; });
+              } else if (twoTiedLow) {
+                playerPoints[holeScores[0].userId] += 4;
+                playerPoints[holeScores[1].userId] += 4;
+                playerPoints[holeScores[2].userId] += 1;
+              } else if (twoTiedHigh) {
+                playerPoints[holeScores[0].userId] += 5;
+                playerPoints[holeScores[1].userId] += 2;
+                playerPoints[holeScores[2].userId] += 2;
+              } else {
+                playerPoints[holeScores[0].userId] += 5;
+                playerPoints[holeScores[1].userId] += 3;
+                playerPoints[holeScores[2].userId] += 1;
+              }
+            } else {
+              // 4+ players - distribute 9 points
+              const pointsPerHole = 9;
+              const uniqueScores = [...new Set(holeScores.map(s => s.netStrokes))];
+              let remainingPoints = pointsPerHole;
+              let processedPlayers = 0;
+              for (const score of uniqueScores) {
+                const tied = holeScores.filter(s => s.netStrokes === score);
+                // Simple approach: split remaining proportionally
+                const share = remainingPoints / (holeScores.length - processedPlayers) * tied.length;
+                const perPlayer = share / tied.length;
+                tied.forEach(s => { playerPoints[s.userId] += perPlayer; });
+                remainingPoints -= share;
+                processedPlayers += tied.length;
+              }
+            }
+          }
+
+          const avgPoints = Object.values(playerPoints).reduce((sum, p) => sum + p, 0) / gamePlayers.length;
+          for (const p of gamePlayers) {
+            const points = Math.round((playerPoints[p.userId] || 0) * 10) / 10;
+            const money = Math.round((points - avgPoints) * betAmount * 100) / 100;
+            ninesStandings.push({
+              userId: p.userId,
+              name: p.user.displayName || p.user.firstName || 'Player',
+              points,
+              money,
+            });
+          }
+          ninesStandings.sort((a, b) => b.points - a.points);
+
+          gameStatus.ninesStatus = { standings: ninesStandings };
+          break;
+        }
+
+        case 'SNAKE': {
+          // Snake: last player to 3-putt holds the snake
+          let snakeHolderId: string | null = null;
+          let snakeHolderName: string | null = null;
+          let lastThreePuttHole: number | null = null;
+
+          for (let h = 1; h <= 18; h++) {
+            for (const p of gamePlayers) {
+              const score = p.scores.find(s => s.holeNumber === h);
+              if (score?.putts && score.putts >= 3) {
+                snakeHolderId = p.userId;
+                snakeHolderName = p.user.displayName || p.user.firstName || 'Player';
+                lastThreePuttHole = h;
+              }
+            }
+          }
+
+          gameStatus.snakeStatus = { snakeHolderId, snakeHolderName, lastThreePuttHole };
+          break;
+        }
+
+        case 'BINGO_BANGO_BONGO': {
+          // BBB: points for first on green (bingo), closest to pin (bango), first in hole (bongo)
+          const bbbStandings: Array<{ userId: string; name: string; bingos: number; bangos: number; bongos: number; total: number; money: number }> = [];
+          const bbbCounts: Record<string, { bingos: number; bangos: number; bongos: number }> = {};
+          gamePlayers.forEach(p => { bbbCounts[p.userId] = { bingos: 0, bangos: 0, bongos: 0 }; });
+
+          for (const point of bbbPointsForStatus) {
+            if (point.bingoUserId && bbbCounts[point.bingoUserId]) bbbCounts[point.bingoUserId].bingos++;
+            if (point.bangoUserId && bbbCounts[point.bangoUserId]) bbbCounts[point.bangoUserId].bangos++;
+            if (point.bongoUserId && bbbCounts[point.bongoUserId]) bbbCounts[point.bongoUserId].bongos++;
+          }
+
+          const totalBBBPoints = Object.values(bbbCounts).reduce((sum, c) => sum + c.bingos + c.bangos + c.bongos, 0);
+          const avgBBB = totalBBBPoints / gamePlayers.length;
+
+          for (const p of gamePlayers) {
+            const counts = bbbCounts[p.userId] || { bingos: 0, bangos: 0, bongos: 0 };
+            const total = counts.bingos + counts.bangos + counts.bongos;
+            const money = Math.round((total - avgBBB) * betAmount * 100) / 100;
+            bbbStandings.push({
+              userId: p.userId,
+              name: p.user.displayName || p.user.firstName || 'Player',
+              ...counts,
+              total,
+              money,
+            });
+          }
+          bbbStandings.sort((a, b) => b.total - a.total);
+
+          gameStatus.bbbStatus = { standings: bbbStandings };
+          break;
+        }
+
+        case 'VEGAS': {
+          // Vegas: team-based, combine scores to make a number (e.g., 4 and 5 = 45, but bad team gets 54)
+          const vegasTeamsList: Array<{ playerNames: string[]; combinedScore: number; money: number }> = [];
+
+          if (vegasTeamsForStatus.length === 2) {
+            for (const team of vegasTeamsForStatus) {
+              const p1 = gamePlayers.find(p => p.userId === team.player1Id);
+              const p2 = gamePlayers.find(p => p.userId === team.player2Id);
+              if (!p1 || !p2) continue;
+
+              let teamTotal = 0;
+              for (let h = 1; h <= 18; h++) {
+                const s1 = p1.scores.find(s => s.holeNumber === h);
+                const s2 = p2.scores.find(s => s.holeNumber === h);
+                if (s1?.strokes && s2?.strokes) {
+                  const low = Math.min(s1.strokes, s2.strokes);
+                  const high = Math.max(s1.strokes, s2.strokes);
+                  teamTotal += low * 10 + high;
+                }
+              }
+
+              vegasTeamsList.push({
+                playerNames: [
+                  p1.user.displayName || p1.user.firstName || 'Player',
+                  p2.user.displayName || p2.user.firstName || 'Player',
+                ],
+                combinedScore: teamTotal,
+                money: 0, // will be set after both teams calculated
+              });
+            }
+
+            if (vegasTeamsList.length === 2) {
+              const diff = vegasTeamsList[0].combinedScore - vegasTeamsList[1].combinedScore;
+              vegasTeamsList[0].money = Math.round(-diff * betAmount * 100) / 100;
+              vegasTeamsList[1].money = Math.round(diff * betAmount * 100) / 100;
+            }
+          }
+
+          gameStatus.vegasStatus = { teams: vegasTeamsList };
+          break;
+        }
+
+        case 'BANKER': {
+          // Banker: each hole has a banker who sets the stakes
+          const bankerStandings: Array<{ userId: string; name: string; money: number }> = [];
+          const bankerMoney: Record<string, number> = {};
+          gamePlayers.forEach(p => { bankerMoney[p.userId] = 0; });
+
+          let currentBankerName: string | undefined;
+
+          for (const decision of bankerDecisionsForStatus) {
+            const banker = gamePlayers.find(p => p.userId === decision.bankerUserId);
+            if (!banker) continue;
+
+            const hole = holes.find(ho => ho.holeNumber === decision.holeNumber);
+            if (!hole) continue;
+
+            // Track current/latest banker
+            currentBankerName = banker.user.displayName || banker.user.firstName || 'Player';
+
+            // Calculate who won the hole
+            const holeScores: Array<{ userId: string; netStrokes: number }> = [];
+            for (const p of gamePlayers) {
+              const score = p.scores.find(s => s.holeNumber === decision.holeNumber);
+              if (!score?.strokes) continue;
+              const handicapDiff = (p.courseHandicap || 0) - minHandicap;
+              const strokesGiven = hole.handicapRank <= handicapDiff ? 1 : 0;
+              holeScores.push({ userId: p.userId, netStrokes: score.strokes - strokesGiven });
+            }
+
+            if (holeScores.length < 2) continue;
+
+            const bankerScore = holeScores.find(s => s.userId === decision.bankerUserId);
+            if (!bankerScore) continue;
+
+            const holeBet = betAmount;
+
+            for (const playerScore of holeScores) {
+              if (playerScore.userId === decision.bankerUserId) continue;
+              if (playerScore.netStrokes < bankerScore.netStrokes) {
+                // Player beat banker
+                bankerMoney[playerScore.userId] += holeBet;
+                bankerMoney[decision.bankerUserId] -= holeBet;
+              } else if (playerScore.netStrokes > bankerScore.netStrokes) {
+                // Banker beat player
+                bankerMoney[decision.bankerUserId] += holeBet;
+                bankerMoney[playerScore.userId] -= holeBet;
+              }
+            }
+          }
+
+          for (const p of gamePlayers) {
+            bankerStandings.push({
+              userId: p.userId,
+              name: p.user.displayName || p.user.firstName || 'Player',
+              money: Math.round((bankerMoney[p.userId] || 0) * 100) / 100,
+            });
+          }
+          bankerStandings.sort((a, b) => b.money - a.money);
+
+          gameStatus.bankerStatus = { standings: bankerStandings, currentBankerName };
+          break;
+        }
+
         default: {
-          // Generic description for unsupported game types
           gameStatus.description = `${game.type} game in progress`;
           break;
         }

@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { ChevronLeft, Trophy } from "lucide-react";
 import { Button, Skeleton } from "@/components/ui";
-import { api, type RoundDetail, type PressStatus, type PressSegment, type GameLiveStatus, type DotsType, type DotsAchievement } from "@/lib/api";
+import { api, isSessionExpired, type RoundDetail, type PressStatus, type PressSegment, type GameLiveStatus, type DotsType, type DotsAchievement } from "@/lib/api";
 import { ScorecardGrid } from "@/components/scorecard/scorecard-grid";
 import { ScoreEntryModal } from "@/components/scorecard/score-entry-modal";
 import { GamesSummary } from "@/components/scorecard/games-summary";
@@ -292,6 +292,10 @@ export default function ScorecardPage() {
           fetchDots();
         }
       } catch (error) {
+        if (isSessionExpired(error)) {
+          window.location.href = '/sign-in';
+          return;
+        }
         console.error("Failed to fetch round:", error);
       } finally {
         dispatch({ type: "SET_LOADING", payload: false });

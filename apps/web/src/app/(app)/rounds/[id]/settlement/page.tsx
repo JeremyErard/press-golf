@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button, Card, CardContent, Badge, Avatar, Skeleton } from "@/components/ui";
-import { api, type RoundDetail, type ApiSettlement, type PaymentMethodType, type DotsData, type User as ApiUser } from "@/lib/api";
+import { api, isSessionExpired, type RoundDetail, type ApiSettlement, type PaymentMethodType, type DotsData, type User as ApiUser } from "@/lib/api";
 import { formatMoney, cn } from "@/lib/utils";
 import { gameTypeLabels } from "@/lib/game-types";
 import { toast } from "@/components/ui/sonner";
@@ -60,6 +60,10 @@ export default function SettlementPage() {
           }
         }
       } catch (error) {
+        if (isSessionExpired(error)) {
+          window.location.href = '/sign-in';
+          return;
+        }
         console.error("Failed to fetch data:", error);
         setFetchError(true);
       } finally {
