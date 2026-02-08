@@ -25,7 +25,7 @@ function Toaster() {
   return (
     <ToasterComponent
       theme="dark"
-      position="top-center"
+      position="bottom-center"
       toastOptions={{
         classNames: {
           toast:

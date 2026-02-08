@@ -1271,9 +1271,17 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       return badRequest(reply, 'Settlement was already updated by another request');
     }
 
-    // Fetch the updated settlement
+    // Fetch the updated settlement with relations
     const updated = await prisma.settlement.findUnique({
       where: { id },
+      include: {
+        fromUser: {
+          select: { id: true, displayName: true, firstName: true, paymentMethods: true },
+        },
+        toUser: {
+          select: { id: true, displayName: true, firstName: true, paymentMethods: true },
+        },
+      },
     });
 
     // Audit log: successful payment mark
@@ -1366,9 +1374,17 @@ export const gameRoutes: FastifyPluginAsync = async (app) => {
       return badRequest(reply, 'Settlement was already updated by another request');
     }
 
-    // Fetch the updated settlement
+    // Fetch the updated settlement with relations
     const updated = await prisma.settlement.findUnique({
       where: { id },
+      include: {
+        fromUser: {
+          select: { id: true, displayName: true, firstName: true, paymentMethods: true },
+        },
+        toUser: {
+          select: { id: true, displayName: true, firstName: true, paymentMethods: true },
+        },
+      },
     });
 
     // Audit log: successful confirmation
