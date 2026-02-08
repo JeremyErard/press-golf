@@ -291,7 +291,7 @@ export default function DashboardPage() {
                 <Image
                   src={careerEarnings >= 0
                     ? "/images/golf-trophy.jpg"
-                    : "https://i0.wp.com/efe.com/wp-content/uploads/2024/04/rss-efe6d24dff7e3f5149dfef214769b347848fdc6af6fw.jpg?fit=1920%2C1346&ssl=1"
+                    : "/images/golf-19th-hole.jpg"
                   }
                   alt={careerEarnings >= 0 ? "Winning golfer" : "Disappointed golfer"}
                   fill
