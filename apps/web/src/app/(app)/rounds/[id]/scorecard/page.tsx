@@ -657,6 +657,11 @@ export default function ScorecardPage() {
 
       </div>
 
+      {/* Spacer for the fixed Complete Round bar so content isn't hidden behind it */}
+      {holesWithScores >= 14 && round.status === "ACTIVE" && (
+        <div className="h-20" />
+      )}
+
       {/* Complete Round Button - visible once at least 14 holes have scores */}
       {holesWithScores >= 14 && round.status === "ACTIVE" && (
         <div className="fixed bottom-nav left-0 right-0 z-40 glass border-t border-border">
@@ -676,8 +681,8 @@ export default function ScorecardPage() {
 
       {/* Complete Round Confirmation Overlay */}
       {showFinishConfirm && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-background rounded-t-2xl border-t border-border p-6 space-y-5 animate-in slide-in-from-bottom duration-200">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-background rounded-t-2xl border-t border-border p-6 safe-area-bottom space-y-5 animate-in slide-in-from-bottom duration-200">
             <div className="text-center">
               <div className="w-14 h-14 rounded-full bg-brand/20 flex items-center justify-center mx-auto mb-3">
                 <Trophy className="w-7 h-7 text-brand" />
